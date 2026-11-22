@@ -23,7 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Scenario\Step;
 /**
  * Runs a scenario against whichever checkout the process autoloads and
  * returns what it observed, normalized: one entry per command (its exit code
- * and both output streams), the collected files, and the calls the scripted
+ * and both output streams), the collected files and the calls the scripted
  * provider received.
  */
 final readonly class ScenarioRunner

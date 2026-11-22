@@ -143,7 +143,7 @@ final class ExecutiveSummaryReportRendererTest extends AbstractReportRendererTes
 
     /**
      * A single LOW finding scores 2, below the Safe threshold (< 5), so the
-     * risk level is Safe while the report still carries a validated finding —
+     * risk level is Safe while the report still carries a validated finding:
      * the business-impact prose must not claim there were none.
      *
      * @throws InvalidCodeLocationException

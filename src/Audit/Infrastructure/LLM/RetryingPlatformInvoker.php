@@ -38,14 +38,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Sugg
 /**
  * Invokes the platform behind the rate limiter with transient-failure retry:
  * empty-content and non-transient failures are classified into the matching
- * custom exception, rate-limit failures honor the server's Retry-After hint,
+ * custom exception, rate-limit failures honor the server's Retry-After hint
  * and other transient failures back off per the retry policy. Every failed
  * attempt is booked first, so one the provider answered and billed is on the
- * books whether it is retried or not, and no retry goes out once that spend
+ * books whether it is retried or not; no retry goes out once that spend
  * has run past the budget. The caller checks the budget before the first
  * attempt.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class RetryingPlatformInvoker
 {

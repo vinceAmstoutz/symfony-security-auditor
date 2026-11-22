@@ -23,7 +23,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * resolved configuration knows: which API key the run is about to spend. The
  * credential is named by its masked preview, never printed.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class CredentialConsoleBanner implements ConsoleBannerInterface
 {

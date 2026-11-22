@@ -19,7 +19,7 @@ use Symfony\AI\Platform\Exception\IncompleteStreamException;
  * A stream that ended without saying why the model stopped: cut on the way,
  * though its bridge did not report it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class UnfinishedStreamException extends IncompleteStreamException
 {

@@ -340,7 +340,7 @@ final class ReviewerAgentTest extends TestCase
     {
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH);
 
-        // LLM returns [[{...}]] — array wrapping an array
+        // LLM returns [[{...}]]: array wrapping an array
         $reviewResponse = (string) json_encode([[
             'accepted' => true,
             'adjusted_severity' => 'critical',
@@ -390,7 +390,7 @@ final class ReviewerAgentTest extends TestCase
 
         $reviewerAgent->review([$vulnerability], $files, new NullCoverageRecorder());
 
-        // vulnerability filePath is UserController.php — not in $files (OtherController.php)
+        // vulnerability filePath is UserController.php, not in $files (OtherController.php)
         // Full File Context section should be empty
         self::assertStringContainsString('## Full File Context', (string) $capturedUserMessage);
         self::assertStringNotContainsString('class OtherController', (string) $capturedUserMessage);
@@ -2017,7 +2017,7 @@ final class ReviewerAgentTest extends TestCase
      */
     public function test_it_ignores_corrected_type_when_value_is_not_a_string(): void
     {
-        // Non-string corrected_type (e.g. integer) must be ignored — would TypeError on enum::from()
+        // Non-string corrected_type (e.g. integer) must be ignored (would TypeError on enum::from())
         // if the is_string guard were removed.
         $vulnerability = $this->makeVulnerability();
 

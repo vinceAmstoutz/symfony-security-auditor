@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
  * A way of laying out an application that moves its checks away from the
  * default Symfony controller.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 enum ArchitectureStyle: string
 {

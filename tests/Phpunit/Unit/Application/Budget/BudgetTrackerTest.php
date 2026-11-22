@@ -171,8 +171,8 @@ final class BudgetTrackerTest extends TestCase
      */
     public function test_cost_used_accumulates_across_multiple_calls(): void
     {
-        // Pins: `$this->costUsdUsed += ...` — if mutated to `=`, the second call
-        // would overwrite the first, and the total would be $5 (not $15).
+        // Pins: `$this->costUsdUsed += ...`: if mutated to `=`, the second call
+        // would overwrite the first and the total would be $5 (not $15).
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 10.0);
 
         $budgetTracker->recordCall(LLMResponse::of('a', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(1_000_000, 0)));

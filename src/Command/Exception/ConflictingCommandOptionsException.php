@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command\Exception;
 
 use InvalidArgumentException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class ConflictingCommandOptionsException extends InvalidArgumentException
 {
     public static function forOutputWithNoOutput(): self

@@ -17,10 +17,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
  * Outcome of splitting findings against the verdict cache: the resolved
- * code contexts, the already-reviewed cache hits (keyed by original index),
+ * code contexts, the already-reviewed cache hits (keyed by original index)
  * and the cache misses still needing an LLM batch (with their indexes).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class CachePartition
 {

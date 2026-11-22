@@ -38,7 +38,7 @@ enum SkippedFileReason: string
 
     /**
      * A file left out for its size, because it could not be read or because
-     * it is a symbolic link was dropped silently before, and nothing gates on it; a file that cannot be
+     * it is a symbolic link was dropped silently before and nothing gates on it; a file that cannot be
      * named or read back one way only could hide code, so the run cannot
      * pass as complete.
      */

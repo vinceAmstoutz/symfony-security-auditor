@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay;
  * Synchronous-sleep adapter. Injected so retry tests stay deterministic
  * (FakeSleeper records durations and returns immediately).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface SleeperInterface
 {

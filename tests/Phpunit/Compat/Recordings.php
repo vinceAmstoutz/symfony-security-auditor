@@ -22,10 +22,10 @@ use UnexpectedValueException;
 
 /**
  * The recordings of the last release, under `Fixture/<X.Y.Z>/`: one JSON file
- * per scenario, as `tools/Compat/record.php` wrote them, and
+ * per scenario (as `tools/Compat/record.php` wrote them) and
  * `environment.json`, where the recorder notes the PHP and package versions
  * it recorded with, the manifest of the recordings (each scenario with the
- * SHA-256 of its recording), the scenarios it could not record, and the seal
+ * SHA-256 of its recording), the scenarios it could not record and the seal
  * over all of it.
  */
 final readonly class Recordings

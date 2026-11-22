@@ -25,7 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFact
  * tools like read_file / grep / list_files can answer the LLM's questions
  * without re-walking the filesystem.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SymfonyToolRegistryFactory implements ToolRegistryFactoryInterface
 {

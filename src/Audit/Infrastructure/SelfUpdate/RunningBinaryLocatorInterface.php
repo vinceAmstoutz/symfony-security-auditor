@@ -15,11 +15,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 interface RunningBinaryLocatorInterface
 {
     /**
-     * Absolute path to the currently-running executable — the file self-update
+     * Absolute path to the currently-running executable: the file self-update
      * replaces.
      *
      * @throws SelfUpdateFailedException

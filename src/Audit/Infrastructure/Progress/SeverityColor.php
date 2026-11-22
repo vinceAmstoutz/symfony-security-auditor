@@ -18,10 +18,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 /**
  * Maps a vulnerability severity to a Symfony Console foreground color, so the
  * decorated findings feed is colored by risk. Lives in Infrastructure because
- * the color scheme is a presentation concern — the Domain enum stays free of
+ * the color scheme is a presentation concern: the Domain enum stays free of
  * rendering details.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SeverityColor
 {

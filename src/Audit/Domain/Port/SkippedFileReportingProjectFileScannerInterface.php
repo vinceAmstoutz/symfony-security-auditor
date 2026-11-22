@@ -21,13 +21,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
  * size limit, could not be read or are symbolic links, which a scan never
  * follows. `IngestionStage` checks `instanceof` and
  * lists each in the report's coverage as `skipped` under the `scan` stage:
- * the report shows the file was left out, and nothing gates on it, so the
+ * the report shows the file was left out and nothing gates on it, so the
  * report stays complete as it did when such a file was dropped silently. A
  * file left out because its repaired name or content could read as something
  * else (`SkippedFileReason::leavesTheRunIncomplete()`) is listed as
  * `errored` instead, which leaves the report incomplete. A scanner that does
  * not implement it keeps working and reports nothing. Files
- * excluded on purpose — gitignored, hidden, outside the included paths — are
+ * excluded on purpose (gitignored, hidden, outside the included paths) are
  * not among them.
  */
 interface SkippedFileReportingProjectFileScannerInterface extends ProjectFileScannerInterface

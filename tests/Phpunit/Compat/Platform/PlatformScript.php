@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Platform;
 /**
  * What the scripted provider answers beyond the `FINDING {json}` markers it
  * reads in the audited files: reviewer verdicts keyed by a title fragment,
- * the tool calls the first attacker turn makes, and a provider failure after
+ * the tool calls the first attacker turn makes and a provider failure after
  * a number of calls.
  */
 final readonly class PlatformScript

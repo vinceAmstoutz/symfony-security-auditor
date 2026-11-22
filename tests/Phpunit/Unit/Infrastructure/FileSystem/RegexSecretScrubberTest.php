@@ -227,7 +227,7 @@ final class RegexSecretScrubberTest extends TestCase
 
     /**
      * The credential is redacted but the header name and scheme are kept, so the
-     * LLM still sees that the request authenticates and how — removing them
+     * LLM still sees that the request authenticates and how: removing them
      * would hide the auth mechanism the audit is meant to reason about.
      */
     public function test_a_basic_authorization_header_keeps_its_scheme_and_redacts_only_the_credential(): void

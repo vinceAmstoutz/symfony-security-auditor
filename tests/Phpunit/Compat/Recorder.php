@@ -25,7 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Scenario\ScenarioCatalog;
 /**
  * What `tools/Compat/record.php` does for the checkout it autoloads: records
  * scenarios into `Fixture/<release>/`, refuses the ones it cannot record
- * there, and writes and seals `environment.json`.
+ * there and writes and seals `environment.json`.
  */
 final readonly class Recorder
 {
@@ -45,7 +45,7 @@ final readonly class Recorder
     ) {}
 
     /**
-     * Records each scenario, or notes why it cannot, and seals the result.
+     * Records each scenario (or notes why it cannot) and seals the result.
      *
      * @param list<string> $names
      *

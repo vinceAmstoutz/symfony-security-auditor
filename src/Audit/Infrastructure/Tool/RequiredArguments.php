@@ -25,7 +25,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool;
  * are normalised downstream (`VulnerabilityFactory`, `VerdictApplier`) and
  * must keep being accepted.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class RequiredArguments
 {

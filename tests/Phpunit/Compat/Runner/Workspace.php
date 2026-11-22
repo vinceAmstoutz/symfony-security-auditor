@@ -30,7 +30,7 @@ use UnexpectedValueException;
  * A scenario reads and writes nothing outside it: a path a step, a setup action
  * or an artifact names outside the workspace is refused. The one exception is
  * `{null-device}`, the discard device a report can be written to: the real
- * `/dev/null` for a process that cannot write `/dev`, and a device node of its
+ * `/dev/null` for a process that cannot write `/dev` and a device node of its
  * own under the workspace for one that can, so a release that replaces its
  * output file through a rename never replaces the system's.
  */

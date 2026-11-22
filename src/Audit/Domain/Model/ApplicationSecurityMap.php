@@ -19,7 +19,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
  *
  * {@see SymfonyMapping} is the same data under Symfony vocabulary and delegates
  * here; its Symfony-named accessors are deprecated in favour of these. Prompt
- * rendering keeps the framework's words — that is the framework profile's job,
+ * rendering keeps the framework's words: that is the framework profile's job,
  * not this model's.
  */
 final readonly class ApplicationSecurityMap

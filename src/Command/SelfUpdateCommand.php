@@ -31,7 +31,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\SelfUpd
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckState;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\UpdateCheckStoreInterface;
 
-/** @internal not part of the BC promise — the command *name* (`self-update`) is public, but the PHP class itself is for internal use only. */
+/** @internal not part of the BC promise: the command *name* (`self-update`) is public, but the PHP class itself is for internal use only. */
 #[AsCommand(name: self::NAME, description: self::DESCRIPTION)]
 final readonly class SelfUpdateCommand
 {
@@ -96,7 +96,7 @@ final readonly class SelfUpdateCommand
 
     /**
      * This command always reaches the release feed, so its answer supersedes
-     * whatever the throttled passive notice last cached — otherwise the notice
+     * whatever the throttled passive notice last cached; otherwise the notice
      * keeps contradicting a version the user has just been shown. The notice
      * only ever announces a release, so a snapshot answer is never cached.
      */

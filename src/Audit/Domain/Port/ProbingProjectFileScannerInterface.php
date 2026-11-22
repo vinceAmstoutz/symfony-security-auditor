@@ -20,7 +20,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
  * decides which project to audit. A scanner without it is asked through a
  * whole scan.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface ProbingProjectFileScannerInterface extends ProjectFileScannerInterface
 {

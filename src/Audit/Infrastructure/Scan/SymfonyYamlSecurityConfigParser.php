@@ -22,7 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ImportAwareSecurityCo
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RuleOrderAwareSecurityConfigParserInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\UnreadableYamlException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class SymfonyYamlSecurityConfigParser implements ImportAwareSecurityConfigParserInterface, RuleOrderAwareSecurityConfigParserInterface
 {
     private const string PRODUCTION_ENVIRONMENT_BLOCK = 'when@prod';
@@ -92,7 +92,7 @@ final readonly class SymfonyYamlSecurityConfigParser implements ImportAwareSecur
 
     /**
      * Public marker recorded for an `access_control` entry that matches but
-     * carries no requirement at all (e.g. an explicit `roles: []`) — a
+     * carries no requirement at all (e.g. an explicit `roles: []`): a
      * deliberate "this path is public" rule. Recording it (instead of
      * skipping the entry) preserves first-match-wins: a later rule for the
      * same path must not silently present as the sole governing rule when an
@@ -103,7 +103,7 @@ final readonly class SymfonyYamlSecurityConfigParser implements ImportAwareSecur
     /**
      * Symfony evaluates `access_control` first-match-wins, so a later rule for
      * an already-seen path applies only to requests the earlier rule's
-     * constraints (methods, ips, …) did not match — it is appended as a single
+     * constraints (methods, ips, …) did not match: it is appended as a single
      * `or: …` requirement instead of silently replacing the earlier rule.
      *
      * @param array<string, mixed>        $section
@@ -195,7 +195,7 @@ final readonly class SymfonyYamlSecurityConfigParser implements ImportAwareSecur
     /**
      * The `security` blocks of the document the production kernel reads, in the
      * order it loads them: the root one, then the `when@prod` override,
-     * wherever the document writes them — a `when@test` or `when@dev` block
+     * wherever the document writes them. A `when@test` or `when@dev` block
      * protects nothing in production. A bare root-level
      * `access_control`/`firewalls` document (an imported partial) also counts
      * as a section.
@@ -240,7 +240,7 @@ final readonly class SymfonyYamlSecurityConfigParser implements ImportAwareSecur
     private function targetOf(array $entry): ?string
     {
         $rawPath = $entry['path'] ?? null;
-        // A blank path becomes an empty PCRE pattern, which matches any route at all — never record it.
+        // A blank path becomes an empty PCRE pattern, which matches any route at all: never record it.
         $path = \is_string($rawPath) ? trim($rawPath) : '';
         if ('' !== $path) {
             return $path;

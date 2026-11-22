@@ -25,7 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedMode
  * none for a subscription, a pulled model for Ollama, a priced list where
  * the catalog has one, the model id otherwise.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class InitModelQuestion
 {

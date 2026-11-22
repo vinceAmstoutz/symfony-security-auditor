@@ -22,7 +22,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
  *
  * Implementations must be idempotent: scrubFile($path, scrubFile($path, x)) === scrubFile($path, x).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface PathAwareSecretScrubberInterface extends SecretScrubberInterface
 {

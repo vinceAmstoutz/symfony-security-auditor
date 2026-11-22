@@ -27,13 +27,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 /**
  * Winds down a concurrent request whose answer will never be read because a
  * sibling's failure ended the window. An HTTP response left unconsumed
- * completes itself in its destructor — it waits for the provider to finish
+ * completes itself in its destructor (it waits for the provider to finish
  * generating, then throws for a failed status in place of the failure already
- * propagating — so it is cancelled. Cancelling does not undo a request the
+ * propagating), so it is cancelled. Cancelling does not undo a request the
  * provider accepted and bills, so its estimated input tokens are booked as
  * spent; the output it would have produced is unknown and counted as none.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class InFlightRequestCanceller
 {
@@ -51,7 +51,7 @@ final readonly class InFlightRequestCanceller
      * A request whose dispatch failed never reached the provider, so only the
      * rate-limit reservation taken for it is released.
      *
-     * @param array<int, array{?DeferredResult, int}> $unconsumed each request the window has not consumed — its deferred result, null when its dispatch failed, and its estimated input tokens — by window index
+     * @param array<int, array{?DeferredResult, int}> $unconsumed each request the window has not consumed, by window index: its deferred result (null when its dispatch failed) and its estimated input tokens
      *
      * @throws InvalidTokenUsageException
      * @throws NegativeTokenCountException

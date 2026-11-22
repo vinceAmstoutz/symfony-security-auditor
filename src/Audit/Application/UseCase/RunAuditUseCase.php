@@ -47,8 +47,8 @@ final readonly class RunAuditUseCase
      * @param list<string> $scanPaths            optional project-relative paths that
      *                                           replace the configured scan surface for
      *                                           the run: they are scanned themselves, by
-     *                                           a scanner that can be told where to look,
-     *                                           and narrow the configured files otherwise;
+     *                                           a scanner that can be told where to look.
+     *                                           They narrow the configured files otherwise;
      *                                           empty list (the default) audits the
      *                                           configured scan surface
      * @param bool         $bypassCache          when true, agents skip the attacker and

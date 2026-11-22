@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
  * The names people know the providers `init` lists by, in place of the
  * symfony/ai platform keys the configuration is written with.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ProviderNames
 {

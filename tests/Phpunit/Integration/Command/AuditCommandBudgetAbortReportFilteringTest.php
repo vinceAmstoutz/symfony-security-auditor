@@ -58,7 +58,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\Budge
  * Drives {@see AuditCommand} with a pipeline that adds one already-validated
  * finding and then throws `BudgetExceededException`, to verify the partial
  * report `handleBudgetAbort()` writes is shaped by the same finding-type
- * filter and baseline suppression a completed run applies — not written out
+ * filter and baseline suppression a completed run applies, not written out
  * raw.
  */
 final class AuditCommandBudgetAbortReportFilteringTest extends TestCase

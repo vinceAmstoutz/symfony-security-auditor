@@ -30,20 +30,20 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTex
  * sized to the stage count, stage.started/audit.iteration.started/
  * attacker.chunk.started/review.started refresh its message (the chunk message
  * reads "⏳ querying model …" so a slow model call reads as waiting, not hung),
- * stage.completed advances it, and pipeline.completed finishes it. The audit
+ * stage.completed advances it and pipeline.completed finishes it. The audit
  * narrative is printed as lines above the bar: audit.started (attack-surface
  * overview), attacker.finding.recorded (each finding as it is flagged),
  * attacker.chunk.completed (each chunk with its elapsed time, marked as
  * failed when the attacker left it errored), review.skipped
  * (acknowledges a zero-finding pass so the reviewer step doesn't read as
- * having silently disappeared), and review.completed (the reviewer tally).
+ * having silently disappeared) and review.completed (the reviewer tally).
  * Unhandled events are ignored. The non-decorated counterpart is
  * PlainProgressReporter.
  *
- * Mutable because ProgressBar is stateful (tracks current step, format, and
+ * Mutable because ProgressBar is stateful (tracks current step, format and
  * output position).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class ConsoleProgressReporter implements ProgressReporterInterface
 {

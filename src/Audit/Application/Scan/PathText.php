@@ -20,11 +20,11 @@ use function Symfony\Component\String\u;
 
 /**
  * A path typed on the command line is bytes: a Latin-1 directory name is not
- * valid UTF-8, and `u()` refuses it. Text that is valid UTF-8 is handled as
+ * valid UTF-8 and `u()` refuses it. Text that is valid UTF-8 is handled as
  * Unicode, as it always was; any other is handled byte for byte, so it reaches
  * the filesystem exactly as typed.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PathText
 {

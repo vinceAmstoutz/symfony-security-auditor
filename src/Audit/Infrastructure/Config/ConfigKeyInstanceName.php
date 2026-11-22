@@ -18,13 +18,13 @@ use Symfony\Component\Yaml\Yaml;
 
 /**
  * An instance name as `symfony/config` will store it. `ArrayNode::preNormalize()`
- * rewrites a key holding a hyphen and no underscore, and an instance is a
+ * rewrites a key holding a hyphen and no underscore. An instance is a
  * prototyped key like any other, so `generic.my-gateway` registers the service
  * under `my_gateway`. Writing the name the user typed into `provider:` would
  * then point at a service that does not exist, so the name is folded here the
  * same way the framework will fold it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ConfigKeyInstanceName
 {
@@ -47,7 +47,7 @@ final readonly class ConfigKeyInstanceName
      * about a block nested the way the writer nests one: `0` is dumped as a
      * sequence entry the prototype cannot take a name from, symfony/yaml
      * releases before 7.4.21 dump `.inf` and `.nan` unquoted and refuse them on
-     * the way back in, and a name read as a YAML tag or, on those releases, as
+     * the way back in and a name read as a YAML tag or, on those releases, as
      * the merge key comes back as something else entirely, which would leave
      * `provider:` pointing at an instance the block does not hold.
      */

@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\E
 
 use RuntimeException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class UnreadableInputFileException extends RuntimeException
 {
     public static function forReadError(string $path, string $error): self

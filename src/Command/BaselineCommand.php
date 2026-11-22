@@ -27,7 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteEx
 use function Symfony\Component\String\u;
 
 #[AsCommand(name: self::NAME, description: self::DESCRIPTION)]
-/** @internal not part of the BC promise — the command *name* (`audit:baseline`) is public, but the PHP class itself is for internal use only. */
+/** @internal not part of the BC promise: the command *name* (`audit:baseline`) is public, but the PHP class itself is for internal use only. */
 final readonly class BaselineCommand
 {
     public const string NAME = 'audit:baseline';
@@ -89,7 +89,7 @@ final readonly class BaselineCommand
 
     /**
      * Finding titles and file paths originate in the audited project and the
-     * LLM's output, and the baseline path is echoed back verbatim — exactly
+     * LLM's output; the baseline path is echoed back verbatim. Exactly
      * as the trend presenter does, each value is collapsed to a single line
      * and stripped of control/ANSI/bidi characters so a crafted value cannot
      * spoof the terminal.

@@ -19,14 +19,14 @@ use Symfony\Component\Config\Definition\NodeInterface;
 use Symfony\Component\Config\Definition\ScalarNode;
 
 /**
- * A setting that holds text — a path, a folder, a skill's instructions: a
+ * A setting that holds text (a path, a folder, a skill's instructions): a
  * string, or null where it may be left unset, never a number or a switch
  * written as such, which the typed configuration would otherwise reject with
  * a raw `TypeError`. Symfony checks an `%env()%` placeholder against a
- * stand-in value — empty or null after its variable's default, typed after its
- * processor — so a placeholder is taken whatever its stand-in, as before.
+ * stand-in value (empty or null after its variable's default, typed after its
+ * processor), so a placeholder is taken whatever its stand-in, as before.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class TextNode extends ScalarNode
 {

@@ -22,7 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileEx
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
 
 #[AsCommand(name: self::NAME, description: self::DESCRIPTION)]
-/** @internal not part of the BC promise — the command *name* (`audit:trend`) is public, but the PHP class itself is for internal use only. */
+/** @internal not part of the BC promise: the command *name* (`audit:trend`) is public, but the PHP class itself is for internal use only. */
 final readonly class TrendCommand
 {
     public const string NAME = 'audit:trend';
@@ -58,7 +58,7 @@ final readonly class TrendCommand
     /**
      * Human-facing error messages move to stderr when stdout carries a
      * machine-readable document, so `--format=json > trend.json` and
-     * `--format=html > trend.html` receive the document alone — mirrors
+     * `--format=html > trend.html` receive the document alone. This mirrors
      * `DiffCommand::errorStyle()`.
      */
     private function errorStyle(SymfonyStyle $symfonyStyle, TrendOutputFormat $trendOutputFormat): SymfonyStyle

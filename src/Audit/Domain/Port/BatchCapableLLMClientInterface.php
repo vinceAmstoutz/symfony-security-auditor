@@ -22,7 +22,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
  *
  * Implementations MUST preserve input order in the returned list (response[i]
  * corresponds to requests[i]) and MUST be behaviourally identical to calling
- * `complete()` once per request — the only difference is wall-clock latency.
+ * `complete()` once per request: the only difference is wall-clock latency.
  * A best-effort implementation that cannot actually parallelise (e.g. a
  * provider with no async transport) is free to resolve sequentially.
  */

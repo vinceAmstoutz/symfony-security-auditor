@@ -21,7 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileEx
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
 
 #[AsCommand(name: self::NAME, description: self::DESCRIPTION)]
-/** @internal not part of the BC promise — the command *name* (`audit:diff`) is public, but the PHP class itself is for internal use only. */
+/** @internal not part of the BC promise: the command *name* (`audit:diff`) is public, but the PHP class itself is for internal use only. */
 final readonly class DiffCommand
 {
     public const string NAME = 'audit:diff';
@@ -55,7 +55,7 @@ final readonly class DiffCommand
     /**
      * Human-facing error messages move to stderr when stdout carries a
      * machine-readable document, so `--format=json > diff.json` receives the
-     * document alone — mirrors `AuditCommand::displayStyle()`.
+     * document alone. This mirrors `AuditCommand::displayStyle()`.
      */
     private function errorStyle(SymfonyStyle $symfonyStyle, DiffOutputFormat $diffOutputFormat): SymfonyStyle
     {

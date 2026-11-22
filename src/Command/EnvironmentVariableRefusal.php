@@ -18,9 +18,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Environment
 
 /**
  * The credential commands give `init`'s answer to a variable name no `%env()%`
- * placeholder could ever read back: say why, and exit `2` instead of acting.
+ * placeholder could ever read back: say why and exit `2` instead of acting.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class EnvironmentVariableRefusal
 {

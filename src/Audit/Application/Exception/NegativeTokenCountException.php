@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception;
 
 use InvalidArgumentException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class NegativeTokenCountException extends InvalidArgumentException
 {
     public static function forInputTokens(int $inputTokens): self

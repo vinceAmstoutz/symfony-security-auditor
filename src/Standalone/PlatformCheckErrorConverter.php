@@ -17,12 +17,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnloadableBridgeTr
 
 /**
  * The `vendor/composer/platform_check.php` of a bridge tree refuses a PHP it
- * was not resolved for by throwing since Composer 2.8.10, and before that
+ * was not resolved for by throwing since Composer 2.8.10 and before that
  * through `trigger_error(…, E_USER_ERROR)`, which ends the process. While the
  * tree's autoloader is required, this error handler turns the older form into
  * the exception the newer one throws, so both are reported the same way.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PlatformCheckErrorConverter
 {

@@ -15,13 +15,13 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEst
 
 /**
  * BPE tokenizers operate on UTF-8 bytes, not characters, so `charsPerToken`
- * ratios only hold when a character is roughly one byte — true for ASCII/
+ * ratios only hold when a character is roughly one byte: true for ASCII/
  * Latin scripts, false for CJK and emoji, where a character can be 3-4
  * bytes. Counting bytes instead of characters keeps the ratio's assumption
- * valid across scripts with no per-script detection, and is a no-op for the
+ * valid across scripts with no per-script detection and is a no-op for the
  * common ASCII case.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class CharacterRatioCounter
 {

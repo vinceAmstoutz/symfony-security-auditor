@@ -65,7 +65,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlic
  * End-to-end tests exercise the full audit workflow against a realistic Symfony project fixture.
  *
  * The LLM boundary is replaced with deterministic fixture responses so tests are
- * fast, reproducible, and require no API credentials.
+ * fast, reproducible and require no API credentials.
  */
 final class FullAuditEndToEndTest extends TestCase
 {

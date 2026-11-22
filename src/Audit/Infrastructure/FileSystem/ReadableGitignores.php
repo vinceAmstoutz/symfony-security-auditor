@@ -25,7 +25,7 @@ use function Symfony\Component\String\b;
  * The `.gitignore` rules of a project, read the way Finder's
  * `ignoreVCSIgnored()` reads them: the `.gitignore` files from the root of the
  * git repository holding the project, or of the project itself, down to the
- * file; the last matching rule of the deepest one decides, and a file inside
+ * file; the last matching rule of the deepest one decides and a file inside
  * an ignored directory is ignored with it. A `.gitignore` that is not a file,
  * such as a directory a repository commits under that name, holds no rule.
  *
@@ -33,7 +33,7 @@ use function Symfony\Component\String\b;
  * so it opts out of the final readonly rule as a stateful collaborator (see
  * .claude/rules/php-classes.md).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class ReadableGitignores
 {

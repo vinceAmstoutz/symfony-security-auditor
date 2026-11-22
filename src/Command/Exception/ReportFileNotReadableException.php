@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command\Exception;
 use RuntimeException;
 use Throwable;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class ReportFileNotReadableException extends RuntimeException
 {
     public static function forPath(string $path, ?Throwable $throwable = null): self

@@ -29,7 +29,7 @@ use function Symfony\Component\String\u;
  * with property-level defaults; promoted readonly ctor params are invisible to its reflection.
  * Treated as a context carrier per .claude/rules/php-classes.md.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class AuditCommandInput
 {
@@ -107,8 +107,8 @@ final class AuditCommandInput
     }
 
     /**
-     * What decides whether an incomplete run fails: the flag, or — when the
-     * command line left it unset — the configuration key.
+     * What decides whether an incomplete run fails: the flag, or (when the
+     * command line left it unset) the configuration key.
      */
     public function failOnIncompleteSetting(): string
     {
@@ -158,7 +158,7 @@ final class AuditCommandInput
      * `Path::makeRelative()` (used to compute every scanned file's relative
      * path) never produces a leading `./` in its output, so a `--path ./src`
      * or bare `--path .` CLI filter could otherwise never match any scanned
-     * real relative path — silently scanning zero files instead of the
+     * real relative path, silently scanning zero files instead of the
      * intended subdirectory (or, for a bare `.`, the whole project).
      */
     private function stripLeadingCurrentDirSegment(AbstractString $abstractString): AbstractString
@@ -171,9 +171,9 @@ final class AuditCommandInput
     }
 
     /**
-     * `--output` with `--no-output` asks for opposite things, and
+     * `--output` with `--no-output` asks for opposite things and
      * `--generate-baseline` needs a real audit run while `--dry-run` and
-     * `--show-scanned` exit before the LLM is ever invoked — combined, one
+     * `--show-scanned` exit before the LLM is ever invoked. Combined, one
      * silently wins over the other with no file written and no diagnostic.
      *
      * @throws ConflictingCommandOptionsException
@@ -208,7 +208,7 @@ final class AuditCommandInput
     }
 
     /**
-     * A value above the normalized score range fails every run, and is honored
+     * A value above the normalized score range fails every run and is honored
      * as such.
      */
     public function minScoreAboveRange(): ?int

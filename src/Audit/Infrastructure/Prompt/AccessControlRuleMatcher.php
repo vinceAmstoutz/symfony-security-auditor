@@ -20,11 +20,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
  * Finds the roles of the `security.yaml` `access_control` rule that governs a
  * route: the first rule, in the order the map lists them, whose path pattern
  * matches it or that is keyed by its route name. Symfony applies the first
- * rule, in the order they are declared, that matches a request, and a rule
+ * rule, in the order they are declared, that matches a request. A rule
  * without roles or an expression checks nothing, so a route such a rule
  * matches first has no governing roles.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class AccessControlRuleMatcher
 {
@@ -224,14 +224,14 @@ final readonly class AccessControlRuleMatcher
     /**
      * A rule's `methods: GET|POST`-style requirement (recorded verbatim by
      * {@see SymfonyYamlSecurityConfigParser}) only actually governs a route
-     * whose own declared methods are a subset of it — Symfony evaluates
+     * whose own declared methods are a subset of it: Symfony evaluates
      * `access_control` rules in order and skips to the next one on a method
      * mismatch, it does not treat a path-only match as sufficient. A route
      * with no declared methods answers to every HTTP verb, so a
      * method-restricted rule can never fully cover it. A second (or third, …)
      * `access_control` rule for the same path is recorded as one `or: ...`
      * entry per rule ({@see SymfonyYamlSecurityConfigParser::accessControlOf()}),
-     * each its own independent alternative Symfony tries in turn — the path
+     * each its own independent alternative Symfony tries in turn: the path
      * is covered for a route if ANY alternative covers it, not just the
      * first.
      *
@@ -253,7 +253,7 @@ final readonly class AccessControlRuleMatcher
      * Splits the flat, possibly-`or:`-joined roles list into one string per
      * alternative rule: the base rule's own list items joined into a single
      * string, then each `or:` entry on its own. The leading `or: ` marker is
-     * left on those entries — {@see self::methodsRequiredBy()} locates
+     * left on those entries: {@see self::methodsRequiredBy()} locates
      * the `methods:` requirement anywhere in the string, so the marker never
      * affects the check.
      *
@@ -281,7 +281,7 @@ final readonly class AccessControlRuleMatcher
     /**
      * Extracts the alternative's own `methods: GET|POST` requirement via a
      * targeted regex rather than splitting the comma-joined alternative
-     * string apart — `listedRequirements()` already uses `, ` as the
+     * string apart: `listedRequirements()` already uses `, ` as the
      * separator *within* an `ips: ...` requirement, so a generic split
      * would misparse an alternative combining `ips:` and `methods:`. HTTP
      * method names are always uppercase ASCII letters, which no other

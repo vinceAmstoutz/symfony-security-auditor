@@ -19,12 +19,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\N
  * Fails a `privacy.offline_only` run before it boots unless every configured
  * platform talks to this machine (or its private network). A provider is
  * accepted only when it carries at least one URL and every URL it carries
- * resolves to a loopback, link-local or private-range host — so a hosted
+ * resolves to a loopback, link-local or private-range host, so a hosted
  * provider (an `api_key` and nothing else) and a cloud endpoint
  * (`base_url: https://…azure.com`) are both rejected. A provider whose only
  * candidate endpoint a dry run read from an unset variable is not judged.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class OfflineOnlyPlatformGuard
 {
@@ -100,7 +100,7 @@ final readonly class OfflineOnlyPlatformGuard
     /**
      * A dry run stands in for a setting whose `%env()%` variable is unset,
      * since it never reaches the provider: whether that setting is a local
-     * endpoint only the real run can tell, and it names the variable instead.
+     * endpoint only the real run can tell; it names the variable instead.
      *
      * @param array<array-key, mixed> $providerConfig
      */

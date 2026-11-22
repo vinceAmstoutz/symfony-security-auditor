@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
-/** @internal not part of the BC promise — the enum *values* (`attacker`, `reviewer`) are stable identifiers carried in `CoverageRecorderInterface::recordCoverage()` stage labels and in the cost-by-role keys of the JSON/SARIF report schema, but the PHP enum itself is for internal use only. */
+/** @internal not part of the BC promise: the enum *values* (`attacker`, `reviewer`) are stable identifiers carried in `CoverageRecorderInterface::recordCoverage()` stage labels and in the cost-by-role keys of the JSON/SARIF report schema, but the PHP enum itself is for internal use only. */
 enum AgentRole: string
 {
     case Attacker = 'attacker';

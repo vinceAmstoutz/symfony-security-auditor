@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Scenario;
 
 /**
- * The public PHP API: the Domain models read through their accessors, and
+ * The public PHP API: the Domain models read through their accessors and
  * `RunAuditUseCase::execute()` with each of its arguments.
  */
 final readonly class ApiScenarios

@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 use Override;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  *
  * Decorates a {@see LineRetentionDeciderInterface}: retains a line that
  * continues an open construct regardless of the wrapped decider's verdict.

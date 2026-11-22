@@ -20,11 +20,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Project
 /**
  * The project a run audits and the paths it narrows to, as the command line
  * names them. A directory holding no `composer.json` and no file the scan
- * reaches is not a project, and a scan of it would find nothing: the run
+ * reaches is not a project and a scan of it would find nothing: the run
  * audits the Composer project the named paths lie in instead, narrowed to
  * them, so `audit app/src` audits what `audit app --path src` does.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class AuditTarget
 {

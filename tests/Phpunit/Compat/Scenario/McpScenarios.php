@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Mcp\CapturingMcpTransportF
 
 /**
  * `mcp:serve` as an MCP client sees it before calling anything: the answer to
- * `initialize`, and the tools `tools/list` names with their input schemas.
+ * `initialize` and the tools `tools/list` names with their input schemas.
  */
 final readonly class McpScenarios
 {

@@ -149,7 +149,7 @@ function evaluate(
     io()->success('Detection quality meets the configured thresholds.');
 }
 
-/** Castor loads no Composer autoloader, and the Docker setup keeps vendor/ inside the container. */
+/** Castor loads no Composer autoloader and the Docker setup keeps vendor/ inside the container. */
 function registerProjectAutoloader(): void
 {
     spl_autoload_register(static function (string $class): void {
@@ -214,7 +214,7 @@ function fix(): void
     runCodeQualityTools(fixMode: true);
 }
 
-#[AsTask(name: 'lint:docs', description: 'Check Markdown formatting and prose only (fast pre-push check)')]
+#[AsTask(name: 'lint:docs', description: 'Check Markdown formatting and the prose of Markdown and comments (fast pre-push check)')]
 function lintDocs(): void
 {
     $userFlag = sprintf('--user %d:%d', posix_getuid(), posix_getgid());
@@ -242,7 +242,7 @@ function checkProse(): void
 {
     io()->section('Prose check');
     run('sh tests/Shell/prose_check_test.sh');
-    run("git ls-files -z '*.md' | xargs -0 sh .github/scripts/check-prose.sh");
+    run('sh .github/scripts/check-prose.sh');
 }
 
 function runCodeQualityTools(bool $fixMode = false): void

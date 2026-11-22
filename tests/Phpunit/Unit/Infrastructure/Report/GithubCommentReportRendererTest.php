@@ -211,7 +211,7 @@ final class GithubCommentReportRendererTest extends AbstractReportRendererTestCa
     }
 
     /**
-     * One decimal place, matching every sibling renderer — a comment header is
+     * One decimal place, matching every sibling renderer: a comment header is
      * not the place for sub-100ms precision.
      *
      * @throws InvalidAuditContextException
@@ -320,7 +320,7 @@ final class GithubCommentReportRendererTest extends AbstractReportRendererTestCa
 
     /**
      * GFM splits a table row on unescaped `|` before inline parsing, so a code
-     * span does not contain one — a pipe in the LLM-authored file path would
+     * span does not contain one: a pipe in the LLM-authored file path would
      * forge a column in the Location cell.
      *
      * @throws InvalidAuditContextException
@@ -337,7 +337,7 @@ final class GithubCommentReportRendererTest extends AbstractReportRendererTestCa
 
     /**
      * GitHub autolinks a bare `@handle` in a comment body into a live profile
-     * mention, notifying that account — driven purely by attacker-influenced
+     * mention, notifying that account, driven purely by attacker-influenced
      * repository content once the rendered body is posted to a pull request.
      *
      * @throws InvalidAuditContextException

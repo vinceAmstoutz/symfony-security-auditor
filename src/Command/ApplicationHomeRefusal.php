@@ -22,7 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredC
  * refuses, so they give that refusal first instead of reading it as no
  * directory at all.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ApplicationHomeRefusal
 {

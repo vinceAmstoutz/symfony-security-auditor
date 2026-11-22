@@ -203,7 +203,7 @@ final readonly class LLMResponse
 
     /**
      * Whether the provider refused the request because the prompt alone
-     * exceeds the model's input window — the content carries the refusal. A
+     * exceeds the model's input window. The content carries the refusal. A
      * batch client answers this per request where a single call throws, so
      * the caller can split the work; it is degraded too, so no consumer
      * counts it as a verdict.

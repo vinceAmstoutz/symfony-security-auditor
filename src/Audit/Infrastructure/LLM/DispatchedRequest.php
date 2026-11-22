@@ -21,7 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
  * platform took it, null when the dispatch itself failed, or the answer it
  * already has when the rate-limit window refused it as too large to send.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class DispatchedRequest
 {

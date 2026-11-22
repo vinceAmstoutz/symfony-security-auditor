@@ -24,7 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTex
  * Renders a {@see ReportDiff} as human-readable console sections or as a raw
  * JSON document.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class DiffPresenter implements DiffPresenterInterface
 {
@@ -99,10 +99,10 @@ final readonly class DiffPresenter implements DiffPresenterInterface
      * The diff reads its `DiffFinding` fields from two untrusted JSON report
      * files whose titles/paths ultimately come from LLM-produced or
      * project-derived text. `OUTPUT_RAW` bypasses Symfony's formatter but not
-     * the terminal itself, so — exactly as the console audit-report renderer
-     * does — each single-line field is collapsed and stripped of
+     * the terminal itself, so (exactly as the console audit-report renderer
+     * does) each single-line field is collapsed and stripped of
      * control/ANSI/bidi characters so a crafted value cannot forge a fake
-     * `[SEVERITY]` finding line or spoof the terminal, and a legacy
+     * `[SEVERITY]` finding line or spoof the terminal. A legacy
      * `##[command]` in it is defused for a CI runner's log.
      */
     private function sanitize(string $value): string

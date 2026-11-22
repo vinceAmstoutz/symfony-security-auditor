@@ -20,7 +20,7 @@ use function Symfony\Component\String\u;
 /**
  * Names, for a person reading the progress output, why a chunk ended errored.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ChunkFailureReason
 {

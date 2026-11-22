@@ -434,7 +434,7 @@ final class ConcurrentChunkAnalyzerOversizedChunkTest extends TestCase
 
     /**
      * A client whose model fits exactly one file per request: a request
-     * carrying several files is answered as too large, and a one-file request
+     * carrying several files is answered as too large and a one-file request
      * records a finding named after that file. `$expectedCalls` pins how many
      * requests the analyzer needs to get every file answered.
      */

@@ -31,7 +31,7 @@ final readonly class FinalRule implements Rule
 {
     /**
      * Concrete base exceptions that are extended by subtypes yet also thrown
-     * directly — cannot be final (extended) nor abstract (instantiated).
+     * directly: cannot be final (extended) nor abstract (instantiated).
      *
      * @var list<string>
      */

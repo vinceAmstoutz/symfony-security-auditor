@@ -21,7 +21,7 @@ use Symfony\Component\Config\Definition\PrototypedArrayNode;
 
 /**
  * The smallest configuration that sets one path to a value: the model the
- * bundle requires, the required siblings of every section on the way, and a
+ * bundle requires, the required siblings of every section on the way and a
  * prototype's entry as the first item of a list, or the `controller` item of
  * a map keyed by name: a file type, so a map keyed by file type, such as
  * `scan.custom_risk_patterns`, takes it as well as one keyed by any name.
@@ -35,7 +35,7 @@ final readonly class ProbeConfiguration
     /**
      * @param array<string, NodeInterface> $nodes
      *
-     * @return array{array<array-key, mixed>, list<int|string>} the configuration, and where the value lands once processed
+     * @return array{array<array-key, mixed>, list<int|string>} the configuration and where the value lands once processed
      */
     public static function holding(array $nodes, string $path, mixed $value): array
     {

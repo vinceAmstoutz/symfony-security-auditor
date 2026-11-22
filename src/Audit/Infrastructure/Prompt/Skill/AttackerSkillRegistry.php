@@ -23,7 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerSkillPromptRe
  * Collects every {@see AttackerSkillInterface} strategy and emits the blocks
  * for a chunk, ordered by each skill's {@see AttackerSkillInterface::priority()}.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class AttackerSkillRegistry implements AttackerSkillPromptRendererInterface
 {

@@ -22,11 +22,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInter
  * `composer audit`; this implementation is the deterministic fallback used by tests
  * and by hosts that explicitly opt out of running composer at audit time.
  *
- * Returns every advisory registered for the package — version-constraint filtering
+ * Returns every advisory registered for the package. Version-constraint filtering
  * is delegated to the LLM, which already has the installed version and the
  * advisory's `affected_versions` text in front of it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class InMemoryAdvisoryDatabase implements AdvisoryDatabaseInterface
 {

@@ -19,10 +19,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
  * The `symfony/ai` platforms that wrap other platforms instead of reaching a
  * provider, mapped to the container service `symfony/ai-bundle` wires them to
  * beyond the platforms themselves. Only a Symfony application defines those
- * services: the standalone container has none of them, and its config file
+ * services: the standalone container has none of them and its config file
  * cannot declare one, so no block written for these platforms boots there.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class CompoundPlatforms
 {

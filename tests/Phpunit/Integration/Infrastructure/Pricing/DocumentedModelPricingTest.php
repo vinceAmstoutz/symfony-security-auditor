@@ -25,7 +25,7 @@ use function Symfony\Component\String\u;
 /**
  * A model the docs recommend for a paid platform must carry a published price
  * in the packaged `symfony/models-dev` catalog: an unpriced one reports a
- * $0.00 cost, and a run with a cost budget refuses it as a likely typo.
+ * $0.00 cost and a run with a cost budget refuses it as a likely typo.
  */
 final class DocumentedModelPricingTest extends TestCase
 {

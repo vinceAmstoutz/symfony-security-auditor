@@ -75,6 +75,49 @@ expect_pass 'an em dash inside a double-backtick code span passes'
 run_check "$work/missing.md"
 expect_error 'a missing file is refused' "$work/missing.md does not exist."
 
+php_file="$work/Example.php"
+printf '<?php\n\nfinal class Example\n{\n    // Runs once \342\200\224 then caches.\n    public function run(): void {}\n}\n' >"$php_file"
+run_check "$php_file"
+expect_error 'an em dash in a PHP comment is refused' "::error file=$php_file,line=5::"
+
+printf '<?php\n\necho "chunk failed \342\200\224 limit reached, and retried";\n' >"$php_file"
+run_check "$php_file"
+expect_pass 'an em dash or a comma before and in a PHP string passes'
+
+printf '<?php\n\n/**\n * Reads the file.\n *\n * It scans, filters, and reports.\n */\nfunction read(): void {}\n' >"$php_file"
+run_check "$php_file"
+expect_error 'a comma before and in a docblock is refused at its own line' "::error file=$php_file,line=6::"
+
+printf '<?php\n\n/**\n * It scans, filters,\n * and reports.\n */\nfunction scan(): void {}\n' >"$php_file"
+run_check "$php_file"
+expect_error 'a comma before and wrapped over two docblock lines is refused' "::error file=$php_file,line=5::"
+
+printf '<?php\n\n/**\n * It scans, filters, and\n * reports.\n */\nfunction scan(): void {}\n' >"$php_file"
+run_check "$php_file"
+expect_error 'a comment line ending with a comma and and is refused' "::error file=$php_file,line=4::"
+
+printf '<?php\n\n/**\n * Requirements: roles, `methods`,\n * `ips` and `requires_channel`.\n */\nfunction scan(): void {}\n' >"$php_file"
+run_check "$php_file"
+expect_pass 'a wrapped list whose next line opens with inline code passes'
+
+repo="$work/repo"
+mkdir -p "$repo/src" "$repo/tests/Fixture" "$repo/examples"
+printf '<?php\n// Clean comment.\n' >"$repo/src/Clean.php"
+printf '<?php\n// Sample \342\200\224 kept as test data.\n' >"$repo/tests/Fixture/Sample.php"
+printf '<?php\n// Example \342\200\224 app.\n' >"$repo/examples/App.php"
+printf 'Fine prose.\n' >"$repo/README.md"
+printf '<?php\n// Untracked \342\200\224 file.\n' >"$repo/src/Untracked.php"
+git -C "$repo" init -q
+git -C "$repo" add src/Clean.php tests/Fixture/Sample.php examples/App.php README.md
+status=0
+output=$(cd "$repo" && sh "$check" 2>&1) || status=$?
+expect_pass 'without arguments, the tracked Markdown and PHP files outside fixtures and examples pass'
+
+printf '<?php\n// Tracked \342\200\224 code.\n' >"$repo/src/Clean.php"
+status=0
+output=$(cd "$repo" && sh "$check" 2>&1) || status=$?
+expect_error 'without arguments, a tracked PHP file is checked' "::error file=src/Clean.php,line=2::"
+
 if [ "$failures" -eq 0 ]; then
   echo "All prose check tests passed."
   exit 0

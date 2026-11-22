@@ -41,13 +41,13 @@ use function Symfony\Component\String\b;
  * (file present, valid, provider selected, API-key variable set), the provider
  * bridge is installed *and actually boots the audit for the configured
  * provider* (a leftover bridge from a previously configured provider passes a
- * file-existence check but not a boot, and a tree built for another
- * `symfony/ai-platform` is not even loaded), and `composer` is reachable — the
+ * file-existence check but not a boot; a tree built for another
+ * `symfony/ai-platform` is not even loaded) and `composer` is reachable: the
  * prerequisites for a successful audit run. The boot probe is skipped while
  * the configuration check fails, so a config problem is reported once, by the
  * check that owns it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
 {
@@ -165,7 +165,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
     /**
      * The reason is an arbitrary `Throwable` message from the boot probe and
      * may contain non-UTF-8 bytes (paths, quoted file contents), so it is
-     * handled byte-safely — `u()` would throw on it and mask the diagnosis.
+     * handled byte-safely: `u()` would throw on it and mask the diagnosis.
      */
     private function bootFailureDetail(string $failureReason): string
     {

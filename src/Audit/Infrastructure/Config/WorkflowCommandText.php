@@ -15,14 +15,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 /**
  * A GitHub Actions runner reads a job-log line that starts with `::`, leading
- * whitespace aside, as a workflow command, and the legacy `##[command]` form
+ * whitespace aside, as a workflow command and the legacy `##[command]` form
  * wherever it sits in a line. Text from the audited repository or the model
  * is defused before it reaches such a log: a backslash breaks each marker, so
  * the text still reads as written. Which markers need breaking depends on
- * where the text lands — after a prefix of ours, in a message the console may
+ * where the text lands: after a prefix of ours, in a message the console may
  * wrap anywhere, in a document printed line by line, or inside JSON strings.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class WorkflowCommandText
 {
@@ -45,7 +45,7 @@ final readonly class WorkflowCommandText
     }
 
     /**
-     * The runner starts a line after a carriage return too, and trims Unicode
+     * The runner starts a line after a carriage return too and trims Unicode
      * whitespace, so both are looked through; text that is not UTF-8 is
      * scrubbed first, since only valid UTF-8 can be matched for that
      * whitespace.

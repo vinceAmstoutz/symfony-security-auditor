@@ -31,15 +31,15 @@ use function Symfony\Component\String\u;
 
 /**
  * Decorates another pre-scanner and merges in risk markers imported from
- * configured SARIF 2.1.0 report files (`scan.import_sarif`) — the output of
+ * configured SARIF 2.1.0 report files (`scan.import_sarif`): the output of
  * taint-tracking SAST tools like Psalm, Progpilot, PHPStan, or Semgrep. Each
  * SARIF result whose artifact URI matches a scanned file becomes a marker at
  * that file and line, labelled `sarif:<tool>:<rule>`, so the attacker starts
  * from the external tool's concrete leads. Results pointing at files outside
- * the scan surface are dropped — the attacker never sees those files, so a
+ * the scan surface are dropped: the attacker never sees those files, so a
  * marker there could only hallucinate context.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SarifImportingPreScanner implements StaticPreScannerInterface
 {
@@ -206,7 +206,7 @@ final readonly class SarifImportingPreScanner implements StaticPreScannerInterfa
 
     /**
      * A SARIF `codeFlows[0].threadFlows[0].locations` array is the taint-
-     * tracking tool's source-to-sink path — richer evidence than the single
+     * tracking tool's source-to-sink path, richer evidence than the single
      * primary location. A step outside the scan surface comes back as `null`,
      * same as the primary location is dropped, so the attacker never sees an
      * unscanned file.
@@ -298,7 +298,7 @@ final readonly class SarifImportingPreScanner implements StaticPreScannerInterfa
      * SARIF producers emit artifact URIs in several equivalent spellings for
      * the same repository-relative file (`src/A.php`, `./src/A.php`,
      * `file:///<project root>/src/A.php` when no uriBaseId applies,
-     * `src/my%20page.twig` for any segment a URI must escape) — normalize to
+     * `src/my%20page.twig` for any segment a URI must escape): normalize to
      * the project-relative form the scanner uses.
      */
     private function normalizeUri(string $uri): string
@@ -312,8 +312,8 @@ final readonly class SarifImportingPreScanner implements StaticPreScannerInterfa
     /**
      * `artifactLocation.uri` is an RFC 3986 URI reference, so a segment
      * holding a space, a `#` or a non-ASCII character arrives percent-encoded
-     * — the exact inverse of what `SarifReportRenderer::encodeArtifactUri()`
-     * emits. Decoding precedes stripping the project-root prefix because that
+     * (the exact inverse of what `SarifReportRenderer::encodeArtifactUri()`
+     * emits). Decoding precedes stripping the project-root prefix because that
      * prefix is a raw filesystem path, which may itself contain a space.
      * `rawurldecode()` leaves an invalid escape sequence untouched, so a
      * producer that emits raw paths keeps matching.

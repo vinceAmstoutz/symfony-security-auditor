@@ -26,13 +26,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ServingPlatformPricin
  * rates) from the daily `symfony/models-dev` catalog snapshot, read once from
  * `vendor/` with no network call. Replaces the hand-maintained price table.
  * A model is priced from the listing of the `symfony/ai` platform the audit
- * runs against first, and only then from the catalog at large. Each model's
+ * runs against first and only then from the catalog at large. Each model's
  * price is resolved once per run and remembered, since every call asks for it
  * several times.
  *
  * @phpstan-import-type PricedCost from ModelsDevCatalog
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterface, ServingPlatformPricingProviderInterface
 {
@@ -213,7 +213,7 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     /**
      * `docs/configuration.md`'s documented `model: 'name?temperature=0.2'`
      * query-string syntax (per `symfony/ai-bundle`'s own convention) reaches
-     * this provider unparsed — `LLMConfiguration` and `ContainerParameterRegistrar`
+     * this provider unparsed: `LLMConfiguration` and `ContainerParameterRegistrar`
      * both publish the model name verbatim, only `symfony/ai`'s own platform
      * factory ever splits it. Stripping everything from the first `?` before
      * every catalog lookup keeps a model configured this way priced the same
@@ -229,7 +229,7 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     /**
      * A qualified id can legitimately appear under several providers at once
      * (aggregators re-listing the same upstream model) with disagreeing
-     * prices — an aggregator's stray `$0` free-tier listing must never win
+     * prices: an aggregator's stray `$0` free-tier listing must never win
      * over a genuinely paid one just because it sorts first, since that
      * would both under-report the real cost and, via `hasModel()` returning
      * `true`, silently bypass the "no published pricing" budget-guard safety
@@ -352,7 +352,7 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
 
     /**
      * The catalog file this provider actually reads, so `doctor` can name it
-     * instead of assuming the packaged one — a `self-update` refresh writes an
+     * instead of assuming the packaged one: a `self-update` refresh writes an
      * override that takes precedence, unless it cannot serve as a catalog or the
      * packaged one is newer, in which case the packaged one is read in its
      * place.
@@ -381,14 +381,14 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     }
 
     /**
-     * The catalog shipped with the installed `symfony/models-dev` package —
+     * The catalog shipped with the installed `symfony/models-dev` package:
      * the only file whose contents `InstalledVersions::getPrettyVersion()`
      * actually describes, which is why `doctor` compares against it before
      * naming a version.
      *
      * `InstalledVersions::getInstallPath()` resolves relative to the Composer
      * directory, so it hands back a `vendor/composer/../symfony/...` detour.
-     * `Path::canonicalize()` collapses it lexically — `realpath()` cannot, it
+     * `Path::canonicalize()` collapses it lexically; `realpath()` cannot, it
      * returns `false` for the `phar://` path a packaged binary reports.
      */
     public function packagedCatalogPath(): ?string

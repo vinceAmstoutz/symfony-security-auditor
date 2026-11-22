@@ -23,7 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
  * earlier instead of leaving the report incomplete for good. The reviewer
  * checks for it with `instanceof`, so a recorder without it keeps working.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface FindingReviewRecorderInterface
 {

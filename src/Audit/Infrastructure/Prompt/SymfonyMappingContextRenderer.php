@@ -19,20 +19,20 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 /**
  * Renders the {@see SymfonyMapping} sections of the attacker user message:
  * the route access-control map (with firewall-coverage and LACKS markers),
- * voter coverage, and form bindings. Empty mappings render as empty strings
+ * voter coverage and form bindings. Empty mappings render as empty strings
  * so the surrounding prompt collapses cleanly.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SymfonyMappingContextRenderer
 {
     /**
      * `access_control` role tokens that grant access to everyone: the
      * `PUBLIC_ACCESS` attribute, its deprecated predecessor
-     * `IS_AUTHENTICATED_ANONYMOUSLY`, and the `PUBLIC` marker
+     * `IS_AUTHENTICATED_ANONYMOUSLY` and the `PUBLIC` marker
      * {@see SymfonyYamlSecurityConfigParser} records for a requirement-less
      * rule. A route reachable only through such a rule is not protected by the
-     * firewall at all, so it must not be presented as `COVERED_BY` — that would
+     * firewall at all, so it must not be presented as `COVERED_BY`: that would
      * tell the attacker model to skip a genuinely unauthenticated route.
      *
      * @var list<string>
@@ -219,7 +219,7 @@ final readonly class SymfonyMappingContextRenderer
     /**
      * `PhpParserControllerAccessControlParser` emits a `RouteAccessControl`
      * entry for every public method on a controller-like class, not just its
-     * routed actions — a plain constructor or helper method still gets one,
+     * routed actions: a plain constructor or helper method still gets one,
      * with `hasRouteAttribute() === false`. Rendering those would tag every
      * such method `LACKS_ACCESS_CHECK` even though it is not an HTTP action
      * at all, injecting a false-positive `broken_access_control` candidate
@@ -250,7 +250,7 @@ final readonly class SymfonyMappingContextRenderer
 
     /**
      * Every list rendered from the audited repository is repeated in each
-     * chunk prompt, so it is cut at a number of items and of bytes, and a cut
+     * chunk prompt, so it is cut at a number of items and of bytes. A cut
      * list ends with `… and N more`.
      *
      * @param list<string> $values
@@ -338,9 +338,9 @@ final readonly class SymfonyMappingContextRenderer
     }
 
     /**
-     * Every value rendered here — a file path, a class name, or a raw
+     * Every value rendered here (a file path, a class name, or a raw
      * `#[IsGranted("...")]` attribute-argument string literal collected by
-     * the AST parsers — comes from the audited (untrusted) project, not from
+     * the AST parsers) comes from the audited (untrusted) project, not from
      * us. A raw embedded `\n` or bare `\r` would let a crafted value forge a
      * fake `##`-prefixed section (e.g. the literal `## Source Code` heading
      * further down the attacker prompt) as unguarded top-level prompt text.

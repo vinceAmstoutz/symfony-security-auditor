@@ -18,11 +18,11 @@ use function Symfony\Component\String\u;
 /**
  * The folder, relative to the repository root, the audited project lives in
  * (`audit.report_path_prefix`). A finding's path is relative to the project, but
- * the formats a repository host reads — SARIF locations, GitHub annotations —
+ * the formats a repository host reads (SARIF locations, GitHub annotations)
  * are resolved from the repository root, so a project in a sub-folder needs the
  * folder put in front of every path for an alert to land on its file.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ReportPathPrefix
 {

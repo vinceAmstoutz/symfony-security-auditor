@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Revie
 use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererInterface
 {
     #[Override]
@@ -204,7 +204,7 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
 
     /**
      * `title` lands in the bare, single-line `Title: ...` slot with no
-     * surrounding fence or heading to contain it — unlike the fenced/heading
+     * surrounding fence or heading to contain it, unlike the fenced/heading
      * -guarded narrative fields `escapeFences()` protects. A raw `\n` or bare
      * `\r` here would forge a fake standalone instruction paragraph as
      * unguarded top-level prompt text, the same class of injection
@@ -218,7 +218,7 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
     /**
      * The attacker LLM's narrative fields are interpolated into this prompt's
      * own ```-delimited code fence and `###`-prefixed section headers; an
-     * unescaped backtick would break out of the fence, and an unescaped `#`
+     * unescaped backtick would break out of the fence and an unescaped `#`
      * would let the finding forge a fake section (e.g. a bogus
      * `### SYSTEM OVERRIDE`) as unguarded top-level prompt text.
      */

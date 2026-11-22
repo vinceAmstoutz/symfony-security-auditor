@@ -20,7 +20,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * A question answered by the number of a listed choice, or by typing any
  * other value, which is taken as written.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class NumberedChoice
 {

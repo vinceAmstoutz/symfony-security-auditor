@@ -23,10 +23,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
  * The LLM client calls `recordCall()` after every successful platform call,
  * then `assertWithinBudget()` to abort the run if the configured cap is now
  * exceeded. The call that exceeds the cap still completes (its tokens are
- * recorded); the next call is what gets refused — predictable for users
- * reasoning about partial reports.
+ * recorded); the next call is what gets refused (predictable for users
+ * reasoning about partial reports).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class BudgetTracker
 {

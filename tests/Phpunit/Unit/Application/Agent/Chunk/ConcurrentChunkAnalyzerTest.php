@@ -232,7 +232,7 @@ final class ConcurrentChunkAnalyzerTest extends TestCase
      * A generic batch failure must be isolated to its own window: the windows
      * after it still have to be dispatched, exactly as the sequential analyzer
      * keeps analysing chunks after one errors. Otherwise a single odd runtime
-     * error silently drops every later file from the audit — a false-negative
+     * error silently drops every later file from the audit: a false-negative
      * SAFE for a security tool.
      *
      * @throws InvalidProjectFileException

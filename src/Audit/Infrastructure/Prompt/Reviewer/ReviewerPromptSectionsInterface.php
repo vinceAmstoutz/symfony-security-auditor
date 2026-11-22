@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Revie
  * Supplies the fixed text sections the reviewer system prompt is assembled from.
  * Kept out of the builder so the builder is pure composition, not a text dump.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface ReviewerPromptSectionsInterface
 {

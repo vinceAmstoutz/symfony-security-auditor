@@ -33,7 +33,7 @@ use function Symfony\Component\String\u;
 /**
  * Reads and writes the JSON baseline file of accepted-finding fingerprints.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class Baseline implements BaselineInterface
 {
@@ -129,8 +129,8 @@ final readonly class Baseline implements BaselineInterface
 
     /**
      * The baseline is part of the audited repository, so a pull request
-     * controls every field of an entry, and each one reaches the reviewer's
-     * system prompt: each is capped — the reason at the reviewer's own
+     * controls every field of an entry and each one reaches the reviewer's
+     * system prompt: each is capped, the reason at the reviewer's own
      * triage-memory cap.
      */
     private function feedbackOf(mixed $entry): ?AcceptedFindingFeedback
@@ -183,8 +183,8 @@ final readonly class Baseline implements BaselineInterface
     }
 
     /**
-     * A symlink on the way — below the working directory or below the audited
-     * project's root — a path naming a directory, a directory that cannot be
+     * A symlink on the way (below the working directory or below the audited
+     * project's root), a path naming a directory, a directory that cannot be
      * created or one the file cannot be written into.
      *
      * @throws UnsafeBaselineWriteException
@@ -242,12 +242,12 @@ final readonly class Baseline implements BaselineInterface
 
     /**
      * `Filesystem::dumpFile()` transparently writes through a pre-existing
-     * symlink at its destination — a predictable, documented baseline path
+     * symlink at its destination: a predictable, documented baseline path
      * (e.g. `.security-baseline.json`) committed as a symlink by a malicious
      * PR would let the audit overwrite an arbitrary file the CI runner can
      * reach. Mirrors the guard already applied to the filesystem
-     * attacker/reviewer/advisory caches, the standalone config writer, and
-     * the report writer, and walks the audited project below its root as well.
+     * attacker/reviewer/advisory caches, the standalone config writer and
+     * the report writer; it walks the audited project below its root as well.
      *
      * @throws UnsafeBaselineWriteException
      */

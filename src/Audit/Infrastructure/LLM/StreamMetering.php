@@ -22,7 +22,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
  * Not `readonly` because it remembers that verdict; see
  * `.claude/rules/php-classes.md` (stateful collaborator carve-out).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class StreamMetering
 {

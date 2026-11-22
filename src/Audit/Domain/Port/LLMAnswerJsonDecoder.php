@@ -19,7 +19,7 @@ use JsonException;
  * Reads the JSON a model answered with, recovering it from the prose or the
  * truncation a model may wrap around it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class LLMAnswerJsonDecoder
 {
@@ -48,7 +48,7 @@ final readonly class LLMAnswerJsonDecoder
     /**
      * Whether the answer's JSON is one value alone: the only block at its top
      * level that can stand for it, with no block left open after it. Values
-     * written apart — one object per line, an object after an array — or one
+     * written apart (one object per line, an object after an array) or one
      * the output cut off make it one of several, of which `decode()` returns
      * only one.
      */
@@ -75,8 +75,8 @@ final readonly class LLMAnswerJsonDecoder
     /**
      * Takes the last balanced block at the top level of the answer that
      * decodes to an object or to a list holding one: a model that reasons
-     * before its verdict may quote JSON — from the audited code, say — that
-     * must not stand for the verdict that follows it, and a bracket in the
+     * before its verdict may quote JSON (from the audited code, say) that
+     * must not stand for the verdict that follows it. A bracket in the
      * prose after its answer must not either. When no top-level block
      * qualifies, as when the output limit cut an array off before its closing
      * bracket, the first balanced block anywhere that decodes is taken (the
@@ -87,7 +87,7 @@ final readonly class LLMAnswerJsonDecoder
      *
      * When the content itself spans a single balanced block (`[ ... ]` or
      * `{ ... }` with no surrounding prose), the top-level `json_decode` has
-     * already attempted exactly that payload — re-trying nested openers within
+     * already attempted exactly that payload: re-trying nested openers within
      * it would silently accept shallower inner blocks (defeating depth limits,
      * for one), so recovery is skipped in that case.
      */
@@ -159,8 +159,8 @@ final readonly class LLMAnswerJsonDecoder
 
     /**
      * An object, or a list holding one. Anything else is what prose brackets
-     * decode to — `[1]` citing a source, `[ ]` in a checklist, `[[12, 14]]`
-     * listing line ranges — so it never outranks an earlier block.
+     * decode to (`[1]` citing a source, `[ ]` in a checklist, `[[12, 14]]`
+     * listing line ranges), so it never outranks an earlier block.
      *
      * @param array<mixed> $decoded
      */
@@ -198,7 +198,7 @@ final readonly class LLMAnswerJsonDecoder
     }
 
     /**
-     * The decoded block, or `null` when it does not decode — the caller moves
+     * The decoded block, or `null` when it does not decode: the caller moves
      * on to the next candidate.
      */
     private static function decodeBlock(string $block): mixed

@@ -24,7 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
  * Wraps a client that does not book its own usage so each answer it gives is
  * booked through {@see ClientUsageBooker}.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class UsageBookingLLMClient implements UsageBookingLLMClientInterface
 {

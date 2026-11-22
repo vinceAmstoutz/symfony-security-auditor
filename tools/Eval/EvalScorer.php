@@ -18,8 +18,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EchoedFilePath;
 /**
  * Scores an audit run against its ground-truth manifest at (file, type)
  * granularity: a seeded finding the run reproduced is a true positive, one it
- * missed a false negative, and a reported finding with no matching seed a
- * false positive — so safe "decoy" files raise the false-positive count when
+ * missed a false negative and a reported finding with no matching seed a
+ * false positive, so safe "decoy" files raise the false-positive count when
  * the auditor flags them. Precision and recall are reported overall and per
  * vulnerability class.
  */

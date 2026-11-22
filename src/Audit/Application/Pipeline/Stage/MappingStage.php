@@ -43,7 +43,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParser
  * `PhpParser*`/`SymfonyYamlSecurityConfigParser` implementations, so they are
  * required here rather than falling back to a Null* default.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class MappingStage implements StageInterface
 {
@@ -117,7 +117,7 @@ final readonly class MappingStage implements StageInterface
     /**
      * A `#[AsLiveComponent]`/`#[ApiResource]` file classifies as its own
      * dedicated {@see ProjectFileType} (to keep its specialized attacker-skill
-     * treatment) even when it also extends `AbstractController` — so
+     * treatment) even when it also extends `AbstractController`, so
      * `ProjectFileInventory::controllers()` alone would miss its routed,
      * access-controlled actions.
      *
@@ -186,7 +186,7 @@ final readonly class MappingStage implements StageInterface
 
     /**
      * The project's rules and firewalls, the configuration files that could
-     * not be read, and the rules and firewalls of each monorepo application
+     * not be read and the rules and firewalls of each monorepo application
      * the run is narrowed to, kept apart since they govern that application's
      * routes only.
      *

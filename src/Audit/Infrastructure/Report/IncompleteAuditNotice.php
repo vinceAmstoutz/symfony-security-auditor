@@ -20,10 +20,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
  * vulnerabilities found" line when some file could not be fully analyzed, so no format
  * can present an aborted or partly failed run as a clean result. A dry run
  * makes no LLM call and names no failed file, so it says that none was
- * analyzed. A scan that found no file has nothing to analyze and no verdict,
+ * analyzed. A scan that found no file has nothing to analyze and no verdict
  * and says so rather than let an empty report read as a clean one.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class IncompleteAuditNotice
 {

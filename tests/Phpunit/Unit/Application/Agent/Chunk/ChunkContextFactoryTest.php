@@ -78,7 +78,7 @@ final class ChunkContextFactoryTest extends TestCase
 
     /**
      * A chunk's persisted cache entry is keyed by file content and this
-     * context key, never by the mapping — so a `security.yaml` edit, a voter
+     * context key, never by the mapping, so a `security.yaml` edit, a voter
      * added or removed, or a form binding discovered elsewhere in the project
      * would otherwise replay a verdict computed under the old mapping for a
      * file whose own content never changed.

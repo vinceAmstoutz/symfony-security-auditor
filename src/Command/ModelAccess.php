@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPla
  * How someone running `init` reaches an AI model, which narrows the
  * providers it then lists.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 enum ModelAccess: string
 {

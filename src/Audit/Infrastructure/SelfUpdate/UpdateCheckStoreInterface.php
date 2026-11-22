@@ -13,13 +13,13 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 interface UpdateCheckStoreInterface
 {
     public function read(): ?UpdateCheckState;
 
     /**
-     * @return bool whether the state was persisted — a caller that throttles
+     * @return bool whether the state was persisted; a caller that throttles
      *              on it must not act when it cannot record having done so
      */
     public function write(UpdateCheckState $updateCheckState): bool;

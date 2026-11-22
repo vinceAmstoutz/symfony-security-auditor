@@ -25,7 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
  * tool written before {@see RecordingToolInterface} existed still records on
  * a conversation's last round.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ReachTrackingRecordingTool implements RecordingToolInterface
 {

@@ -33,18 +33,18 @@ use function Symfony\Component\String\u;
 /**
  * Filesystem-backed cross-run memory of the reviewer's own rejections: every
  * finding the reviewer rejects with a non-empty `reviewer_notes` is persisted
- * here, keyed by type+file+title, and surfaced back as
- * {@see ReviewerFeedbackProviderInterface} feedback on later runs — so a
+ * here, keyed by type+file+title and surfaced back as
+ * {@see ReviewerFeedbackProviderInterface} feedback on later runs, so a
  * recurring false positive teaches the reviewer once instead of every run,
  * without a maintainer hand-curating a baseline entry for it.
  *
  * Memory is scoped to the audited project: each project gets its own file
  * under the configured directory, keyed by a hash of its path. A user-global
  * cache directory (the standalone binary's default) is therefore not a
- * cross-project channel — project A's rejections never surface in, or
+ * cross-project channel: project A's rejections never surface in, or
  * overwrite, project B's feedback.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProviderInterface, TriageMemoryRecorderInterface
 {
@@ -78,7 +78,7 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
     }
 
     /**
-     * Read lazily — never at construction — so the audited project path set on
+     * Read lazily (never at construction) so the audited project path set on
      * {@see AuditedProjectPathHolder} once the command resolves its argument is
      * the one that scopes the file (mirrors {@see DeferredAdvisoryDatabase}).
      */
@@ -178,7 +178,7 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
      * rejection re-recorded on a later cache-miss run leaves the stored reason
      * untouched, so the {@see ReviewerFeedback::digest()} the reviewer cache
      * keys on stops changing and the finding is re-reviewed once after the
-     * feedback set grows, then served from cache — instead of the reviewer's
+     * feedback set grows, then served from cache, instead of the reviewer's
      * freshly-worded notes churning the digest and forcing a full re-review
      * every run.
      *
@@ -204,11 +204,11 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
     /**
      * The line is part of the key so two distinct findings that share a
      * type/file/title (a generic title reused at different locations) do not
-     * collide — the second rejection would otherwise overwrite the first.
+     * collide: the second rejection would otherwise overwrite the first.
      *
      * `file`/`title` are LLM-sourced and never NUL-sanitized, so each field is
-     * hashed individually before joining — mirroring
-     * `ChunkContextKeyDeriver::derive()` — so a NUL byte cannot shift a value
+     * hashed individually before joining (mirroring
+     * `ChunkContextKeyDeriver::derive()`), so a NUL byte cannot shift a value
      * across the `file`/`title` boundary and collide two distinct findings
      * onto the same key.
      *
@@ -269,8 +269,8 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
 
     /**
      * Mirrors {@see FilesystemReviewerCache}'s symlink guard: this path is
-     * config-fixed rather than content-derived, but the same defense — never
-     * read or write through a symlink — is cheap to keep as a matter of
+     * config-fixed rather than content-derived, but the same defense (never
+     * read or write through a symlink) is cheap to keep as a matter of
      * consistent practice. The configured `cache.dir`, this memory's parent,
      * is the trusted root, as it is for the caches: a symlinked
      * `triage-memory/` is still refused.

@@ -25,10 +25,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BaselineFilePathsInte
  * indexed once, under the form the spellings of one file share, so naming a
  * finding's file takes two lookups whatever the size of the baseline.
  *
- * Mutable by design — non-readonly because the baseline is set after
+ * Mutable by design: non-readonly because the baseline is set after
  * construction. See .claude/rules/php-classes.md for the opt-out policy.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class BaselineFilePathsHolder implements BaselineFilePathsInterface
 {

@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Diff;
  * Compares two lists item by item after aligning the items they share, so an
  * item inserted at the front is one difference instead of a shifted rest of
  * the list: between two shared items, the items lost and gained are compared
- * in pairs, and the ones left over are reported as gone or new. A path names
+ * in pairs. The ones left over are reported as gone or new. A path names
  * an item by its index in the recording, or in the replay for a new one.
  */
 final readonly class ListDiff

@@ -23,14 +23,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableAuditC
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableMcpServeCommandException;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class StandaloneConsoleCommandFactory
 {
     /**
-     * Describes an invokable command from its class alone — the name, aliases,
-     * description and help of its `#[AsCommand]`, and the input its
-     * `__invoke()` declares — for help, a listing or shell completion, none of
+     * Describes an invokable command from its class alone (the name, aliases,
+     * description and help of its `#[AsCommand]` and the input its
+     * `__invoke()` declares) for help, a listing or shell completion, none of
      * which runs it. The instance is only reflected, never invoked, so it needs
      * none of the services the container would inject.
      *

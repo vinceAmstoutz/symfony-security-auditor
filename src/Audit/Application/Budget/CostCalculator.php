@@ -27,12 +27,12 @@ use function Symfony\Component\String\u;
  * otherwise Claude models keep the Anthropic 0.1x-read / 1.25x-write
  * heuristic and other models fall back to the base input rate.
  *
- * Returns the raw fractional cost — callers that present the value to a
+ * Returns the raw fractional cost: callers that present the value to a
  * user (`AuditCost`, `BudgetTracker::costUsdUsed()`) round to 6 decimals
  * at the surface. Keeping a single rounding site lets BudgetTracker test
  * its accessor against unrounded accumulated state.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class CostCalculator
 {

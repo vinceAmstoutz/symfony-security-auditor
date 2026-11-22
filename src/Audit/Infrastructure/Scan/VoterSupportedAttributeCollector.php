@@ -23,7 +23,7 @@ use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\NodeFinder;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class VoterSupportedAttributeCollector
 {
     public function __construct(
@@ -63,7 +63,7 @@ final readonly class VoterSupportedAttributeCollector
 
     /**
      * Resolves `self::EDIT`/`static::EDIT` fetches in `$body` against the
-     * voter's own class constants — the canonical Symfony voter pattern
+     * voter's own class constants: the canonical Symfony voter pattern
      * (`const EDIT = 'edit'; ... in_array($attribute, [self::EDIT, ...])`)
      * has no bare string literal for `collectStringLiterals()` to find. A
      * constant naming an array of strings (`const SUPPORTED = ['edit', ...];
@@ -87,7 +87,7 @@ final readonly class VoterSupportedAttributeCollector
 
     /**
      * The names of the own constants `$body` fetches, each once, in the order
-     * they are first fetched — so a constant fetched thousands of times is
+     * they are first fetched, so a constant fetched thousands of times is
      * expanded once, not once per fetch.
      *
      * @param array<Node> $body

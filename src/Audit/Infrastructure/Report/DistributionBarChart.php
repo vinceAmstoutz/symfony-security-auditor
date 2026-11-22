@@ -14,11 +14,11 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 
 /**
- * Renders labelled counts as an inline SVG horizontal bar chart — no external
+ * Renders labelled counts as an inline SVG horizontal bar chart: no external
  * asset, no script, colors driven by the embedding page's stylesheet so the
  * chart follows the reader's light/dark preference.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class DistributionBarChart
 {

@@ -56,7 +56,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\Provi
  * finding and then throws a non-transient LLM provider failure, to verify the
  * partial report is still written (rather than discarded via the generic
  * `catch (Throwable)` branch) and the exit code stays the generic failure
- * code — this is not a budget abort, so it must not reuse that exit code.
+ * code: this is not a budget abort, so it must not reuse that exit code.
  */
 final class AuditCommandProviderAbortTest extends TestCase
 {

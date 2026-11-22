@@ -30,7 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\Unr
  * loads that the audit does not read is reported with the reason when it may
  * hold security configuration.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  *
  * @phpstan-type Loading array{seen: array<string, string>, loaded: list<ProjectFile>, unreadable: array<string, string>, files: int, bytes: int}
  */

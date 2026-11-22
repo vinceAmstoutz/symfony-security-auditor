@@ -25,13 +25,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
  * `/proc/self/exe` (Linux); elsewhere (notably macOS, which has no
  * `/proc/self/exe`) it falls back to the entry path resolved the way the shell
  * resolves a command: a name carrying a directory against the working
- * directory, a bare name found on `PATH` through a `PATH` lookup only — never
+ * directory, a bare name found on `PATH` through a `PATH` lookup only, never
  * against the working directory, where a same-named file would be taken for the
  * running binary. Both fallbacks accept only an executable regular file, so
  * a same-named stray file or directory is never mistaken for the running binary
  * and overwritten by an update.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class RunningBinaryLocator implements RunningBinaryLocatorInterface
 {

@@ -36,7 +36,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SkippedFileReportingP
  * can share its reads scans both through the scanner sharing them, so a file
  * both reach is read and scrubbed once.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ScopedScan
 {

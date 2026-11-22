@@ -48,8 +48,8 @@ final readonly class ReviewerFeedback
      * invalidate cached reviewer verdicts.
      *
      * Each entry's `type`/`file`/`title`/`reason` is hashed individually before
-     * being joined into that entry's line, and each line is hashed again
-     * before joining the whole set — mirroring `ChunkContextKeyDeriver::derive()`
+     * being joined into that entry's line and each line is hashed again
+     * before joining the whole set, mirroring `ChunkContextKeyDeriver::derive()`
      * at both levels. `file`/`title` are LLM- or file-path-sourced and never
      * NUL-sanitized, so without the field-level hash a NUL byte could shift a
      * value across the `\0` join and make two entries with different

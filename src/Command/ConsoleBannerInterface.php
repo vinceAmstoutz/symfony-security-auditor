@@ -17,11 +17,11 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * Renders the product identity banner. Exactly one collaborator per entry
- * point owns it: the audit command in a bundle install, and the application
- * itself in the standalone binary — where the audit command is handed a
+ * point owns it: the audit command in a bundle install and the application
+ * itself in the standalone binary, where the audit command is handed a
  * `NullConsoleBanner` so the two can never both print one.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface ConsoleBannerInterface
 {

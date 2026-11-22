@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 /**
  * Records a reviewer-rejected finding's own stated reason so a future run's
  * {@see ReviewerFeedbackProviderInterface} can surface it back to the
- * reviewer as a negative example — the reviewer's rejections becoming its
+ * reviewer as a negative example: the reviewer's rejections becoming its
  * own cross-run memory, without requiring a maintainer to hand-curate a
  * baseline entry for every recurring false positive.
  */

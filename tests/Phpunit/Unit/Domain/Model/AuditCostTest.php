@@ -123,7 +123,7 @@ final class AuditCostTest extends TestCase
     /**
      * The per-role breakdown carries no cache-token keys, so `billableTokens()`
      * falls back for both. That fallback must be exactly zero: an entry that
-     * spent nothing and priced to nothing is not a pricing gap, and any other
+     * spent nothing and priced to nothing is not a pricing gap and any other
      * default would invent spend and report one.
      *
      * @throws InvalidAuditCostException
@@ -139,7 +139,7 @@ final class AuditCostTest extends TestCase
 
     /**
      * Cache reads are billed, so a model whose entire spend arrived as cached
-     * prompt tokens has still been charged — and priced at zero it is still a
+     * prompt tokens has still been charged. Priced at zero it is still a
      * pricing gap, even though its fresh input and output are both zero.
      *
      * @throws InvalidAuditCostException
@@ -156,7 +156,7 @@ final class AuditCostTest extends TestCase
     /**
      * "Some tokens were spent" is the sum of input and output, not their
      * difference: an entry that happens to spend as many output tokens as
-     * input ones is still spend, and must still be checked for a price.
+     * input ones is still spend and must still be checked for a price.
      *
      * @throws InvalidAuditCostException
      */

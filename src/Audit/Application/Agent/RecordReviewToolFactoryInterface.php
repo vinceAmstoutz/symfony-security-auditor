@@ -18,7 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 /**
  * Builds a tool that records review verdicts into a given collector. Allows
  * the ReviewerAgent (Application) to depend on a Domain-port tool without
- * importing the Infrastructure implementation directly — the bundle wires the
+ * importing the Infrastructure implementation directly: the bundle wires the
  * concrete factory at the composition root.
  */
 interface RecordReviewToolFactoryInterface

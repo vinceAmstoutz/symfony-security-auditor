@@ -598,7 +598,7 @@ final class AuditOrchestratorTest extends TestCase
 
     /**
      * A single accepted baseline fingerprint grants exactly one credit for the
-     * *whole run*, not one per attacker/reviewer iteration — recomputing the
+     * *whole run*, not one per attacker/reviewer iteration: recomputing the
      * remaining budget fresh on every call would let the same accepted
      * occurrence skip a different, never-reviewed finding that merely shares
      * its fingerprint in a later iteration.
@@ -742,7 +742,7 @@ final class AuditOrchestratorTest extends TestCase
 
     /**
      * `recordBaselineSkip()` only logs/reports the first skip event per
-     * fingerprint per run — a genuine second baseline credit for the
+     * fingerprint per run: a genuine second baseline credit for the
      * identical fingerprint (two originally-accepted findings that happen to
      * collide) still consumes its own budget slot, but must not emit a
      * duplicate log line or progress event for what looks, from the outside,
@@ -1404,7 +1404,7 @@ final class AuditOrchestratorTest extends TestCase
     public function test_lines_overlap_detects_touching_ranges_on_left_boundary(): void
     {
         // Covers $start1 <= $end2 boundary (mutant: <= → <).
-        // existing vuln1 (10-20) persisted first; then vuln2 (5-10) — touching at start1==end2==10.
+        // existing vuln1 (10-20) persisted first; then vuln2 (5-10), touching at start1==end2==10.
         $attackerLlm = self::createStub(LLMClientInterface::class);
         $reviewerLlm = self::createStub(LLMClientInterface::class);
         $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
@@ -1669,7 +1669,7 @@ final class AuditOrchestratorTest extends TestCase
     /**
      * A review that failed reached no verdict: telling the attacker the
      * reviewer rejected that finding would stop it from ever reporting it
-     * again, and the reviewer from getting another chance at it.
+     * again and the reviewer from getting another chance at it.
      *
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException

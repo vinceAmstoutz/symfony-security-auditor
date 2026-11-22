@@ -19,7 +19,7 @@ use Composer\InstalledVersions;
  * Removes what differs between two runs of the same release: the workspace
  * and checkout paths, the discard device, the clock and the date, run identifiers,
  * durations, the PHP version and the versions of the packages the binary
- * prints or pins, and the line numbers of an uncaught exception's origin.
+ * prints or pins and the line numbers of an uncaught exception's origin.
  */
 final readonly class Normalizer
 {

@@ -22,9 +22,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\S
  * the binary's own, unless the tree holds another `symfony/ai-platform` than
  * the bundled one: that tree stays unloaded and the commands needing it say
  * why. A tree whose platform check refuses this PHP is reported rather than
- * fatal, so the command still runs — `init` included, which rebuilds it.
+ * fatal, so the command still runs (`init` included, which rebuilds it).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class BridgeTreeLoader
 {

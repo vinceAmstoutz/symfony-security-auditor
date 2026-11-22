@@ -35,7 +35,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ScopedProjectFileScan
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SkippedFileReportingProjectFileScannerInterface;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class ProjectFileScanner implements ScopedProjectFileScannerInterface, SkippedFileReportingProjectFileScannerInterface, ReadSharingProjectFileScannerInterface, ProbingProjectFileScannerInterface
 {
     /** @var list<string> */
@@ -54,10 +54,10 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
      * findings. Matches the Symfony Flex skeleton (`src/` for PHP, `config/`
      * for YAML/XML, `templates/` for Twig, `public/index.php` for the HTTP
      * front controller, plus the root dotenv files where committed secrets
-     * hide — the gitignored `.env.local` variants are pruned by the default
+     * hide; the gitignored `.env.local` variants are pruned by the default
      * `respect_gitignore: true`). Anything outside this list is silently
-     * skipped — including ad-hoc root-level scripts, `bin/`, custom `app/`
-     * or `lib/` trees, and the build artefacts in `var/`, `public/build`,
+     * skipped, including ad-hoc root-level scripts, `bin/`, custom `app/`
+     * or `lib/` trees and the build artefacts in `var/`, `public/build`,
      * `vendor/`. Override via `scan.included_paths` for non-standard layouts.
      *
      * @var list<string>
@@ -198,8 +198,8 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     }
 
     /**
-     * Paths that overlap — a directory and one inside it, a directory and a
-     * file in it — reach the same file more than once.
+     * Paths that overlap (a directory and one inside it, a directory and a
+     * file in it) reach the same file more than once.
      */
     private function eachFileOnce(ProjectFileScan $projectFileScan): ProjectFileScan
     {
@@ -242,8 +242,8 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
 
     /**
      * A filesystem lists a directory in its own storage order, which differs
-     * between machines; the chunks built from this list, and the prompts and
-     * cache keys built from those, must not.
+     * between machines; the chunks built from this list (and the prompts and
+     * cache keys built from those) must not.
      */
     private function inRelativePathOrder(ProjectFileScan $projectFileScan): ProjectFileScan
     {
@@ -391,7 +391,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
 
     /**
      * Containment is decided on real paths, not on spellings: a symlink
-     * committed in the audited repository can point anywhere on the machine,
+     * committed in the audited repository can point anywhere on the machine
      * and a lexical check would call `src/link/` or `src/link/deep/..` part of
      * the project while the filesystem walks into the link's target.
      *
@@ -478,7 +478,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     /**
      * Finder's `files()` leaves out directories alone, so a named pipe, a
      * socket or a device node named like a source file reaches this point:
-     * opening a pipe waits for a writer forever, and a device may never end,
+     * opening a pipe waits for a writer forever and a device may never end,
      * so anything but a regular file is reported unreadable without being
      * opened.
      *

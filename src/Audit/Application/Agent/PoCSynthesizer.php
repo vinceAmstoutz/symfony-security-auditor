@@ -26,7 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use function Symfony\Component\String\u;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  *
  * Generates a concrete, copy-pasteable proof-of-concept (curl, console,
  * request body, …) for every accepted finding at or above the configured
@@ -221,7 +221,7 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
     /**
      * LLM-echoed finding text is interpolated into this prompt's own
      * ```-delimited code-fence and `###`-prefixed section headers; an
-     * unescaped run of backticks would let the finding forge a fake fence,
+     * unescaped run of backticks would let the finding forge a fake fence
      * and an unescaped `#` would let it forge a fake section header (e.g. a
      * bogus `### SYSTEM OVERRIDE`) as unguarded top-level prompt text.
      */
@@ -232,7 +232,7 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
 
     /**
      * `title` lands in the bare, single-line `Title: ...` slot with no
-     * surrounding fence or heading to contain it — unlike the fenced/heading
+     * surrounding fence or heading to contain it, unlike the fenced/heading
      * -guarded narrative fields `escapeFences()` protects. A raw newline here
      * would forge a fake standalone instruction paragraph as unguarded
      * top-level prompt text.

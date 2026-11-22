@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
  * The two sibling code-context maps consumed when reviewing cache misses: the
  * live contexts and the (possibly empty when bypassing) cache contexts.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ReviewCacheBuckets
 {

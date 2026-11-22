@@ -288,12 +288,12 @@ final class EscalatingAttackerAgentTest extends TestCase
     }
 
     /**
-     * `Vulnerability::filePath()` is free text echoed back by the LLM — the
+     * `Vulnerability::filePath()` is free text echoed back by the LLM: the
      * schema only constrains it to a non-blank string, so a cheap-model
      * quirk like a leading `./` (a plausible path-normalization artifact) is
      * never enforced to exactly match `ProjectFile::relativePath()`. Without
      * normalizing both sides before comparing, the file with a real cheap
-     * finding is silently excluded from the expensive pass — the escalation
+     * finding is silently excluded from the expensive pass: the escalation
      * feature quietly no-ops for it, indistinguishable from "nothing needed
      * escalating".
      *

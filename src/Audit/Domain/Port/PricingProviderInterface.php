@@ -18,7 +18,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
  *
  * Implementations may consult a hardcoded table, a configuration file, or an
  * external pricing service. Unknown models should return `0.0` rather than
- * throw — the audit pipeline keeps running with cost tracking disabled.
+ * throw: the audit pipeline keeps running with cost tracking disabled.
  */
 interface PricingProviderInterface
 {

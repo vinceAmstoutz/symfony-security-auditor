@@ -24,7 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Patch\UnifiedDiff;
  * lines, gets none. The fence is one backtick longer than any run of
  * backticks the code holds, so the code cannot close it early.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class GithubSuggestion
 {
@@ -56,8 +56,8 @@ final readonly class GithubSuggestion
 
     /**
      * The review comment GitHub turns into a one-click fix on the lines it
-     * replaces, with the lines it expects there so a workflow can check the
-     * commit it comments on still holds them, and a key naming the finding and
+     * replaces, with the lines it expects there (so a workflow can check the
+     * commit it comments on still holds them) and a key naming the finding and
      * those lines so a rerun does not post it twice.
      *
      * @return array{key: string, path: string, start_line: int, line: int, expected: list<string>, body: string}

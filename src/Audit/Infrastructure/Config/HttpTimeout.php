@@ -18,13 +18,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\P
 
 /**
  * How long the standalone binary's HTTP client waits for a provider that sends
- * nothing, in seconds — the idle timeout of every request; how long a request
+ * nothing, in seconds: the idle timeout of every request; how long a request
  * takes in total is not bounded. Without it the client falls back to PHP's
- * `default_socket_timeout`, 60 seconds, and gives up on a non-streamed answer
+ * `default_socket_timeout` (60 seconds) and gives up on a non-streamed answer
  * that a slow local model or a self-hosted gateway takes longer to start
  * sending.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class HttpTimeout
 {

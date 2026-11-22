@@ -22,7 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\InstalledPackagesRead
 
 use function Symfony\Component\String\b;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class LockfileInstalledPackagesReader implements InstalledPackagesReaderInterface
 {
     private const string SELF_VERSION = 'self.version';

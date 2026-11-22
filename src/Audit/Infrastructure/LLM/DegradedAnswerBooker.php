@@ -25,9 +25,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 
 /**
- * Books a failed call where it failed. A provider that answered — with
+ * Books a failed call where it failed. A provider that answered, with
  * nothing usable (cut off by the output limit, withheld by a content filter,
- * or empty) or with a tool call whose arguments are not valid JSON — bills the
+ * or empty) or with a tool call whose arguments are not valid JSON, bills the
  * request it accepted, yet the run goes on past such an answer or retries it.
  * So it is booked against the budget, the report's token totals and the
  * rate-limit window: at the usage its raw answer reports, or at its estimated
@@ -36,7 +36,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
  * input tokens as its input, beside the output it reports. A call the
  * provider never answered only releases its rate-limit reservation.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class DegradedAnswerBooker
 {

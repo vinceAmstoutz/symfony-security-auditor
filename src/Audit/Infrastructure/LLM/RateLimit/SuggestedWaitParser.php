@@ -28,7 +28,7 @@ use Throwable;
  * token limit outlasts. Messages are matched byte for byte, since a
  * provider's message is not always valid UTF-8.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SuggestedWaitParser
 {

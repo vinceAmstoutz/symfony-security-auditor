@@ -22,10 +22,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ConnectionCheckInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ConnectionProbe;
 
 /**
- * Builds the audit's container from the saved configuration, as a run
- * would, and sends its LLM client the one short request of the probe.
+ * Builds the audit's container from the saved configuration (as a run
+ * would) and sends its LLM client the one short request of the probe.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class StandaloneConnectionCheck implements ConnectionCheckInterface
 {

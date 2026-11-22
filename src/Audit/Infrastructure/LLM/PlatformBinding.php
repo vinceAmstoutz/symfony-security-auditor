@@ -19,10 +19,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Miss
 
 /**
  * The per-client symfony/ai binding: the platform handle, the model that
- * selects it, the logger, and the model's max-output-token cap. These are the
+ * selects it, the logger and the model's max-output-token cap. These are the
  * values that vary between the attacker / reviewer / cheap clients.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PlatformBinding
 {

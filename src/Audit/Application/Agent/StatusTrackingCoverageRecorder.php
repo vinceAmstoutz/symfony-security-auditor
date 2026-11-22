@@ -25,13 +25,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\InconclusiveAnaly
  * Forwards everything to the recorder it wraps and remembers the attacker's
  * last status per file, so the escalating agent can tell which files the
  * expensive pass actually judged once that pass returns, why a file that
- * ended errored did, and which analyzed files were judged on a partial look.
+ * ended errored did and which analyzed files were judged on a partial look.
  *
  * Mutable by design: it accumulates the pass's coverage while the pass runs,
  * so it opts out of the final readonly rule as a per-run accumulator (see
  * .claude/rules/php-classes.md: documented context carriers).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class StatusTrackingCoverageRecorder implements CoverageRecorderInterface, FailureReasonRecorderInterface, InconclusiveAnalysisRecorderInterface
 {

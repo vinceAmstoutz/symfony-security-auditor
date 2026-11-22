@@ -21,13 +21,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProbingProjectFileSca
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 
 /**
- * Resolves the exact set of files an audit would ingest — the project scan
- * scoped to the `--path` values as the real run scopes it — without
+ * Resolves the exact set of files an audit would ingest (the project scan
+ * scoped to the `--path` values as the real run scopes it) without
  * invoking the LLM. Backs the `--show-scanned` console option so a user can
  * confirm their `included_paths` / `--path` configuration matches the files
  * they expect before paying for a run.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ListScannedFilesUseCase
 {

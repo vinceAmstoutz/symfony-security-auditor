@@ -17,11 +17,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
  * Names the lines a statement spans from the line it starts on: every line
  * that follows while a parenthesis opened on the way is still open. String
  * literals and comments, which may span lines themselves, never count. A
- * statement whose parentheses are never closed spans its first line only, and
+ * statement whose parentheses are never closed spans its first line only and
  * so does one that stays open past the next {@see self::MAX_LOOKAHEAD_LINES}
  * lines: the cost of one statement is bounded, not the length of the file.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class MultiLineCallExtent
 {

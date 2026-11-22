@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\E
 use RuntimeException;
 use Throwable;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class SelfUpdateFailedException extends RuntimeException
 {
     public static function forUnresolvableLatestVersion(string $source, ?Throwable $throwable = null): self

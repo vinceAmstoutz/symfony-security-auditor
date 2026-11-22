@@ -28,7 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolv
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class IngestionStage implements StageInterface
 {
     private const string SECRET_SCRUBBING = 'secret_scrubbing';
@@ -86,7 +86,7 @@ final readonly class IngestionStage implements StageInterface
 
     /**
      * What the scrubber redacted and the static pre-scan matched is queued as
-     * candidate findings for the reviewer, and announced right away.
+     * candidate findings for the reviewer and announced right away.
      *
      * @param list<ProjectFile> $files
      */
@@ -132,7 +132,7 @@ final readonly class IngestionStage implements StageInterface
      * read back one way only once its invalid UTF-8 is repaired is `errored`,
      * so the run cannot pass as complete without it.
      * Only the files the run was asked to cover are listed: `ScopedScan`
-     * hands over those under the `--path` scope only, and for a `--since` run
+     * hands over those under the `--path` scope only and for a `--since` run
      * the ones not changed since the ref are left out here.
      *
      * @param list<SkippedFile> $skippedFiles

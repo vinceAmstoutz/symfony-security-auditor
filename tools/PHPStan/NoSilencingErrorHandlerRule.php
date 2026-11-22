@@ -29,7 +29,7 @@ use PHPStan\Rules\RuleErrorBuilder;
 use PHPStan\ShouldNotHappenException;
 
 /**
- * Forbids set_error_handler() with a callback that merely returns true — a
+ * Forbids set_error_handler() with a callback that merely returns true: a
  * blanket silencer that swallows every error just like the @ operator.
  *
  * @implements Rule<FuncCall>

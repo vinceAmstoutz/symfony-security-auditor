@@ -18,7 +18,7 @@ use Override;
 /**
  * Compares two decoded JSON audit reports by finding fingerprint.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ReportDiffer implements ReportDifferInterface
 {
@@ -69,8 +69,8 @@ final readonly class ReportDiffer implements ReportDifferInterface
     }
 
     /**
-     * A finding the current run found again and left out of its report —
-     * accepted by the baseline, or muted by type — is not fixed. Each
+     * A finding the current run found again and left out of its report
+     * (accepted by the baseline, or muted by type) is not fixed. Each
      * fingerprint the report lists as suppressed shelters one disappeared
      * finding, the way a baseline entry covers one finding.
      *
@@ -100,7 +100,7 @@ final readonly class ReportDiffer implements ReportDifferInterface
 
     /**
      * A finding that disappeared from a file the current run never finished
-     * analyzing, or never looked at, is not fixed — nobody looked — so it is
+     * analyzing, or never looked at, is not fixed (nobody looked), so it is
      * kept apart from the ones whose file was analyzed and came back clean.
      *
      * @param list<DiffFinding> $disappeared
@@ -126,7 +126,7 @@ final readonly class ReportDiffer implements ReportDifferInterface
 
     /**
      * Two distinct findings can share a fingerprint (same type/file/title,
-     * different line) — grouping by fingerprint instead of overwriting keeps
+     * different line): grouping by fingerprint instead of overwriting keeps
      * both instead of silently dropping one. Buckets are paired off by count:
      * a fingerprint with more entries in `$findings` than in `$excluded`
      * contributes only its excess as "not excluded", matching each shared

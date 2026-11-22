@@ -17,9 +17,9 @@ use Symfony\AI\Platform\Exception\IncompleteStreamException;
 
 /**
  * A stream that ended without reporting its usage, so its bill is unknown:
- * the call is sent again, and the platform is no longer streamed.
+ * the call is sent again and the platform is no longer streamed.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class UnmeteredStreamException extends IncompleteStreamException
 {

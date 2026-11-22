@@ -281,7 +281,7 @@ final class RegexCodeSlicerTest extends TestCase
 
     /**
      * A heredoc body line that merely starts with the closing identifier word
-     * — followed by more text, not by `;`/`,`/`)` — is not a real PHP closing
+     * (followed by more text, not by `;`/`,`/`)`) is not a real PHP closing
      * marker, only a body line that happens to share its first word.
      *
      * @throws InvalidProjectFileException
@@ -306,10 +306,10 @@ final class RegexCodeSlicerTest extends TestCase
 
     /**
      * When a still-open multi-line call's closing `)`/`;` sits on the same
-     * line as the heredoc's closing identifier (a common Doctrine/DBAL idiom
-     * — `->executeQuery(<<<SQL ... SQL);`), that line is consumed entirely by
+     * line as the heredoc's closing identifier (a common Doctrine/DBAL idiom:
+     * `->executeQuery(<<<SQL ... SQL);`), that line is consumed entirely by
      * the heredoc branch and its trailing code must still feed continuation
-     * tracking — otherwise `openParenDepth` never returns to zero and every
+     * tracking: otherwise `openParenDepth` never returns to zero and every
      * remaining line in the file is force-retained.
      *
      * @throws InvalidProjectFileException
@@ -548,7 +548,7 @@ final class RegexCodeSlicerTest extends TestCase
     public function test_inert_line_resembling_keyword_mid_line_is_elided(): void
     {
         // A comment mentioning "namespace"/"class" mid-line must NOT be treated as
-        // structural — it is only structural when the keyword is at the line start.
+        // structural: it is only structural when the keyword is at the line start.
         $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)."        // the class and namespace are fine\n".str_repeat("        \$x = 1;\n", 20);
         $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
 

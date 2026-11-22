@@ -22,7 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TemplateLoa
  * chart of finding totals over the report series plus a table of per-report
  * new/fixed/unverified deltas.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class TrendHtmlRenderer implements TrendHtmlRendererInterface
 {
@@ -202,8 +202,8 @@ final readonly class TrendHtmlRenderer implements TrendHtmlRendererInterface
     }
 
     /**
-     * Report paths are echoed into markup, so — exactly as the HTML report
-     * renderer does — invalid UTF-8 is repaired, bidi overrides are stripped,
+     * Report paths are echoed into markup, so (exactly as the HTML report
+     * renderer does) invalid UTF-8 is repaired, bidi overrides are stripped
      * and the result is HTML-escaped so a crafted path cannot inject markup
      * or visually reorder the rendered text.
      */

@@ -20,12 +20,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
  * listed by `symfony/ai-bundle`'s `config/platform/*.php`. Taking a `base_url`
  * and being instance keyed are independent: `azure`, `generic` and
  * `openresponses` are both, while `albert` and `amazeeai` require a `base_url`
- * on a flat block, and `bedrock`, `cache` and `failover` are instance keyed
+ * on a flat block; `bedrock`, `cache` and `failover` are instance keyed
  * with no `base_url` at all. Every other platform names its endpoint
  * differently (`ollama` uses `endpoint`, `lmstudio` uses `host_url`) or hosts
  * no endpoint of its own.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class BaseUrlPlatforms
 {

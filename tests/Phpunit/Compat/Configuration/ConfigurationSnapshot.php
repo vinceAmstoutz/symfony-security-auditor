@@ -18,7 +18,7 @@ use Symfony\Component\Config\Definition\NodeInterface;
 
 /**
  * Everything the configuration contract holds for one path of whichever
- * checkout is autoloaded — the snapshot `tools/Compat/record-configuration.php`
+ * checkout is autoloaded: the snapshot `tools/Compat/record-configuration.php`
  * records from a release and `ConfigurationCompatibilityTest` compares with.
  */
 final readonly class ConfigurationSnapshot

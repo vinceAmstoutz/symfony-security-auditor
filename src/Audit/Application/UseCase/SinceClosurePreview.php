@@ -21,11 +21,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 
 /**
  * The files a `--since` run audits once `audit.since_closure` widened its
- * diff, for the previews that run no pipeline — `--show-scanned` and
- * `--dry-run` — so they list and price what the run will send. The project
+ * diff, for the previews that run no pipeline (`--show-scanned` and
+ * `--dry-run`), so they list and price what the run will send. The project
  * mapping is read only when the closure widens the run.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SinceClosurePreview
 {

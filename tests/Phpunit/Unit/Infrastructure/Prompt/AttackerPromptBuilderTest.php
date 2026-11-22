@@ -642,7 +642,7 @@ final class AttackerPromptBuilderTest extends TestCase
     /**
      * A second `access_control` rule for the same path is recorded as a
      * single `or: ...`-prefixed entry appended to the first rule's own list
-     * (see `SymfonyYamlSecurityConfigParser::recordAccessControlEntry()`) —
+     * (see `SymfonyYamlSecurityConfigParser::recordAccessControlEntry()`):
      * this route is only reachable via POST, which only the second
      * (`ROLE_ADMIN`/`methods: POST`) rule covers, not the first
      * (`ROLE_USER`/`methods: GET`) one.
@@ -1759,7 +1759,7 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile, $controller]);
 
-        // Controller has higher attack-surface priority than Voter — must appear first regardless of input order.
+        // Controller has higher attack-surface priority than Voter: must appear first regardless of input order.
         $controllerPos = strpos($prompt, '<skills role="controller">');
         $voterPos = strpos($prompt, '<skills role="voter">');
 
@@ -1980,7 +1980,7 @@ final class AttackerPromptBuilderTest extends TestCase
             SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
         );
 
-        // Lock both per-line numbering AND the "\n" separator between lines —
+        // Lock both per-line numbering AND the "\n" separator between lines:
         // mutating implode's separator to "" would collapse these into one string.
         self::assertStringContainsString("  1 | <?php\n  2 | \n  3 | class Multi {}", $message);
     }

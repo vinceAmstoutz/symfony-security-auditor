@@ -23,7 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlRule;
  * `instanceof RuleOrderAwareSecurityConfigParserInterface`; without it, a
  * route is labelled from the access-control map alone.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface RuleOrderAwareSecurityConfigParserInterface extends SecurityConfigParserInterface
 {

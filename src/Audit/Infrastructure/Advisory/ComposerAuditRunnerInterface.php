@@ -20,7 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception
  * arbitrary project path. Split from the database implementation so we can stub
  * the shell-out in unit tests and swap to other audit sources later.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface ComposerAuditRunnerInterface
 {

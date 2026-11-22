@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
-/** @internal one implementation per output format — see docs/versioning.md */
+/** @internal one implementation per output format, see docs/versioning.md */
 interface ReportRendererInterface
 {
     /**

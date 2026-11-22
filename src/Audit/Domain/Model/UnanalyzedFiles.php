@@ -17,13 +17,13 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
  * Reads a coverage ledger for the files some stage set out to analyze and
  * never finished: its call failed (`errored`) or an abort stopped the run
  * before reaching it (`aborted`). The attacker revisits every file on each
- * iteration, so only its last word on a file counts; any other stage — the
- * reviewer judging one finding — loses that piece of work, so each of its
+ * iteration, so only its last word on a file counts; any other stage (the
+ * reviewer judging one finding) loses that piece of work, so each of its
  * failures counts, unless the ledger no longer lists it because a later
  * verdict for the same finding superseded it. Files the lean pre-scan left
  * out on purpose (`skipped`) are not among them.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class UnanalyzedFiles
 {

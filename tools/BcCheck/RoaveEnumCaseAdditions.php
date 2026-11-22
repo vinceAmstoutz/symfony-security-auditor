@@ -20,7 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tooling\BcCheck\Exception\UnpatchableEn
  * compatibility job no longer fails on a case added to an enum: its install
  * removes, from the changes the enum cases check of
  * roave/backward-compatibility-check returns, the one line that adds the
- * added cases, and a removed case still fails the job.
+ * added cases. A removed case still fails the job.
  */
 final readonly class RoaveEnumCaseAdditions
 {

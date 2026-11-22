@@ -30,7 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
  * the model cannot review with its whole file in the prompt is recorded as
  * errored and the review goes on with the next one.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SequentialReviewAnalyzer
 {

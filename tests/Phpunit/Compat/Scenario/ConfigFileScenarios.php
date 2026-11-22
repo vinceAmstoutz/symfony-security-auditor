@@ -16,9 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Scenario;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Every bundle configuration the recorded release documented — its
+ * Every bundle configuration the recorded release documented (its
  * `examples/configs` files and each `symfony_security_auditor:` block of its
- * README and docs, kept under `Input/<release>/` — loaded by an application
+ * README and docs, kept under `Input/<release>/`), loaded by an application
  * that then audits the base project.
  */
 final readonly class ConfigFileScenarios

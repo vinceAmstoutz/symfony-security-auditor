@@ -24,11 +24,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInter
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\InvalidCustomRiskPatternException;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  *
  * Pattern dictionary is split by file-type bucket. Each entry maps a regex
  * to a short pattern label and a human-readable description. The scanner
- * walks every file once, matches per-line, and emits one marker per match.
+ * walks every file once, matches per-line and emits one marker per match.
  */
 final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
 {
@@ -41,7 +41,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
 
     /**
      * Detects the `s` (DOTALL) flag among a PCRE pattern's trailing modifier
-     * letters — the run of letters after the closing delimiter, which is never
+     * letters: the run of letters after the closing delimiter, which is never
      * itself a letter, so no in-pattern `s` is mistaken for the modifier.
      */
     private const string TRAILING_DOT_ALL_MODIFIER = '/s[a-zA-Z]*$/';
@@ -530,12 +530,12 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
      * or messenger handler calling `unserialize()` on request input is at least
      * as exploitable. `scan()` selects a single type bucket per file, so
      * without this every non-`php` component (controller, voter, entity,
-     * repository, form, authenticator, …) would miss those markers — and under
+     * repository, form, authenticator, …) would miss those markers; under
      * the `fast` profile's lean-mode filter, which drops files carrying zero
      * markers, such a file would be excluded from the audit entirely. Keyed by
      * label, so a `php`-typed file (whose own bucket already is the `php` set)
      * gets each pattern exactly once after the spread merge. Non-PHP files
-     * (Twig templates, YAML config) are excluded — these patterns are
+     * (Twig templates, YAML config) are excluded: these patterns are
      * PHP-source specific.
      *
      * @return array<string, array{regex: string, description: string}>
@@ -552,10 +552,10 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
     /**
      * The request-input markers (`request_get`, `redirect_with_input`,
      * `submit_request_all`, `request_mapping_attribute`) live in the CONTROLLER
-     * bucket, but `#[ApiResource]` classes, `#[AsLiveComponent]` classes, and
+     * bucket, but `#[ApiResource]` classes, `#[AsLiveComponent]` classes and
      * EasyAdmin `AbstractCrudController` classes classify as their own type
      * while still declaring `#[Route]`-mapped or custom actions that read
-     * `$request` — the controller-like pattern the mapping parsers and the
+     * `$request`, the controller-like pattern the mapping parsers and the
      * chunker already honour via {@see ProjectFileType::isControllerLike()}.
      * Without this merge, such an action produces zero markers and is excluded
      * by the `fast` profile's lean-mode filter, which drops files carrying no
@@ -603,8 +603,8 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
 
     /**
      * A pattern the PCRE engine refuses to evaluate on one line will refuse on
-     * every remaining line too — e.g. `pcre.backtrack_limit` exhausted by a
-     * catastrophic-backtracking pattern — so evaluation stops for this pattern
+     * every remaining line too (e.g. `pcre.backtrack_limit` exhausted by a
+     * catastrophic-backtracking pattern), so evaluation stops for this pattern
      * rather than repeating a failing (and CPU-costly) call once per remaining
      * line.
      */
@@ -618,7 +618,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
 
     /**
      * A well-formed PCRE pattern always has a non-empty delimiter and its
-     * closing counterpart somewhere in the string — both are asserted rather
+     * closing counterpart somewhere in the string: both are asserted rather
      * than branched on, since a pattern violating either is already
      * malformed and will fail its own `preg_match()` call regardless of what
      * this method returns.
@@ -630,7 +630,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
 
     /**
      * A cross-line match's own security-relevant token (`return null;`, the
-     * actual `->request(` call) sits at the END of the match, not its start —
+     * actual `->request(` call) sits at the END of the match, not its start:
      * a marker line pointing to the match's opening keyword (e.g. `public
      * function supports(`) is often a structural line the code slicer already
      * retains unconditionally, restoring nothing.

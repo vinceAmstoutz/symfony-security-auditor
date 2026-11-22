@@ -24,8 +24,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
  *
  * Implementations MUST preserve input order in the returned list (response[i]
  * corresponds to requests[i]) and MUST be behaviourally identical to calling
- * `completeWithTools()` once per request — each request's tools are executed
- * against its own registry, and the only difference is wall-clock latency.
+ * `completeWithTools()` once per request: each request's tools are executed
+ * against its own registry and the only difference is wall-clock latency.
  * A best-effort implementation that cannot actually parallelise is free to
  * resolve sequentially.
  */

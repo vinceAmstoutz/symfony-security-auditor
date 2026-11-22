@@ -20,7 +20,7 @@ use function Symfony\Component\String\u;
  * feature, so grouping a project costs time proportional to its files rather
  * than to its files times its controllers.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class FeatureNameIndex
 {

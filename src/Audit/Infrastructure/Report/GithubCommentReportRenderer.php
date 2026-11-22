@@ -20,11 +20,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 /**
  * Renders an audit report as a pull-request comment body: the grade and
  * normalized score as a headline, then the most severe findings as one table
- * row each. Sized for a comment rather than a full report — {@see MARKER} lets
- * a workflow find its own previous comment and edit it in place, and the row cap
+ * row each. Sized for a comment rather than a full report: {@see MARKER} lets
+ * a workflow find its own previous comment and edit it in place; the row cap
  * keeps a large report from hitting GitHub's comment length limit.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class GithubCommentReportRenderer implements ReportRendererInterface
 {

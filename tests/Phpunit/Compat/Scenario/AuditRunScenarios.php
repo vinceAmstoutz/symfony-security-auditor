@@ -22,7 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Platform\PlatformScript;
  * `audit:run` of an application with the bundle, one behaviour each: the
  * collection modes, profiles, filters, iterations and deduplication, the
  * scan scope, `--since` and `--path`, budgets and provider failures, the
- * caches, escalation, how sloppy model answers are read, and an
+ * caches, escalation, how sloppy model answers are read and an
  * application's own client and stage.
  */
 final readonly class AuditRunScenarios

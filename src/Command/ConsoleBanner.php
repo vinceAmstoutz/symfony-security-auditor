@@ -17,11 +17,11 @@ use Override;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * The product identity line, shared by every entry point that shows it — the
- * `audit` command through `AuditPresenter::header()`, and every other
+ * The product identity line, shared by every entry point that shows it: the
+ * `audit` command through `AuditPresenter::header()` and every other
  * standalone-binary command through `StandaloneApplication::doRun()`.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ConsoleBanner implements ConsoleBannerInterface
 {
@@ -41,7 +41,7 @@ final readonly class ConsoleBanner implements ConsoleBannerInterface
     private const string BANNER_PINK = '#e71c55';
 
     /**
-     * Brightened from the wordmark's `#242d5c` in `assets/banner.webp` — that
+     * Brightened from the wordmark's `#242d5c` in `assets/banner.webp`: that
      * navy sits on the banner image's light background, but as terminal
      * foreground text it degrades toward black on a 16-colour palette and
      * disappears on the dark background most terminals default to.
@@ -94,8 +94,8 @@ final readonly class ConsoleBanner implements ConsoleBannerInterface
     }
 
     /**
-     * The locale variables are the portable signal, and a Windows console
-     * sets none of them unless the shell is UTF-8 aware — so Windows lands on
+     * The locale variables are the portable signal and a Windows console
+     * sets none of them unless the shell is UTF-8 aware, so Windows lands on
      * the ASCII wordmark without this needing a platform branch, which could
      * only ever be exercised on one platform's CI leg.
      */

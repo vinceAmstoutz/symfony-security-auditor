@@ -25,7 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFileReason;
  * scan never follows one, so each is reported as left out, under the same
  * rules as the walk for dot directories and `.gitignore` files.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SymlinkedDirectories
 {

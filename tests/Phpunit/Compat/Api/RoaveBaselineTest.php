@@ -22,7 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\UnreleasedChangelog;
 
 /**
  * Every break `.roave-backward-compatibility-check.xml` accepts is one line
- * the API compatibility job reported, written as that line, and announced by
+ * the API compatibility job reported, written as that line and announced by
  * a bullet under `## [Unreleased]` in `CHANGELOG.md`, named in the comment
  * right before it: a wildcard could accept a break nobody looked at.
  */

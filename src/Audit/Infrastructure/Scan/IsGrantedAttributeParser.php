@@ -23,7 +23,7 @@ use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\String_;
 
 /**
- * Extracts `#[IsGranted(...)]`/`#[Security(...)]` attribute values —
+ * Extracts `#[IsGranted(...)]`/`#[Security(...)]` attribute values:
  * `#[IsGranted]`'s value parameter is `$attribute`, `#[Security]`'s is
  * `$expression`; both are resolved the same way, matched by name when the
  * call uses named arguments (so a reordered call still yields the right
@@ -32,7 +32,7 @@ use PhpParser\Node\Scalar\String_;
  * whether it is written as that name or as an expression that only calls
  * `is_granted()` on it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class IsGrantedAttributeParser
 {
@@ -70,7 +70,7 @@ final readonly class IsGrantedAttributeParser
 
     /**
      * A value argument is a genuine access check even when it cannot be
-     * resolved to a literal string (an enum case, `new Expression(...)`) —
+     * resolved to a literal string (an enum case, `new Expression(...)`):
      * presence alone is sufficient, matching this parser's established
      * "presence is sufficient" heuristic. Only {@see self::extractValues()}'s
      * display list is limited to literal strings.

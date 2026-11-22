@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
  * Where a chunk's findings are cached and whether they may be: everything a
  * cache lookup needs of a {@see ChunkContext}, known before its prompts are.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ChunkCacheCoordinates
 {

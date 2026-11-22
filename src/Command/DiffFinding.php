@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
  * A single finding surfaced by {@see ReportDifferInterface}, carrying only the
  * fields a diff needs to identify and display it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class DiffFinding
 {

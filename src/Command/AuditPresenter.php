@@ -28,7 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterf
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\WorkflowCommandText;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class AuditPresenter implements AuditPresenterInterface
 {
     private const string NO_FILE_FOUND_VERDICT = 'The scan found no file to audit, so the run has no verdict.';
@@ -201,7 +201,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     /**
      * Derived from the cost breakdown itself rather than restating
      * `EstimateAuditCostUseCase::DEFAULT_REVIEWER_INPUT_RATIO` as a fixed
-     * string — a caller constructing the use case with a different ratio, or
+     * string: a caller constructing the use case with a different ratio, or
      * a future change to the default, would otherwise silently drift from
      * this caveat.
      */
@@ -251,16 +251,16 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 
     /**
      * A lighter-weight replacement for `SymfonyStyle::success()` on
-     * intermediate confirmations — no boxed `[OK]` block, just a short line —
+     * intermediate confirmations (no boxed `[OK]` block, just a short line)
      * but keeping its leading marker (gated on `isDecorated()`, since a
      * redirected/CI log has no use for an emoji) and its trailing blank line,
      * so it doesn't abut whatever prints next.
      */
     /**
      * `SymfonyStyle::note()` frames a caveat in a full-width `[NOTE]` block
-     * with a `!` gutter down every wrapped line — weight this earns only for
+     * with a `!` gutter down every wrapped line: weight this earns only for
      * something the reader must act on. A dimmed line reads as the footnote
-     * it is, and matches the other estimate caveats printed alongside it.
+     * it is and matches the other estimate caveats printed alongside it.
      */
     private function caveat(SymfonyStyle $symfonyStyle, string $message): void
     {
@@ -287,8 +287,8 @@ final readonly class AuditPresenter implements AuditPresenterInterface
      * where a filename may legally contain a newline, ANSI escape or bidi
      * override. `OutputFormatter::escape()` neutralises `<`/`>` markup but not
      * those characters, so the path is first collapsed to a single line and
-     * stripped of control/bidi characters — a crafted filename cannot forge a
-     * fake listing entry or spoof the terminal — and a legacy `##[command]`
+     * stripped of control/bidi characters (a crafted filename cannot forge a
+     * fake listing entry or spoof the terminal) and a legacy `##[command]`
      * in it is defused for a CI runner's log.
      */
     /**
@@ -418,8 +418,8 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     }
 
     /**
-     * A run with no verdict — no file found, or none analyzed and nothing
-     * found — states no risk level: a SAFE there would vouch for code nobody
+     * A run with no verdict (no file found, or none analyzed and nothing
+     * found) states no risk level: a SAFE there would vouch for code nobody
      * read.
      */
     private function incompleteSummary(AuditReport $auditReport): string

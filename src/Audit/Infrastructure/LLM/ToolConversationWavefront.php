@@ -42,14 +42,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Tran
  * Runs every tool-using conversation in a concurrency window as a wavefront:
  * each round dispatches the next platform invocation for every still-pending
  * conversation WITHOUT blocking, then resolves them, executes the requested
- * tools against that conversation's own registry, and queues the follow-up
+ * tools against that conversation's own registry and queues the follow-up
  * round. On an async transport (the symfony/ai DeferredResult contract) the
  * per-round invocations overlap on the wire. A conversation whose last round
- * still asks to read gets one closing request ({@see FinalRound}), and one
+ * still asks to read gets one closing request ({@see FinalRound}); one
  * that reads again ends at the iteration cap. Any dispatch or resolution
  * failure first retries the same conversation through
- * `RetryingPlatformInvoker` — the same classify-then-retry-or-fail seam the
- * sequential path uses — once the budget allows another call. When every
+ * `RetryingPlatformInvoker` (the same classify-then-retry-or-fail seam the
+ * sequential path uses) once the budget allows another call. When every
  * attempt of that retry fails transiently, the audit aborts as it does on the
  * sequential path, under an attempt count that includes the dispatch. When the
  * retry fails otherwise, a conversation that hasn't run a tool yet falls back
@@ -57,11 +57,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Tran
  * already ran a tool cannot restart without executing it twice: a failure
  * classified non-transient is rethrown instead of masked, per the LLM seam's
  * contract that non-transient provider failures must never be swallowed into
- * a false-negative SAFE result, and anything else finalizes it as an empty
+ * a false-negative SAFE result; anything else finalizes it as an empty
  * `empty_content` response.
  *
- * An answer with nothing usable in it — empty, cut off by the output limit or
- * withheld by a content filter — is never retried or restarted either: the
+ * An answer with nothing usable in it (empty, cut off by the output limit or
+ * withheld by a content filter) is never retried or restarted either: the
  * conversation ends as the matching degraded response.
  *
  * A prompt the model cannot take in is never retried or restarted: before any
@@ -71,7 +71,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Tran
  * requests still in flight, so their HTTP responses neither wait for the
  * provider in their destructors nor replace the failure with their own.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ToolConversationWavefront
 {
@@ -141,9 +141,9 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * Refuses to dispatch a round once the budget is spent, and gives the
+     * Refuses to dispatch a round once the budget is spent and gives the
      * budget verdict only after every conversation the round did dispatch has
-     * been advanced — each was billed by the provider, so its spend belongs on
+     * been advanced: each was billed by the provider, so its spend belongs on
      * the books before the abort, not just the first one's.
      *
      * @param array<int, ConversationState> $states
@@ -249,9 +249,9 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * Every in-flight request left open is cancelled — including the
+     * Every in-flight request left open is cancelled (including the
      * conversation whose own advance threw, whose HTTP handle may still be
-     * open — and booked as spent. The conversation that threw is not booked:
+     * open) and booked as spent. The conversation that threw is not booked:
      * it was read to completion (its real usage is already recorded) or it
      * errored before generating anything. A conversation whose dispatch failed
      * never reached the provider: only its rate-limit reservation is released.
@@ -312,8 +312,8 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * A prompt the model cannot take in is not worth a retry or a restart —
-     * the same prompt is refused again — so it ends the conversation at once.
+     * A prompt the model cannot take in is not worth a retry or a restart
+     * (the same prompt is refused again), so it ends the conversation at once.
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
@@ -372,7 +372,7 @@ final readonly class ToolConversationWavefront
      * classify-then-retry-or-fail seam the sequential path uses. A retry whose
      * attempts all fail transiently aborts the audit, as the sequential path
      * does, counting the dispatch that failed first. A retry that fails
-     * otherwise goes to `abortConversation()`, and a retry the model refuses
+     * otherwise goes to `abortConversation()`; a retry the model refuses
      * as too large ends the conversation without the restart, which would
      * only send the same prompt a third time.
      *
@@ -456,7 +456,7 @@ final readonly class ToolConversationWavefront
      * scratch through completeWithTools(). After one ran it cannot restart
      * without executing that tool a second time: a failure classified
      * non-transient is rethrown, since finalizing it would mask a failure that
-     * repeats on every call behind a false-negative SAFE result, and anything
+     * repeats on every call behind a false-negative SAFE result; anything
      * else ends the conversation as `empty_content`, keeping what it recorded.
      *
      * @throws InvalidTokenUsageException
@@ -507,7 +507,7 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * The model answered, but with nothing usable — cut off by the output
+     * The model answered, but with nothing usable: cut off by the output
      * limit, withheld by a content filter, or empty. Asking again would get the
      * same answer at the same price, so the conversation ends as the degraded
      * response the sequential path returns for it, keeping any tool results it
@@ -533,8 +533,8 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * Before any tool ran, the refusal is the caller's to act on — the
-     * `request_too_large` response carries it as content, and the chunk it
+     * Before any tool ran, the refusal is the caller's to act on: the
+     * `request_too_large` response carries it as content and the chunk it
      * stands for gets split. After a tool ran it is the tool results that
      * outgrew the model, which splitting the chunk would not change, so the
      * conversation ends with what it recorded.

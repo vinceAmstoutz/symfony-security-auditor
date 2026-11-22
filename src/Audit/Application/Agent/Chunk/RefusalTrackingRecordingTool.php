@@ -24,7 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
  * finding the model sent and the tool turned away is not mistaken for a chunk
  * with nothing to report. The model still reads the tool's own answer.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class RefusalTrackingRecordingTool implements RecordingToolInterface
 {

@@ -26,7 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMCl
  * before the bundle's usage-booking decorators, while each id still names the
  * client the application wired.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class CheapAttackerClientNoticePass implements CompilerPassInterface
 {

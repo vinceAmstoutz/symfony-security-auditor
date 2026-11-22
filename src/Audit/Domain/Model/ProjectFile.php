@@ -62,7 +62,7 @@ final readonly class ProjectFile
     }
 
     /**
-     * Preserves the original `fileType()` instead of reclassifying — a
+     * Preserves the original `fileType()` instead of reclassifying: a
      * `CodeSlicer`-elided version of a content-detected component (e.g. a
      * voter matched via `implements VoterInterface`) must not lose its type
      * just because the slicer dropped the telltale line.
@@ -89,7 +89,7 @@ final readonly class ProjectFile
     }
 
     /**
-     * The framework-neutral shape of this file — what core logic switches on so
+     * The framework-neutral shape of this file: what core logic switches on so
      * it need not name a Symfony concept. {@see fileType()} stays the precise
      * taxonomy for prompts and skill lookup.
      */

@@ -213,7 +213,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      */
     public function test_output_token_estimate_uses_ceil_not_floor(): void
     {
-        // 100 * 0.21 = 21.0 exactly — floor=21, ceil=21, round=21. Useless to distinguish.
+        // 100 * 0.21 = 21.0 exactly: floor=21, ceil=21, round=21. Useless to distinguish.
         // Try 100 * 0.234 = 23.4 → ceil=24, floor=23, round=23. Picks ceil distinctly.
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [$this->makeProjectFile('a.php', 'aaa')],
@@ -481,7 +481,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      */
     public function test_scanned_files_are_set_on_the_audit_context(): void
     {
-        // Pins: `$auditContext->setProjectFiles($files)` — if removed, the resulting
+        // Pins: `$auditContext->setProjectFiles($files)`: if removed, the resulting
         // AuditReport's `filesScanned` would be 0 instead of the actual count.
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [
@@ -827,7 +827,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      * A real run renders a chunk's skill block from only that chunk's own
      * file types (`AttackerPromptBuilder::skillsForFiles()`), not the whole
      * project's type union. Two chunks with different types therefore get
-     * differently-sized skill text — a renderer stubbed to return the same
+     * differently-sized skill text: a renderer stubbed to return the same
      * text for every call would hide a regression that flattens this back
      * into "render once, multiply by chunk count".
      *
@@ -1226,7 +1226,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         };
     }
 
-    /** Recording estimator — returns 0 but captures the length of the last input seen. */
+    /** Recording estimator: returns 0 but captures the length of the last input seen. */
     private function measuringEstimator(): MeasuringTokenEstimator
     {
         return new MeasuringTokenEstimator();
@@ -1269,7 +1269,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     /**
      * Non-zero pricing fixture that produces costs with at least six significant
-     * decimals — used to pin the rounding mutators on the per-role cost rows
+     * decimals, used to pin the rounding mutators on the per-role cost rows
      * (`round(_, 6)`) which all collapse to 0.0 under `zeroPricing()`.
      */
     private function nonZeroPricing(float $inputPricePerMillion, float $outputPricePerMillion): PricingProviderInterface

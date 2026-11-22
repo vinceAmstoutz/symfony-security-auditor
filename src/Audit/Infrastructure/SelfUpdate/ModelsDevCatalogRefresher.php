@@ -24,7 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
 
 /**
  * Downloads the latest `symfony/models-dev` catalog snapshot to a writable
- * override location — `ModelsDevPricingProvider` checks it before falling
+ * override location: `ModelsDevPricingProvider` checks it before falling
  * back to the catalog frozen into the binary at build time. The only route a
  * standalone install otherwise has to a fresher catalog is a whole new
  * tagged release.
@@ -33,10 +33,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
  * it has been confirmed to decode as JSON *and* to carry at least one
  * priced model, so neither a truncated transfer nor an unrelated document
  * served in its place can overwrite a working catalog. The URL tracks
- * upstream `main` on purpose — a pinned ref would freeze the catalog at the
+ * upstream `main` on purpose: a pinned ref would freeze the catalog at the
  * same staleness a new tagged release already fixes.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ModelsDevCatalogRefresher implements PricingCatalogRefresherInterface
 {

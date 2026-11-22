@@ -23,7 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProfileAwareAttackerP
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
 use WeakMap;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class AttackerPromptBuilder implements ProfileAwareAttackerPromptBuilderInterface
 {
     /**
@@ -59,7 +59,7 @@ final readonly class AttackerPromptBuilder implements ProfileAwareAttackerPrompt
     /**
      * The route access-control map of every mapping this builder has seen,
      * dropped with it: matching each route against the repository's
-     * `access_control` patterns is the costly part of a user message, and
+     * `access_control` patterns is the costly part of a user message and
      * every chunk of a run shares the run's mapping.
      *
      * @var WeakMap<SymfonyMapping, string>
@@ -178,7 +178,7 @@ final readonly class AttackerPromptBuilder implements ProfileAwareAttackerPrompt
 
     /**
      * A scanned file's path comes from the audited project's filesystem, not
-     * from us — a POSIX filename may contain a raw newline, which would
+     * from us: a POSIX filename may contain a raw newline, which would
      * otherwise let a crafted filename forge a fake `##`-prefixed section
      * (e.g. the literal `## Source Code` heading further down this prompt)
      * as unguarded top-level prompt text.

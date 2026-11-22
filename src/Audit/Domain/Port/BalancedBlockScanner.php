@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
  * Finds the `[ ... ]` and `{ ... }` blocks of a text, skipping the brackets a
  * JSON string literal holds.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class BalancedBlockScanner
 {
@@ -53,7 +53,7 @@ final readonly class BalancedBlockScanner
 
     /**
      * True when `$content` starts with an opener and `scanBalancedBlockFrom`
-     * consumes the entire string — meaning the original top-level `json_decode`
+     * consumes the entire string, meaning the original top-level `json_decode`
      * call already saw exactly this payload.
      */
     public static function contentIsSingleBalancedBlock(string $content): bool
@@ -73,7 +73,7 @@ final readonly class BalancedBlockScanner
 
     /**
      * Delegates to {@see self::advanceStringLiteralState()} only when the
-     * content's quotes are genuinely paired — otherwise every character is
+     * content's quotes are genuinely paired. Otherwise every character is
      * reported as not consumed, so `openerPositions` tries every `[`/`{`
      * position directly instead of relying on a toggle a stray unpaired quote
      * would desync (see {@see self::hasBalancedQuotes()}).
@@ -93,13 +93,13 @@ final readonly class BalancedBlockScanner
 
     /**
      * An unescaped double-quote toggles "inside a string" on and off as
-     * `openerPositions` scans for genuine `[`/`{` openers —
+     * `openerPositions` scans for genuine `[`/`{` openers,
      * meant to skip a bracket embedded in a quoted prose phrase (see
      * `test_it_skips_a_leading_quoted_string_with_escaped_bracket_before_the_real_array`).
      * That toggle only makes sense when every quote in the content is
      * genuinely paired; a single unpaired literal quote before the real
      * JSON (e.g. a measurement like `5"`) would otherwise flip the running
-     * state permanently, hiding every opener after it — including the real
+     * state permanently, hiding every opener after it, including the real
      * one. Running the same state machine across the whole content and
      * checking whether it ends still "inside a string" detects that case,
      * so the scan can fall back to trying every opener directly instead.

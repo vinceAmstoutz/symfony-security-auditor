@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Patch;
  * The hunks a unified diff applies to one file, named by its path relative to
  * the project root.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class FilePatch
 {

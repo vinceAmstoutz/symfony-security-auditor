@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
  * One tool-using conversation bound for a tool-batch-capable client. Separate
  * from {@see LLMRequest} so the registry is never nullable.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ToolLLMRequest
 {

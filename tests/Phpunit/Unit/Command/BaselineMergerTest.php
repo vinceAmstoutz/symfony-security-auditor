@@ -235,8 +235,8 @@ final class BaselineMergerTest extends TestCase
 
     /**
      * A report that never analyzed a file says nothing about the findings in
-     * it, so a prune keeps their accepted entries — and the reasons a
-     * maintainer wrote for them.
+     * it, so a prune keeps their accepted entries (and the reasons a
+     * maintainer wrote for them).
      *
      * @param list<array{stage: string, file: string, status: string}> $coverage
      *
@@ -354,8 +354,8 @@ final class BaselineMergerTest extends TestCase
 
     /**
      * A run under a baseline leaves the findings it accepted out of its report,
-     * so the report lists them by fingerprint instead: their entries, and the
-     * reasons a maintainer wrote for them, outlive a prune.
+     * so the report lists them by fingerprint instead: their entries (and the
+     * reasons a maintainer wrote for them) outlive a prune.
      *
      * @throws MalformedBaselineFileException
      * @throws MalformedReportFileException
@@ -1088,7 +1088,7 @@ final class BaselineMergerTest extends TestCase
 
     /**
      * An entry a baseline written before 1.22 holds the `Injection` finding of
-     * `src/Foo.php` under: the path the model echoed with a leading `./`, and
+     * `src/Foo.php` under: the path the model echoed with a leading `./` and
      * the type it was reported as.
      *
      * @return array<string, string>
@@ -1108,7 +1108,7 @@ final class BaselineMergerTest extends TestCase
      * A report over two files of `/abs/project` whose findings are drawn from a
      * few types, files and titles so that they collide, sometimes listed under
      * a fingerprint of another finding, with any coverage, completeness and
-     * suppressed baseline fingerprints, and written by either release.
+     * suppressed baseline fingerprints, written by either release.
      *
      * @return array<string, mixed>
      */

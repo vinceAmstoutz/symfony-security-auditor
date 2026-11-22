@@ -25,7 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Exce
 /**
  * Fixed-minute token bucket with three independent dimensions (RPM, ITPM, OTPM).
  *
- * `acquire()` blocks until the next request fits inside the current window —
+ * `acquire()` blocks until the next request fits inside the current window,
  * either because capacity is available or because the next reset is reached.
  * `record()` reconciles the pre-call input estimate with the post-call actual
  * so subsequent `acquire()` decisions stay accurate. `pauseUntil()` propagates
@@ -34,17 +34,17 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Exce
  *
  * Class invariant: at least one rate-limit dimension is set. The bundle wires
  * `NullRateLimiter` when all dimensions are null, so this class is never
- * instantiated with a fully-disabled configuration — enforced in the
- * constructor.
+ * instantiated with a fully-disabled configuration (enforced in the
+ * constructor).
  *
  * State is per-process: multiple processes sharing one API key still need
- * out-of-process coordination (Redis/file lock) — out of scope here.
+ * out-of-process coordination (Redis/file lock), out of scope here.
  *
  * Not `readonly` because the bucket carries mutable accounting state; see
- * `.claude/rules/php-classes.md` (stateful collaborator carve-out — same
+ * `.claude/rules/php-classes.md` (stateful collaborator carve-out, same
  * shape as `BudgetTracker`).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class TokenBucketRateLimiter implements RateLimiterInterface
 {
@@ -58,7 +58,7 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
 
     private int $outputTokensUsed = 0;
 
-    /** @var list<int> FIFO queue — one entry per unreconciled acquire(), oldest first */
+    /** @var list<int> FIFO queue: one entry per unreconciled acquire(), oldest first */
     private array $pendingInputEstimates = [];
 
     private ?DateTimeImmutable $pausedUntil = null;
@@ -190,7 +190,7 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
      * The reset also zeroes the *amounts* of the pending estimates while
      * keeping their FIFO slots: the reservations they credit were wiped with
      * the window counters, so a straddling call's later `record()` must not
-     * subtract a reservation the new window never carried — that would drive
+     * subtract a reservation the new window never carried: that would drive
      * `inputTokensUsed` negative and over-admit the fresh window. The slot is
      * kept so reconciliation order stays aligned; the straddling call's
      * actual usage is charged to the current window, erring on the side of

@@ -13,12 +13,12 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 enum ChunkingStrategy: string
 {
     /**
      * Groups files by feature: the controller, its entity, its repository,
-     * its form, its voter, and related templates land in the same chunk so
+     * its form, its voter and related templates land in the same chunk so
      * the LLM can follow cross-file data flow.
      */
     case Feature = 'feature';
