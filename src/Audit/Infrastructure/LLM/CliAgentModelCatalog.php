@@ -14,25 +14,26 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Override;
-use Symfony\AI\Platform\Bridge\ClaudeCode\ClaudeCode;
-use Symfony\AI\Platform\Bridge\ClaudeCode\ModelCatalog;
 use Symfony\AI\Platform\Exception\ModelNotFoundException;
 use Symfony\AI\Platform\Model;
 use Symfony\AI\Platform\ModelCatalog\ModelCatalogInterface;
 
 /**
- * The bridge lists the Claude Code aliases only, while the CLI also takes a
- * full model id such as `claude-opus-5-5`: any name it does not list runs as
- * a Claude Code model too, and the CLI accepts or refuses it.
+ * A CLI bridge lists a few models while its CLI takes any model id the
+ * subscription offers, such as `claude-opus-5-5` or `gpt-5.5`: a name the
+ * bridge does not list runs as a model of the same class as one it does, and
+ * the CLI accepts or refuses it.
  *
  * @internal not part of the BC promise — see docs/versioning.md
  */
-final readonly class ClaudeCodeModelCatalog implements ModelCatalogInterface
+final readonly class CliAgentModelCatalog implements ModelCatalogInterface
 {
-    private const string LISTED_MODEL = 'opus';
-
+    /**
+     * @param non-empty-string $listedModel
+     */
     public function __construct(
-        private ModelCatalog $modelCatalog = new ModelCatalog(),
+        private ModelCatalogInterface $modelCatalog,
+        private string $listedModel,
     ) {}
 
     #[Override]
@@ -41,7 +42,10 @@ final readonly class ClaudeCodeModelCatalog implements ModelCatalogInterface
         try {
             return $this->modelCatalog->getModel($modelName);
         } catch (ModelNotFoundException) {
-            return new ClaudeCode($modelName, $this->modelCatalog->getModel(self::LISTED_MODEL)->getCapabilities());
+            $listedModel = $this->modelCatalog->getModel($this->listedModel);
+            $modelClass = $listedModel::class;
+
+            return new $modelClass($modelName, $listedModel->getCapabilities());
         }
     }
 

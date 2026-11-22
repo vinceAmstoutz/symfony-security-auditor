@@ -79,7 +79,7 @@ final readonly class CliAgentPlatforms
 
     private const string PLATFORM_SERVICE_PREFIX = 'ai.platform.';
 
-    private const string EFFORT_PLATFORM = 'claudecode';
+    private const string REASONING_CONFIG_PLATFORM = 'codex';
 
     private const string PLATFORM_TAG = 'ai.platform';
 
@@ -158,18 +158,29 @@ final readonly class CliAgentPlatforms
                 ->setFactory([CliAgentPlatformFactory::class, 'create'])
                 ->setArguments([self::FACTORIES[$name], \is_array($settings) ? ($settings['cli_binary'] ?? null) : null]);
             $containerBuilder->register($serviceId, CliAgentPlatform::class)
-                ->setArguments([new Reference($cliServiceId), [...self::ISOLATING_OPTIONS[$name], ...self::effortOf($name, $settings)], \in_array($name, self::SHARED_PROMPT_ARGUMENT, true)])
+                ->setArguments([new Reference($cliServiceId), self::optionsOf($name, $settings), \in_array($name, self::SHARED_PROMPT_ARGUMENT, true)])
                 ->addTag(self::PLATFORM_TAG);
         }
     }
 
     /**
-     * @return array{effort?: string}
+     * The isolating options, plus the effort in the spelling each CLI reads.
+     *
+     * @param key-of<self::ISOLATING_OPTIONS> $name
+     *
+     * @return array<string, mixed>
      */
-    private static function effortOf(string $name, mixed $settings): array
+    private static function optionsOf(string $name, mixed $settings): array
     {
-        $effort = self::EFFORT_PLATFORM === $name && \is_array($settings) ? ($settings['effort'] ?? null) : null;
+        $options = self::ISOLATING_OPTIONS[$name];
+        $effort = \is_array($settings) ? ($settings['effort'] ?? null) : null;
 
-        return \is_string($effort) ? ['effort' => $effort] : [];
+        if (!\is_string($effort)) {
+            return $options;
+        }
+
+        return self::REASONING_CONFIG_PLATFORM === $name
+            ? [...$options, 'config' => [...self::ISOLATING_OPTIONS[self::REASONING_CONFIG_PLATFORM]['config'], \sprintf('model_reasoning_effort="%s"', $effort)]]
+            : [...$options, 'effort' => $effort];
     }
 }

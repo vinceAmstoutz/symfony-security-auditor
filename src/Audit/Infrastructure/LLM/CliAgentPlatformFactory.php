@@ -14,7 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Symfony\AI\Platform\Bridge\ClaudeCode\Factory as ClaudeCodeFactory;
+use Symfony\AI\Platform\Bridge\ClaudeCode\ModelCatalog as ClaudeCodeModelCatalog;
 use Symfony\AI\Platform\Bridge\Codex\Factory as CodexFactory;
+use Symfony\AI\Platform\Bridge\Codex\ModelCatalog as CodexModelCatalog;
 use Symfony\AI\Platform\Platform;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -44,10 +46,16 @@ final readonly class CliAgentPlatformFactory
         $workingDirectory = \sprintf('%s/symfony-security-auditor-cli-%s', sys_get_temp_dir(), bin2hex(random_bytes(16)));
         (new Filesystem())->mkdir($workingDirectory, self::PRIVATE_DIRECTORY_MODE);
 
-        if (ClaudeCodeFactory::class === $bridgeFactory) {
-            return ClaudeCodeFactory::createPlatform($cliBinary, $workingDirectory, modelCatalog: new ClaudeCodeModelCatalog());
-        }
+        return $bridgeFactory::createPlatform($cliBinary, $workingDirectory, modelCatalog: self::modelCatalogFor($bridgeFactory));
+    }
 
-        return $bridgeFactory::createPlatform($cliBinary, $workingDirectory);
+    /**
+     * @param class-string<ClaudeCodeFactory>|class-string<CodexFactory> $bridgeFactory
+     */
+    private static function modelCatalogFor(string $bridgeFactory): CliAgentModelCatalog
+    {
+        return ClaudeCodeFactory::class === $bridgeFactory
+            ? new CliAgentModelCatalog(new ClaudeCodeModelCatalog(), 'opus')
+            : new CliAgentModelCatalog(new CodexModelCatalog(), 'gpt-5.4');
     }
 }

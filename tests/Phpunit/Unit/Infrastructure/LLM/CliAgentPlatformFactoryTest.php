@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\Bridge\ClaudeCode\Factory as ClaudeCodeFactory;
+use Symfony\AI\Platform\Bridge\Codex\Factory as CodexFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatformFactory;
 
 final class CliAgentPlatformFactoryTest extends TestCase
@@ -31,5 +32,12 @@ final class CliAgentPlatformFactoryTest extends TestCase
         $platform = CliAgentPlatformFactory::create(ClaudeCodeFactory::class, null);
 
         self::assertSame('claude-opus-5', $platform->getModelCatalog()->getModel('claude-opus-5')->getName());
+    }
+
+    public function test_the_codex_platform_runs_a_gpt_model_it_does_not_list(): void
+    {
+        $platform = CliAgentPlatformFactory::create(CodexFactory::class, null);
+
+        self::assertSame('gpt-5.5', $platform->getModelCatalog()->getModel('gpt-5.5')->getName());
     }
 }

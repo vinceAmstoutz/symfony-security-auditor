@@ -138,6 +138,22 @@ final class CodexPlatformTest extends TestCase
     }
 
     /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_codex_cli_reasons_at_the_configured_effort(): void
+    {
+        $this->invoke([], ['effort' => 'high']);
+
+        self::assertContains(['--config', 'model_reasoning_effort="high"'], $this->consecutiveArgumentPairs());
+    }
+
+    /**
      * @param array<string, mixed>  $options
      * @param array<string, string> $settings
      *
