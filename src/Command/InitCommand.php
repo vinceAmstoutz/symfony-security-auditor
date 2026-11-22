@@ -112,9 +112,12 @@ final readonly class InitCommand
             return Command::INVALID;
         }
 
-        $model = b($initCommandInput->model ?? (new InitModelQuestion($this->pricedModelList, $this->pulledModelList))->ask($symfonyStyle, $providerKey, $platformConnection->endpoint))->trim()->toString();
+        $initModelQuestion = new InitModelQuestion($this->pricedModelList, $this->pulledModelList);
+        $model = b($initCommandInput->model ?? $initModelQuestion->ask($symfonyStyle, $providerKey, $platformConnection->endpoint))->trim()->toString();
 
-        if ($this->refused($symfonyStyle, InitRefusal::forModel($model, $providerKey))) {
+        $reviewerModel = $initCommandInput->reviewerModel ?? $initModelQuestion->askReviewer($symfonyStyle, $providerKey);
+
+        if ($this->refused($symfonyStyle, $this->modelsRefusal($model, $reviewerModel, $providerKey))) {
             return Command::INVALID;
         }
 
@@ -131,7 +134,7 @@ final readonly class InitCommand
         }
 
         $this->installBridges($symfonyStyle, $provider, $providerKey, $model);
-        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $platformConnection));
+        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $platformConnection, $reviewerModel));
 
         $this->reportWritten($symfonyStyle, $configFile, $provider, $model, $envVar);
         ConnectionTestOffer::make($this->connectionTestRunner, $symfonyStyle, $interactive);
@@ -228,6 +231,11 @@ final readonly class InitCommand
     {
         $symfonyStyle->text(\sprintf('Installing support for %s — this can take a minute…', OutputFormatter::escape(ProviderNames::ofPlatform($providerKey->platform))));
         $this->bridgeInstaller->install($provider, $this->xdgConfigPathResolver->dataDir(), ...$companionPlatforms);
+    }
+
+    private function modelsRefusal(string $model, ?string $reviewerModel, ProviderKey $providerKey): ?string
+    {
+        return InitRefusal::forModel($model, $providerKey) ?? (null === $reviewerModel ? null : InitRefusal::forModel($reviewerModel));
     }
 
     private function refused(SymfonyStyle $symfonyStyle, ?string $violation): bool

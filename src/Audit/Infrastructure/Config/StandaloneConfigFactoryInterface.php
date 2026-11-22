@@ -21,5 +21,5 @@ interface StandaloneConfigFactoryInterface
     /**
      * @return array<string, mixed>
      */
-    public function create(string $provider, string $model, ?string $apiKeyEnvironmentVariable, PlatformConnection $platformConnection = new PlatformConnection()): array;
+    public function create(string $provider, string $model, ?string $apiKeyEnvironmentVariable, PlatformConnection $platformConnection = new PlatformConnection(), ?string $reviewerModel = null): array;
 }

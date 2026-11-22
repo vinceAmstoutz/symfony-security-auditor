@@ -32,6 +32,8 @@ final readonly class InitModelQuestion
 {
     private const string DEFAULT_MODEL = 'claude-opus-5-5';
 
+    private const string CLAUDE_REVIEWER_MODEL = 'claude-haiku-5-5';
+
     private const string DEFAULT_MODEL_ID = '#(?:^|[./])claude-opus-5-5(?:@[a-z0-9-]+)?$#';
 
     public function __construct(
@@ -62,6 +64,15 @@ final readonly class InitModelQuestion
         return 'anthropic' === $providerKey->platform
             ? InitPrompt::withDefault($symfonyStyle, 'Which model should the auditor use?', self::DEFAULT_MODEL)
             : InitPrompt::required($symfonyStyle, 'Which model should the auditor use? Type its id as your provider names it');
+    }
+
+    public function askReviewer(SymfonyStyle $symfonyStyle, ProviderKey $providerKey): ?string
+    {
+        if ('claudecode' !== $providerKey->platform) {
+            return null;
+        }
+
+        return NumberedChoice::ask($symfonyStyle, 'Which model should review the findings? Pick a number, or type a model id', CliAgentPlatformFactory::CLAUDE_MODEL_IDS, self::CLAUDE_REVIEWER_MODEL);
     }
 
     private function askOllamaModel(SymfonyStyle $symfonyStyle, ?string $endpoint): string

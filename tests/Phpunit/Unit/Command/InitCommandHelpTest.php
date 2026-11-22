@@ -23,6 +23,11 @@ final class InitCommandHelpTest extends TestCase
         self::assertStringContainsString('claude-opus-5-5 — set it for any other provider, it is not derived from one', InitCommandHelp::HELP);
     }
 
+    public function test_it_names_the_reviewer_model_a_claude_subscription_defaults_to(): void
+    {
+        self::assertStringContainsString('<info>--reviewer-model</info> claude-haiku-5-5 on a Claude subscription; elsewhere --model reviews too', InitCommandHelp::HELP);
+    }
+
     public function test_it_names_the_env_var_default_as_the_console_will_print_it(): void
     {
         self::assertStringContainsString('<PLATFORM>_API_KEY', InitCommandHelp::HELP);

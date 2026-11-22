@@ -132,7 +132,33 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertSame('claude-opus-5-5', Yaml::parseFile($this->configFile())['model']);
+        self::assertSame('claude-opus-5-5', $this->configuredValue('model'));
+    }
+
+    public function test_it_suggests_haiku_5_5_to_review_on_a_claude_subscription(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'claudecode', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('claude-haiku-5-5', $this->configuredValue('reviewer_model'));
+    }
+
+    public function test_it_takes_the_reviewer_model_from_the_command_line(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'claudecode', '--reviewer-model' => 'claude-sonnet-5-5'], ['interactive' => false]);
+
+        self::assertSame('claude-sonnet-5-5', $this->configuredValue('reviewer_model'));
+    }
+
+    public function test_it_refuses_a_reviewer_model_the_container_would_read_as_a_parameter(): void
+    {
+        $commandTester = $this->commandTester();
+
+        self::assertSame(Command::INVALID, $commandTester->execute(['--provider' => 'claudecode', '--reviewer-model' => '%kernel.secret%'], ['interactive' => false]));
     }
 
     public function test_it_tests_the_connection_when_the_user_accepts(): void
@@ -484,14 +510,14 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_configures_the_claude_code_cli_with_no_api_key_and_opus_5_5(): void
+    public function test_it_configures_the_claude_code_cli_with_no_api_key_opus_5_5_and_haiku_5_5_to_review(): void
     {
         $commandTester = $this->commandTester();
 
         $commandTester->execute(['--provider' => 'claudecode'], ['interactive' => false]);
 
         self::assertSame(
-            ['provider' => 'claudecode', 'platform' => ['claudecode' => []], 'model' => 'claude-opus-5-5', 'audit' => ['report_static_findings' => true]],
+            ['provider' => 'claudecode', 'platform' => ['claudecode' => []], 'model' => 'claude-opus-5-5', 'reviewer_model' => 'claude-haiku-5-5', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }

@@ -27,6 +27,7 @@ final readonly class InitCommandHelp
         Defaults:
           <info>--provider</info>  anthropic
           <info>--model</info>     claude-opus-5-5 — set it for any other provider, it is not derived from one
+          <info>--reviewer-model</info> claude-haiku-5-5 on a Claude subscription; elsewhere --model reviews too
           <info>--env-var</info>   <PLATFORM>_API_KEY, except for a platform you host yourself, which is written without a credential unless you name one
 
         A platform configured per instance needs the instance in <info>--provider</info>, and the endpoint it reaches in <info>--base-url</info>:

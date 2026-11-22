@@ -30,6 +30,9 @@ final class InitCommandInput
     #[Option(description: 'Model the auditor should use; defaults to claude-opus-5-5 for every provider, so set it for any other. Skips the prompt when set.')]
     public ?string $model = null;
 
+    #[Option(description: 'Model that reviews the findings; defaults to claude-haiku-5-5 on a Claude subscription (claudecode), to --model elsewhere. Skips the prompt when set.')]
+    public ?string $reviewerModel = null;
+
     #[Option(description: 'Environment variable holding the API key; defaults to <PLATFORM>_API_KEY')]
     public ?string $envVar = null;
 
