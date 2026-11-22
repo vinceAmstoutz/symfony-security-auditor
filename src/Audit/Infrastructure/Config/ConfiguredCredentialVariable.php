@@ -63,6 +63,20 @@ final readonly class ConfiguredCredentialVariable
         return null !== $apiKey ? EnvPlaceholder::in($apiKey) : null;
     }
 
+    public function platformNeedsNoApiKey(): bool
+    {
+        $parsed = $this->parsedConfig();
+        $platform = $parsed['platform'] ?? null;
+
+        if (!\is_array($platform) || [] === $platform) {
+            return false;
+        }
+
+        $block = PlatformApiKey::blockForProvider($platform, $this->activeProvider($parsed));
+
+        return null !== $block && null === PlatformApiKey::valueIn($block);
+    }
+
     /**
      * @param array<array-key, mixed> $parsed
      */

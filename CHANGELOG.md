@@ -38,6 +38,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - A class in an `Admin/` folder or named `*Admin.php` gets the Sonata admin skill only when it uses Sonata, so form providers, page objects and API state providers kept there are audited as what they are ([#693](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/693))
 - OpenAI cached input is billed at the cache rate again and its cache writes are no longer billed on top of the full prompt, so `estimated_cost_usd` and `audit.budget.max_cost_usd` stop running up to 3x high and `audit.rate_limit.input_tokens_per_minute` counts each prompt once (thanks @JerritEic) ([#701](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/701))
 - `doctor --check-connection` and the test request `init` offers to send no longer run out of memory under PHP's default 128 MB limit: the pricing catalog now keeps only the model details the auditor reads, about a quarter of the memory it took ([#709](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/709))
+- `auth:status` says the configured platform needs no API key, and exits `0`, when the audit runs on a Claude or ChatGPT subscription or another platform without a key, instead of asking to run `init` again
 
 ### Core 🧱
 
