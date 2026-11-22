@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatformFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModelListInterface;
@@ -40,6 +41,10 @@ final readonly class InitModelQuestion
 
     public function ask(SymfonyStyle $symfonyStyle, ProviderKey $providerKey, ?string $endpoint = null): string
     {
+        if ('claudecode' === $providerKey->platform) {
+            return NumberedChoice::ask($symfonyStyle, 'Which model should the auditor use? Pick a number, or type a model id', CliAgentPlatformFactory::CLAUDE_MODEL_IDS, CliAgentPlatformFactory::CLAUDE_MODEL_IDS[0]);
+        }
+
         $subscriptionModel = CliAgentPlatforms::DEFAULT_MODELS[$providerKey->platform] ?? null;
         if (null !== $subscriptionModel) {
             return $subscriptionModel;

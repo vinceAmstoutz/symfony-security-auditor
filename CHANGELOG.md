@@ -32,6 +32,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `auth:test` checks that the API key works with one short test request; `auth:status` suggests it once a key resolves ([#702](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/702))
 - `doctor` suggests `auth:status` to see where the API key comes from, when the configured platform uses one ([#713](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/713))
 - The standalone binary no longer lists Symfony's `completion` command among its own; `completion` still prints the shell completion script ([#713](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/713))
+- `init` asks which Claude model a Claude subscription runs on, Opus 5.5 by default. `model` takes any Claude model id there, such as `claude-sonnet-5-5`, besides the `opus`, `sonnet` and `haiku` aliases
 - `audit:run` reports a folder of a project named as the project in one `Scope:` line under the header, in place of a `[NOTE]` block that repeated the project and folder paths ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
 - `audit:run` writes its long-run notice with a colon in place of a dash ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
 

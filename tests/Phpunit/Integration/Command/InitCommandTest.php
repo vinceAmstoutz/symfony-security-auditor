@@ -125,6 +125,16 @@ final class InitCommandTest extends TestCase
         self::assertStringContainsString('Which subscription do you have? [Claude (through the Claude Code CLI)]: [1] Claude (through the Claude Code CLI) [2] ChatGPT (through the Codex CLI) >', $this->unwrappedDisplay($commandTester));
     }
 
+    public function test_it_suggests_opus_5_5_for_a_claude_subscription(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'claudecode', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('claude-opus-5-5', Yaml::parseFile($this->configFile())['model']);
+    }
+
     public function test_it_tests_the_connection_when_the_user_accepts(): void
     {
         $recordingConnectionTestRunner = new RecordingConnectionTestRunner();
@@ -231,14 +241,14 @@ final class InitCommandTest extends TestCase
         self::assertStringStartsWith(' How do you access AI models? Pick a number, or type a provider name [', $this->unwrappedDisplay($commandTester));
     }
 
-    public function test_it_asks_no_model_for_a_subscription(): void
+    public function test_it_asks_no_model_for_a_chatgpt_subscription(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), '1', '']);
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'codex', '']);
 
         $commandTester->execute([]);
 
-        self::assertSame([false, 'opus'], [str_contains($commandTester->getDisplay(), 'Which model should the auditor use?'), $this->configuredValue('model')]);
+        self::assertSame([false, 'gpt-5.4'], [str_contains($commandTester->getDisplay(), 'Which model should the auditor use?'), $this->configuredValue('model')]);
     }
 
     public function test_it_says_it_sends_the_test_request_once_the_user_agreed(): void
@@ -474,14 +484,14 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_configures_the_claude_code_cli_with_no_api_key_and_its_opus_model(): void
+    public function test_it_configures_the_claude_code_cli_with_no_api_key_and_opus_5_5(): void
     {
         $commandTester = $this->commandTester();
 
         $commandTester->execute(['--provider' => 'claudecode'], ['interactive' => false]);
 
         self::assertSame(
-            ['provider' => 'claudecode', 'platform' => ['claudecode' => []], 'model' => 'opus', 'audit' => ['report_static_findings' => true]],
+            ['provider' => 'claudecode', 'platform' => ['claudecode' => []], 'model' => 'claude-opus-5-5', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }

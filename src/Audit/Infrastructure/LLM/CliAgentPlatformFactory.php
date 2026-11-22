@@ -32,12 +32,21 @@ final readonly class CliAgentPlatformFactory
     private const int PRIVATE_DIRECTORY_MODE = 0o700;
 
     /**
+     * The full ids the Claude Code CLI runs besides its aliases, Opus first.
+     */
+    public const array CLAUDE_MODEL_IDS = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
+
+    /**
      * @param class-string<ClaudeCodeFactory>|class-string<CodexFactory> $bridgeFactory
      */
     public static function create(string $bridgeFactory, ?string $cliBinary): Platform
     {
         $workingDirectory = \sprintf('%s/symfony-security-auditor-cli-%s', sys_get_temp_dir(), bin2hex(random_bytes(16)));
         (new Filesystem())->mkdir($workingDirectory, self::PRIVATE_DIRECTORY_MODE);
+
+        if (ClaudeCodeFactory::class === $bridgeFactory) {
+            return ClaudeCodeFactory::createPlatform($cliBinary, $workingDirectory, modelCatalog: new ClaudeCodeModelCatalog());
+        }
 
         return $bridgeFactory::createPlatform($cliBinary, $workingDirectory);
     }
