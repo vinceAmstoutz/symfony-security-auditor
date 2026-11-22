@@ -30,8 +30,8 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `init` configures Azure OpenAI: it asks the resource URL and the deployment name, which the new `--deployment` option sets, instead of printing a block to complete by hand ([#702](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/702))
 - `doctor --check-connection` sends one short test request to the configured provider and reports whether it answered. An interactive `init` offers to run it at the end, saying first that a paid API may bill it and sending it only on `yes` ([#702](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/702))
 - `auth:test` checks that the API key works with one short test request; `auth:status` suggests it once a key resolves ([#702](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/702))
-- `doctor` suggests `auth:status` to see where the API key comes from, when the configured platform uses one
-- The standalone binary no longer lists Symfony's `completion` command among its own; `completion` still prints the shell completion script
+- `doctor` suggests `auth:status` to see where the API key comes from, when the configured platform uses one ([#713](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/713))
+- The standalone binary no longer lists Symfony's `completion` command among its own; `completion` still prints the shell completion script ([#713](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/713))
 - `audit:run` reports a folder of a project named as the project in one `Scope:` line under the header, in place of a `[NOTE]` block that repeated the project and folder paths ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
 - `audit:run` writes its long-run notice with a colon in place of a dash ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
 
@@ -40,7 +40,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - A class in an `Admin/` folder or named `*Admin.php` gets the Sonata admin skill only when it uses Sonata, so form providers, page objects and API state providers kept there are audited as what they are ([#693](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/693))
 - OpenAI cached input is billed at the cache rate again and its cache writes are no longer billed on top of the full prompt, so `estimated_cost_usd` and `audit.budget.max_cost_usd` stop running up to 3x high and `audit.rate_limit.input_tokens_per_minute` counts each prompt once (thanks @JerritEic) ([#701](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/701))
 - `doctor --check-connection` and the test request `init` offers to send no longer run out of memory under PHP's default 128 MB limit: the pricing catalog now keeps only the model details the auditor reads, about a quarter of the memory it took ([#709](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/709))
-- `auth:status`, `auth:set` and `auth:remove` say the configured platform needs no API key when the audit runs on a Claude or ChatGPT subscription or another platform without a key, instead of asking to run `init` again; `auth:status` and `auth:remove` exit `0` then
+- `auth:status`, `auth:set` and `auth:remove` say the configured platform needs no API key when the audit runs on a Claude or ChatGPT subscription or another platform without a key, instead of asking to run `init` again; `auth:status` and `auth:remove` exit `0` then ([#713](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/713))
 
 ### Core 🧱
 
