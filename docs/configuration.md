@@ -500,17 +500,19 @@ model: gpt-5.6
 
 ### Running on a Claude subscription
 
-_Since 1.23_ the standalone binary can run the audit on a Claude subscription instead of an API key, through the [Claude Code](https://code.claude.com) CLI installed on the machine. `init --provider=claudecode` downloads the bridge and writes:
+_Since 1.23_ the standalone binary can run the audit on a Claude subscription instead of an API key, through the [Claude Code](https://code.claude.com) CLI installed on the machine. `init --provider=claudecode` downloads the bridge and asks for the two models and the effort. It writes:
 
 ```yaml
 provider: claudecode
 platform:
-    claudecode: {}
-model: opus
+    claudecode: { effort: medium }
+model: claude-opus-5-5
+reviewer_model: claude-haiku-5-5
 ```
 
 - **Requirements.** The `claude` CLI is installed and logged in to the subscription. On a CI runner, set the `CLAUDE_CODE_OAUTH_TOKEN` that `claude setup-token` prints. When `claude` is not on the `PATH`, name it with `cli_binary:` under `claudecode:`.
-- **Models.** Claude Code's aliases: `opus`, `sonnet` or `haiku`.
+- **Models.** _Since 1.23_ `init` offers Opus 5.5 to find the issues and Haiku 5.5 to review them; `--model` and `--reviewer-model` set them without asking. Afterwards, edit `model` and `reviewer_model`: any Claude model id works, as do Claude Code's aliases `opus`, `sonnet` and `haiku`.
+- **Effort.** _Since 1.23_ `init` asks the effort the CLI runs at, `medium` by default: `low`, `medium`, `high`, `xhigh` or `max`. Higher finds more and uses more of the plan. `--effort` sets it without asking. Afterwards, edit `effort:` under `claudecode:`; without it, the CLI keeps its own default. The effort is a standalone setting: the bundle's `cli_agent` has none.
 - **How each call runs.** The auditor starts `claude` with its built-in tools off and the MCP servers of the machine ignored, outside the audited project, so the code it reads cannot make it act. The attacker and the reviewer answer in JSON: `audit.tools_enabled`, `audit.structured_collection`, `audit.reviewer_tools_enabled` and `audit.reviewer_structured_collection` are set to `false`, so the model cannot open other files of the project during a chunk.
 - **In a Symfony application.** Require `symfony/ai-claude-code-platform` and set `cli_agent: { platform: claudecode }` with `model: opus` under `symfony_security_auditor:`. The application's own `symfony/ai` platform is left as it is.
 - **Limits.** The plan's usage limits apply. Its terms decide what automated use it allows. The run is not priced, so `--dry-run` shows no cost and an `audit.budget` cost cap cannot be enforced. A prompt longer than the 128 KiB one command-line argument can carry is split like one the provider refuses as too large. `privacy.offline_only` refuses this platform.
