@@ -29,6 +29,7 @@ Full configuration reference for the `symfony-security-auditor` bundle. Covers b
   - [`init`](#init-generating-the-standalone-configuration)
   - [`self-update`](#self-update-updating-the-standalone-binary)
   - [`doctor`](#doctor-preflight-environment-check)
+  - [Shell completion](#shell-completion)
   - [Update notifications](#update-notifications)
 
 > See also: [Architecture](architecture.md) · [Extending](extending.md) · [CI](ci.md) · [FAQ](faq.md) · [Troubleshooting](troubleshooting.md)
@@ -580,7 +581,7 @@ The prompt never echoes, so the key stays out of the terminal and the shell hist
 
 **In output** a key is never printed: it is named by a masked preview (`sk-ant…qF4A`) and a truncated SHA-256 fingerprint (`SHA256:ed9ff73cc4b2cd57`). A key shorter than 24 characters is masked entirely.
 
-**Exit codes.** The `auth:*` commands exit `2` when no API-key variable is configured or named with `--env-var`, or when the name is not a valid variable name. Otherwise `auth:status` exits `0` when a key resolves and `1` when none does; `auth:set` exits `2` when nothing usable was entered or the terminal cannot hide input, `1` when the key cannot be stored; `auth:remove` exits `1` when the file cannot be rewritten.
+**Exit codes.** The `auth:*` commands exit `2` when no API-key variable is configured or named with `--env-var`, or when the name is not a valid variable name. When the configured platform needs no key (a subscription, a local model), `auth:status` and `auth:remove` say so and exit `0`; `auth:set` exits `2`. Otherwise `auth:status` exits `0` when a key resolves and `1` when none does; `auth:set` exits `2` when nothing usable was entered or the terminal cannot hide input, `1` when the key cannot be stored; `auth:remove` exits `1` when the file cannot be rewritten.
 
 Nothing is required: a machine with nothing stored falls back to the environment variable.
 
@@ -1028,7 +1029,7 @@ It runs four checks and prints one line for each:
 
 | Check | What it verifies |
 | --- | --- |
-| Configuration | `config.yaml` resolves, holds a `platform:` block and sets every `%env(...)%` variable of the selected platform (an unset key is reported as `API key`) |
+| Configuration | `config.yaml` resolves, holds a `platform:` block and sets every `%env(...)%` variable of the selected platform (an unset key is reported as `API key`); a key that resolves is shown masked, with a pointer to `auth:status` for where it comes from |
 | Provider bridge | the bridge `init` installed is there, matches the binary's `symfony/ai-platform` release and boots the audit |
 | Composer | `composer` is on the host, for the `lookup_advisory` tool only; `init` uses its own |
 | Pricing catalog | the `symfony/models-dev` catalog that prices the run is there |
@@ -1040,6 +1041,14 @@ symfony-security-auditor doctor && symfony-security-auditor audit path/to/app
 ```
 
 _Since 1.23._ `doctor --check-connection` also sends one short request to the provider and adds a `Connection` line, a **failure** naming why when it does not answer (refused key, unknown model, unreachable endpoint). A paid API bills it, usually well under a cent, so it runs only when asked; an interactive `init` offers it at the end.
+
+### Shell completion
+
+The binary completes its commands, options and arguments in bash, zsh and fish. `completion` prints the script for your shell and stays out of the command list. Load it from your shell's startup file:
+
+```bash
+eval "$(symfony-security-auditor completion bash)"
+```
 
 ### Update notifications
 
