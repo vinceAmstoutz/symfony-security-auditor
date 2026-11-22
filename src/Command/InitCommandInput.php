@@ -33,6 +33,9 @@ final class InitCommandInput
     #[Option(description: 'Model that reviews the findings; defaults to claude-haiku-5-5 on a Claude subscription (claudecode), to --model elsewhere. Skips the prompt when set.')]
     public ?string $reviewerModel = null;
 
+    #[Option(description: 'Effort the Claude Code CLI runs at, for a Claude subscription (claudecode): low, medium, high, xhigh or max; defaults to medium. Skips the prompt when set.')]
+    public ?string $effort = null;
+
     #[Option(description: 'Environment variable holding the API key; defaults to <PLATFORM>_API_KEY')]
     public ?string $envVar = null;
 

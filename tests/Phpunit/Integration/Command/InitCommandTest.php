@@ -161,6 +161,43 @@ final class InitCommandTest extends TestCase
         self::assertSame(Command::INVALID, $commandTester->execute(['--provider' => 'claudecode', '--reviewer-model' => '%kernel.secret%'], ['interactive' => false]));
     }
 
+    public function test_it_suggests_a_medium_effort_on_a_claude_subscription(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'claudecode', '', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(['claudecode' => ['effort' => 'medium']], $this->configuredValue('platform'));
+    }
+
+    public function test_it_takes_the_effort_from_the_command_line(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'claudecode', '--effort' => 'high'], ['interactive' => false]);
+
+        self::assertSame(['claudecode' => ['effort' => 'high']], $this->configuredValue('platform'));
+    }
+
+    public function test_it_refuses_an_effort_the_claude_code_cli_does_not_know(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--provider' => 'claudecode', '--effort' => 'banana'], ['interactive' => false]);
+
+        self::assertSame([Command::INVALID, true], [$exitCode, str_contains($this->unwrappedDisplay($commandTester), 'The effort must be one of low, medium, high, xhigh, max.')]);
+    }
+
+    public function test_it_refuses_an_effort_for_a_platform_that_takes_none(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--provider' => 'anthropic', '--effort' => 'high'], ['interactive' => false]);
+
+        self::assertSame([Command::INVALID, true], [$exitCode, str_contains($this->unwrappedDisplay($commandTester), 'Only a Claude subscription (claudecode) takes an effort; leave --effort out for anthropic.')]);
+    }
+
     public function test_it_tests_the_connection_when_the_user_accepts(): void
     {
         $recordingConnectionTestRunner = new RecordingConnectionTestRunner();
@@ -510,14 +547,14 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_configures_the_claude_code_cli_with_no_api_key_opus_5_5_and_haiku_5_5_to_review(): void
+    public function test_it_configures_the_claude_code_cli_with_no_api_key_opus_5_5_haiku_5_5_to_review_and_a_medium_effort(): void
     {
         $commandTester = $this->commandTester();
 
         $commandTester->execute(['--provider' => 'claudecode'], ['interactive' => false]);
 
         self::assertSame(
-            ['provider' => 'claudecode', 'platform' => ['claudecode' => []], 'model' => 'claude-opus-5-5', 'reviewer_model' => 'claude-haiku-5-5', 'audit' => ['report_static_findings' => true]],
+            ['provider' => 'claudecode', 'platform' => ['claudecode' => ['effort' => 'medium']], 'model' => 'claude-opus-5-5', 'reviewer_model' => 'claude-haiku-5-5', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }

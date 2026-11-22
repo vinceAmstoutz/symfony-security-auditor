@@ -83,6 +83,16 @@ final readonly class InitRefusal
         };
     }
 
+    public static function forEffort(?string $effort, ProviderKey $providerKey): ?string
+    {
+        return match (true) {
+            null === $effort => null,
+            InitEffortQuestion::PLATFORM !== $providerKey->platform => \sprintf('Only a Claude subscription (%s) takes an effort; leave --effort out for %s.', InitEffortQuestion::PLATFORM, $providerKey->platform),
+            !\in_array($effort, InitEffortQuestion::LEVELS, true) => \sprintf('The effort must be one of %s.', implode(', ', InitEffortQuestion::LEVELS)),
+            default => null,
+        };
+    }
+
     /**
      * Null is a platform written without a credential, which has no name to
      * validate.

@@ -73,6 +73,10 @@ final readonly class StandaloneConfigFactory implements StandaloneConfigFactoryI
             $connection['deployment'] = ContainerParameterSyntax::literal($platformConnection->deployment);
         }
 
+        if (null !== $platformConnection->effort) {
+            $connection['effort'] = $platformConnection->effort;
+        }
+
         if (null !== $apiKeyEnvironmentVariable) {
             $connection['api_key'] = \sprintf('%%env(%s)%%', $apiKeyEnvironmentVariable);
         }
