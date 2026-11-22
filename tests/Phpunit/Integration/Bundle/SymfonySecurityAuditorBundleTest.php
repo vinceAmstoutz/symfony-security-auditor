@@ -32,6 +32,9 @@ use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Definition\Exception\InvalidTypeException;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\Compiler\AutowirePass;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
@@ -125,6 +128,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPr
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bundle\Fixture\OptionsRecordingPlatform;
@@ -245,6 +249,37 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertInstanceOf(LLMClientInterface::class, $llmClient);
 
         self::assertSame('OK', $llmClient->complete('sys', 'usr')->content());
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_cli_agent_dry_run_says_the_subscription_is_not_priced_per_call(): void
+    {
+        $kernel = $this->boot(['model' => 'claude-opus-5-5', 'cli_agent' => ['platform' => 'codex', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
+        $auditCommand = $this->getPrivateService($kernel, AuditCommand::class);
+        self::assertInstanceOf(AuditCommand::class, $auditCommand);
+        (new Filesystem())->dumpFile($this->tmpDir.'/project/src/Controller/HomeController.php', "<?php\n\nfinal class HomeController {}\n");
+        $commandTester = new CommandTester($auditCommand);
+
+        $commandTester->execute(['project-path' => $this->tmpDir.'/project', '--dry-run' => true], ['interactive' => false]);
+
+        self::assertStringContainsString('The audit runs on a subscription through the Codex CLI, which is not priced per call', (string) preg_replace('/[\s!]+/', ' ', $commandTester->getDisplay()));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_cli_agent_run_says_the_subscription_is_not_priced_per_call(): void
+    {
+        $kernel = $this->boot(['model' => 'claude-opus-5-5', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
+        $unpricedModelBudgetGuard = $this->getPrivateService($kernel, UnpricedModelBudgetGuardInterface::class);
+        self::assertInstanceOf(UnpricedModelBudgetGuardInterface::class, $unpricedModelBudgetGuard);
+        $input = new ArrayInput([]);
+        $input->setInteractive(false);
+
+        $bufferedOutput = new BufferedOutput();
+        $unpricedModelBudgetGuard->permitsRun($input, new SymfonyStyle($input, $bufferedOutput));
+
+        self::assertStringContainsString('The audit runs on a subscription through the Claude Code CLI', (string) preg_replace('/[\s!]+/', ' ', $bufferedOutput->fetch()));
     }
 
     /**

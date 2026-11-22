@@ -107,11 +107,17 @@ final readonly class CliAgentPlatforms
      */
     public static function auditConfigFor(array $auditConfig, StandalonePlatformConfig $standalonePlatformConfig): array
     {
-        if (null === $standalonePlatformConfig->activeProvider || !\array_key_exists($standalonePlatformConfig->activeProvider, self::FACTORIES)) {
-            return $auditConfig;
-        }
+        return null === self::activeAgentOf($standalonePlatformConfig) ? $auditConfig : self::withToolFreeAudit($auditConfig);
+    }
 
-        return self::withToolFreeAudit($auditConfig);
+    /**
+     * The CLI the standalone `provider:` selects, if it selects one.
+     */
+    public static function activeAgentOf(StandalonePlatformConfig $standalonePlatformConfig): ?string
+    {
+        $provider = $standalonePlatformConfig->activeProvider;
+
+        return null !== $provider && \array_key_exists($provider, self::FACTORIES) ? $provider : null;
     }
 
     /**

@@ -35,6 +35,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `init` asks which model a Claude or ChatGPT subscription runs on (Opus 5.5 or `gpt-5.4` by default). `model` takes any model id the CLI runs there, such as `claude-sonnet-5-5` or `gpt-5.5`, besides the few its bridge lists
 - `init` asks which model reviews the findings on a subscription (Haiku 5.5 on Claude, `gpt-5.4-mini` on ChatGPT) and writes it as `reviewer_model`. `init --reviewer-model` sets it without asking
 - `init` asks the effort a subscription runs at (medium by default) and writes it as `effort:` under `platform.claudecode` or `platform.codex`, which takes `low`, `medium`, `high`, `xhigh` or `max`. `init --effort` sets it without asking and `cli_agent.effort` sets it in a Symfony application; left unset, the CLI keeps its own
+- On a Claude or ChatGPT subscription, `audit:run` and `--dry-run` say the run is not priced per call instead of showing a cost at API rates or calling the model name a likely typo; a budgeted run asks to remove `audit.budget.max_cost_usd`
 - `audit:run` reports a folder of a project named as the project in one `Scope:` line under the header, in place of a `[NOTE]` block that repeated the project and folder paths ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
 - `audit:run` writes its long-run notice with a colon in place of a dash ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
 

@@ -20,11 +20,13 @@ use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\ProviderBridgeException;
@@ -187,6 +189,30 @@ final class ClaudeCodePlatformTest extends TestCase
     }
 
     /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_dry_run_on_a_claude_subscription_says_it_is_not_priced_per_call(): void
+    {
+        $project = $this->workingDirectory.'/project';
+        (new Filesystem())->dumpFile($project.'/src/Controller/HomeController.php', "<?php\n\nfinal class HomeController {}\n");
+        $auditCommand = $this->container([], ['model' => 'claude-opus-5-5'])->get(AuditCommand::class);
+        self::assertInstanceOf(AuditCommand::class, $auditCommand);
+        $commandTester = new CommandTester($auditCommand);
+
+        $commandTester->execute(['project-path' => $project, '--dry-run' => true], ['interactive' => false]);
+
+        $display = (string) preg_replace('/[\s!]+/', ' ', $commandTester->getDisplay());
+
+        self::assertSame([true, false], [str_contains($display, 'The audit runs on a subscription through the Claude Code CLI, which is not priced per call'), str_contains($display, 'typo')]);
+    }
+
+    /**
      * @param array<string, mixed>  $options
      * @param array<string, string> $settings
      *
@@ -206,6 +232,7 @@ final class ClaudeCodePlatformTest extends TestCase
 
     /**
      * @param array<string, string> $settings
+     * @param array<string, mixed>  $auditConfig
      *
      * @throws AmbiguousPlatformException
      * @throws MissingBundleExtensionException
@@ -213,10 +240,10 @@ final class ClaudeCodePlatformTest extends TestCase
      * @throws NonLocalPlatformEndpointException
      * @throws ProviderBridgeException
      */
-    private function container(array $settings = []): ContainerBuilder
+    private function container(array $settings = [], array $auditConfig = []): ContainerBuilder
     {
         return (new StandaloneContainerFactory())->create(
-            new StandaloneConfig([], new StandalonePlatformConfig(['claudecode' => ['cli_binary' => $this->fakeCli(), ...$settings]], 'claudecode')),
+            new StandaloneConfig($auditConfig, new StandalonePlatformConfig(['claudecode' => ['cli_binary' => $this->fakeCli(), ...$settings]], 'claudecode')),
             $this->workingDirectory.'/cache',
         );
     }

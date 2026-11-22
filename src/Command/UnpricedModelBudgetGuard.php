@@ -27,6 +27,7 @@ final readonly class UnpricedModelBudgetGuard implements UnpricedModelBudgetGuar
         private PricingProviderInterface $pricingProvider,
         private array $models,
         private ?float $maxCostUsd = null,
+        private ?string $cliAgent = null,
     ) {}
 
     #[Override]
@@ -38,10 +39,7 @@ final readonly class UnpricedModelBudgetGuard implements UnpricedModelBudgetGuar
         }
 
         $errorStyle = $symfonyStyle->getErrorStyle();
-        $errorStyle->warning(\sprintf(
-            'No published pricing for the configured model(s): %s. Cost reporting will show $0.00 for these — correct for local or self-hosted models (e.g. Ollama, LM Studio); otherwise the name is likely a typo or an unlisted model.',
-            implode(', ', $unpricedModels),
-        ));
+        $errorStyle->warning(UnpricedModelNotice::forRun($unpricedModels, $this->cliAgent));
 
         if (null === $this->maxCostUsd) {
             return true;
@@ -56,7 +54,7 @@ final readonly class UnpricedModelBudgetGuard implements UnpricedModelBudgetGuar
             return $errorStyle->confirm('Continue anyway, knowing the cost budget will not be enforced?', false);
         }
 
-        $errorStyle->error('Refusing to start a budgeted audit with an unpriceable model in non-interactive mode. Configure a model with published pricing, or remove audit.budget.max_cost_usd.');
+        $errorStyle->error(UnpricedModelNotice::forBudgetRefusal($this->cliAgent));
 
         return false;
     }
