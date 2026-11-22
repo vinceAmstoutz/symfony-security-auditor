@@ -38,7 +38,7 @@ final readonly class AuthTestCommand
             return Command::FAILURE;
         }
 
-        $symfonyStyle->success('Your API key works. You can run an audit now.');
+        $symfonyStyle->success('The provider answered the test request. You can run an audit now.');
 
         return Command::SUCCESS;
     }
