@@ -152,6 +152,13 @@ return [
         'changelog' => '#702',
     ],
     [
+        'scenarios' => ['standalone/list'],
+        'path' => 'runs.0.stdout.lines',
+        'match' => '/^-\\s+completion\\s+Dump the shell completion script$/',
+        'reason' => 'The standalone binary keeps Symfony\'s completion command out of its listing; the command still runs.',
+        'changelog' => '#713',
+    ],
+    [
         'scenarios' => ['standalone/auth-status-environment', 'standalone/auth-status-stored'],
         'path' => 'runs.0.stdout.lines',
         'match' => '/^\\+(?: Run "auth:test" to check that this key works\\. .*)?$/',
