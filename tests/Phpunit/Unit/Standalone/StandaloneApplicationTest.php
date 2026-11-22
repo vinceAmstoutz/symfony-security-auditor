@@ -84,6 +84,15 @@ final class StandaloneApplicationTest extends TestCase
         yield 'the script the shell evaluates' => ['completion'];
     }
 
+    public function test_its_listing_leaves_out_the_shell_completion_command(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+
+        (new StandaloneApplication('symfony-security-auditor', '1.2.3', '132.0'))->doRun(new StringInput('list'), $bufferedOutput);
+
+        self::assertStringNotContainsString('Dump the shell completion script', $bufferedOutput->fetch());
+    }
+
     public function test_a_quiet_run_gets_no_banner(): void
     {
         $bufferedOutput = new BufferedOutput(OutputInterface::VERBOSITY_QUIET);

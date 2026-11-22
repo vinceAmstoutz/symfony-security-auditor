@@ -31,6 +31,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `doctor --check-connection` sends one short test request to the configured provider and reports whether it answered. An interactive `init` offers to run it at the end, saying first that a paid API may bill it and sending it only on `yes` ([#702](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/702))
 - `auth:test` checks that the API key works with one short test request; `auth:status` suggests it once a key resolves ([#702](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/702))
 - `doctor` suggests `auth:status` to see where the API key comes from, when the configured platform uses one
+- The standalone binary no longer lists Symfony's `completion` command among its own; `completion` still prints the shell completion script
 - `audit:run` reports a folder of a project named as the project in one `Scope:` line under the header, in place of a `[NOTE]` block that repeated the project and folder paths ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
 - `audit:run` writes its long-run notice with a colon in place of a dash ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
 
