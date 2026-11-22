@@ -22,7 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatfo
  * The effort a subscription's CLI runs at, asked of a subscription only: no
  * other platform `init` writes takes one.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class InitEffortQuestion
 {

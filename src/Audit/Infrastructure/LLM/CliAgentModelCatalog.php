@@ -20,11 +20,11 @@ use Symfony\AI\Platform\ModelCatalog\ModelCatalogInterface;
 
 /**
  * A CLI bridge lists a few models while its CLI takes any model id the
- * subscription offers, such as `claude-opus-5-5` or `gpt-5.5`: a name the
- * bridge does not list runs as a model of the same class as one it does, and
- * the CLI accepts or refuses it.
+ * subscription offers, such as `claude-opus-5-5` or `gpt-5.5`. A name the
+ * bridge does not list runs as a model of the same class as one it does. The
+ * CLI then accepts or refuses it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class CliAgentModelCatalog implements ModelCatalogInterface
 {

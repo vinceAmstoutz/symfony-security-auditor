@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
  * What to say about models no price covers: on a subscription, that it is not
  * priced per call, never that the model name may be a typo.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class UnpricedModelNotice
 {
