@@ -79,6 +79,8 @@ final readonly class CliAgentPlatforms
 
     private const string PLATFORM_SERVICE_PREFIX = 'ai.platform.';
 
+    private const string EFFORT_PLATFORM = 'claudecode';
+
     private const string PLATFORM_TAG = 'ai.platform';
 
     public static function declares(ProviderKey $providerKey): bool
@@ -156,8 +158,18 @@ final readonly class CliAgentPlatforms
                 ->setFactory([CliAgentPlatformFactory::class, 'create'])
                 ->setArguments([self::FACTORIES[$name], \is_array($settings) ? ($settings['cli_binary'] ?? null) : null]);
             $containerBuilder->register($serviceId, CliAgentPlatform::class)
-                ->setArguments([new Reference($cliServiceId), self::ISOLATING_OPTIONS[$name], \in_array($name, self::SHARED_PROMPT_ARGUMENT, true)])
+                ->setArguments([new Reference($cliServiceId), [...self::ISOLATING_OPTIONS[$name], ...self::effortOf($name, $settings)], \in_array($name, self::SHARED_PROMPT_ARGUMENT, true)])
                 ->addTag(self::PLATFORM_TAG);
         }
+    }
+
+    /**
+     * @return array{effort?: string}
+     */
+    private static function effortOf(string $name, mixed $settings): array
+    {
+        $effort = self::EFFORT_PLATFORM === $name && \is_array($settings) ? ($settings['effort'] ?? null) : null;
+
+        return \is_string($effort) ? ['effort' => $effort] : [];
     }
 }

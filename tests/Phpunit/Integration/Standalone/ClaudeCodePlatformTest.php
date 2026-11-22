@@ -155,20 +155,19 @@ final class ClaudeCodePlatformTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $options
-     *
      * @throws AmbiguousPlatformException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
      * @throws ProviderBridgeException
      */
-    private function invoke(array $options): string
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_claude_code_cli_runs_at_the_configured_effort(): void
     {
-        $platform = $this->container()->get(PlatformInterface::class);
-        self::assertInstanceOf(PlatformInterface::class, $platform);
+        $this->invoke([], ['effort' => 'high']);
 
-        return $platform->invoke('opus', new MessageBag(Message::forSystem('Be terse.'), Message::ofUser('Audit this.')), $options)->asText();
+        self::assertContains(['--effort', 'high'], $this->consecutiveArgumentPairs());
     }
 
     /**
@@ -178,10 +177,46 @@ final class ClaudeCodePlatformTest extends TestCase
      * @throws NonLocalPlatformEndpointException
      * @throws ProviderBridgeException
      */
-    private function container(): ContainerBuilder
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_claude_code_cli_keeps_its_own_effort_when_none_is_configured(): void
+    {
+        $this->invoke([]);
+
+        self::assertNotContains('--effort', $this->arguments());
+    }
+
+    /**
+     * @param array<string, mixed>  $options
+     * @param array<string, string> $settings
+     *
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    private function invoke(array $options, array $settings = []): string
+    {
+        $platform = $this->container($settings)->get(PlatformInterface::class);
+        self::assertInstanceOf(PlatformInterface::class, $platform);
+
+        return $platform->invoke('opus', new MessageBag(Message::forSystem('Be terse.'), Message::ofUser('Audit this.')), $options)->asText();
+    }
+
+    /**
+     * @param array<string, string> $settings
+     *
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    private function container(array $settings = []): ContainerBuilder
     {
         return (new StandaloneContainerFactory())->create(
-            new StandaloneConfig([], new StandalonePlatformConfig(['claudecode' => ['cli_binary' => $this->fakeCli()]], 'claudecode')),
+            new StandaloneConfig([], new StandalonePlatformConfig(['claudecode' => ['cli_binary' => $this->fakeCli(), ...$settings]], 'claudecode')),
             $this->workingDirectory.'/cache',
         );
     }

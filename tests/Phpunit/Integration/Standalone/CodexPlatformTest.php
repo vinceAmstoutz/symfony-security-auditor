@@ -122,7 +122,24 @@ final class CodexPlatformTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $options
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_codex_cli_gets_no_claude_code_effort_flag(): void
+    {
+        $this->invoke([], ['effort' => 'high']);
+
+        self::assertNotContains('--effort', $this->arguments());
+    }
+
+    /**
+     * @param array<string, mixed>  $options
+     * @param array<string, string> $settings
      *
      * @throws AmbiguousPlatformException
      * @throws MissingBundleExtensionException
@@ -130,25 +147,27 @@ final class CodexPlatformTest extends TestCase
      * @throws NonLocalPlatformEndpointException
      * @throws ProviderBridgeException
      */
-    private function invoke(array $options): string
+    private function invoke(array $options, array $settings = []): string
     {
-        $platform = $this->container()->get(PlatformInterface::class);
+        $platform = $this->container($settings)->get(PlatformInterface::class);
         self::assertInstanceOf(PlatformInterface::class, $platform);
 
         return $platform->invoke('gpt-5.4', new MessageBag(Message::forSystem('Be terse.'), Message::ofUser('Audit this.')), $options)->asText();
     }
 
     /**
+     * @param array<string, string> $settings
+     *
      * @throws AmbiguousPlatformException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
      * @throws ProviderBridgeException
      */
-    private function container(): ContainerBuilder
+    private function container(array $settings = []): ContainerBuilder
     {
         return (new StandaloneContainerFactory())->create(
-            new StandaloneConfig([], new StandalonePlatformConfig(['codex' => ['cli_binary' => $this->fakeCli()]], 'codex')),
+            new StandaloneConfig([], new StandalonePlatformConfig(['codex' => ['cli_binary' => $this->fakeCli(), ...$settings]], 'codex')),
             $this->workingDirectory.'/cache',
         );
     }
