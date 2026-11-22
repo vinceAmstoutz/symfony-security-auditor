@@ -73,6 +73,19 @@ final class ComposerPharTest extends TestCase
         self::assertStringEqualsFile($composerPhar->in($this->directory.'/.composer'), "<?php echo \"fixture composer\";\n");
     }
 
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_replaces_a_read_only_composer_an_earlier_run_copied_out_of_the_binary(): void
+    {
+        $this->filesystem->dumpFile($this->directory.'/.composer/composer.phar', '<?php // an older composer');
+        $this->filesystem->chmod($this->directory.'/.composer/composer.phar', 0o444);
+
+        $composerPhar = new ComposerPhar(self::FIXTURE_PHAR, (string) hash_file('sha256', self::FIXTURE_PHAR));
+
+        self::assertStringEqualsFile($composerPhar->in($this->directory.'/.composer'), "<?php echo \"fixture composer\";\n");
+    }
+
     public function test_it_refuses_a_bundled_composer_whose_checksum_does_not_match_and_keeps_none_of_it(): void
     {
         $composerPhar = new ComposerPhar($this->bundledPhar, hash('sha256', 'another composer'));
