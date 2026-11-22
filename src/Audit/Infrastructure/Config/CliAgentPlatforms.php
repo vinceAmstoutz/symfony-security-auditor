@@ -40,6 +40,12 @@ final readonly class CliAgentPlatforms
     ];
 
     /**
+     * The effort levels both CLIs take, Claude Code as `--effort`, Codex as
+     * its `model_reasoning_effort`.
+     */
+    public const array EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+    /**
      * Built-in tools off, the machine's own configuration ignored: Claude
      * Code takes an empty tool list and no MCP server but the command line's;
      * Codex runs read-only with its shell and web search off, nothing kept.

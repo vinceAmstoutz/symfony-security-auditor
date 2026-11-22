@@ -84,6 +84,7 @@ Create `config/packages/symfony_security_auditor.yaml`. The bundle exposes the f
 | `reviewer_max_output_tokens` | `int` (≥ 1) | `null` | Reviewer output token cap; `max_output_tokens` when unset. |
 | `provider_json_mode` | bool | `false` | Ask a gateway serving a Claude model (`openrouter`, `generic`, …) to enforce JSON output with `response_format: {type: json_object}`. Not sent on `anthropic` and `bedrock`; no effect on other models. |
 | `cli_agent.platform` | `string` \| `null` | `null` | _Since 1.23._ Run the audit on a subscription through a CLI installed on the machine: `claudecode` (Claude, through `claude`) or `codex` (ChatGPT, through `codex`). The application's own `symfony/ai` platform is left alone. Needs `symfony/ai-claude-code-platform` or `symfony/ai-codex-platform`; see [Running on a Claude subscription](#running-on-a-claude-subscription). |
+| `cli_agent.effort` | `string` \| `null` | `null` | _Since 1.23._ The effort the CLI runs at: `low`, `medium`, `high`, `xhigh` or `max`, passed to Claude Code as `--effort` and to Codex as `model_reasoning_effort`. `null` keeps the CLI's own. |
 | `cli_agent.cli_binary` | `string` \| `null` | `null` | _Since 1.23._ Path to the CLI when it is not on the `PATH`. |
 
 Model names must be ones the platform configured in `ai.yaml` serves. When you raise `max_output_tokens`, raise `audit.rate_limit.output_tokens_per_minute` too, or that bucket throttles first.
@@ -512,9 +513,9 @@ reviewer_model: claude-haiku-5-5
 
 - **Requirements.** The `claude` CLI is installed and logged in to the subscription. On a CI runner, set the `CLAUDE_CODE_OAUTH_TOKEN` that `claude setup-token` prints. When `claude` is not on the `PATH`, name it with `cli_binary:` under `claudecode:`.
 - **Models.** _Since 1.23_ `init` offers Opus 5.5 to find the issues and Haiku 5.5 to review them; `--model` and `--reviewer-model` set them without asking. Afterwards, edit `model` and `reviewer_model`: any Claude model id works, as do Claude Code's aliases `opus`, `sonnet` and `haiku`.
-- **Effort.** _Since 1.23_ `init` asks the effort the CLI runs at, `medium` by default: `low`, `medium`, `high`, `xhigh` or `max`. Higher finds more and uses more of the plan. `--effort` sets it without asking. Afterwards, edit `effort:` under `claudecode:`; without it, the CLI keeps its own default. The effort is a standalone setting: the bundle's `cli_agent` has none.
+- **Effort.** _Since 1.23_ `init` asks the effort the CLI runs at, `medium` by default: `low`, `medium`, `high`, `xhigh` or `max`. Higher finds more and uses more of the plan. `--effort` sets it without asking. Afterwards, edit `effort:` under `claudecode:`; without it, the CLI keeps its own default. In a Symfony application, set it as `cli_agent.effort`.
 - **How each call runs.** The auditor starts `claude` with its built-in tools off and the MCP servers of the machine ignored, outside the audited project, so the code it reads cannot make it act. The attacker and the reviewer answer in JSON: `audit.tools_enabled`, `audit.structured_collection`, `audit.reviewer_tools_enabled` and `audit.reviewer_structured_collection` are set to `false`, so the model cannot open other files of the project during a chunk.
-- **In a Symfony application.** Require `symfony/ai-claude-code-platform` and set `cli_agent: { platform: claudecode }` with `model: opus` under `symfony_security_auditor:`. The application's own `symfony/ai` platform is left as it is.
+- **In a Symfony application.** Require `symfony/ai-claude-code-platform` and set `cli_agent: { platform: claudecode, effort: medium }` with `model: claude-opus-5-5` and `reviewer_model: claude-haiku-5-5` under `symfony_security_auditor:`. The application's own `symfony/ai` platform is left as it is.
 - **Limits.** The plan's usage limits apply. Its terms decide what automated use it allows. The run is not priced, so `--dry-run` shows no cost and an `audit.budget` cost cap cannot be enforced. A prompt longer than the 128 KiB one command-line argument can carry is split like one the provider refuses as too large. `privacy.offline_only` refuses this platform.
 
 ### Running on a ChatGPT subscription
@@ -533,7 +534,7 @@ reviewer_model: gpt-5.4-mini
 - **Models.** _Since 1.23_ `init` offers `gpt-5.4` to find the issues and `gpt-5.4-mini` to review them; `--model` and `--reviewer-model` set them without asking. Afterwards, edit `model` and `reviewer_model`: any model id your Codex CLI runs works, such as `gpt-5.5`, not only the ones the bundled bridge lists.
 - **Effort.** _Since 1.23_ `init` asks the reasoning effort, `medium` by default: `low`, `medium`, `high`, `xhigh` or `max`, passed to Codex as `model_reasoning_effort`. `--effort` sets it without asking. Afterwards, edit `effort:` under `codex:`; without it, Codex keeps its own default.
 - **How each call runs.** The auditor runs `codex exec` read-only and outside the audited project, with its shell and web search off, the user's Codex configuration and rules ignored and nothing kept of the session. As with Claude Code, the attacker and the reviewer answer in JSON.
-- **In a Symfony application.** Require `symfony/ai-codex-platform` and set `cli_agent: { platform: codex }` with `model: gpt-5.4` under `symfony_security_auditor:`.
+- **In a Symfony application.** Require `symfony/ai-codex-platform` and set `cli_agent: { platform: codex, effort: medium }` with `model: gpt-5.4` and `reviewer_model: gpt-5.4-mini` under `symfony_security_auditor:`.
 - **Limits.** The same as for a [Claude subscription](#running-on-a-claude-subscription), except that Codex joins the system and user prompts into one command-line argument, so the 128 KiB limit applies to both together.
 
 ## Providing the API key

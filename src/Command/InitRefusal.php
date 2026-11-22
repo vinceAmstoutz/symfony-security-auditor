@@ -89,7 +89,7 @@ final readonly class InitRefusal
         return match (true) {
             null === $effort => null,
             !InitEffortQuestion::takesEffort($providerKey) => \sprintf('Only a subscription (%s) takes an effort; leave --effort out for %s.', implode(' or ', array_keys(CliAgentPlatformFactory::SUBSCRIPTION_MODELS)), $providerKey->platform),
-            !\in_array($effort, InitEffortQuestion::LEVELS, true) => \sprintf('The effort must be one of %s.', implode(', ', InitEffortQuestion::LEVELS)),
+            !\in_array($effort, CliAgentPlatforms::EFFORT_LEVELS, true) => \sprintf('The effort must be one of %s.', implode(', ', CliAgentPlatforms::EFFORT_LEVELS)),
             default => null,
         };
     }

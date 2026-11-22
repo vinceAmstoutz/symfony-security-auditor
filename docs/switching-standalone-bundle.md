@@ -113,7 +113,7 @@ Replace the standalone-only keys:
 | --- | --- |
 | `platform:` | `ai.platform` in `config/packages/ai.yaml` |
 | `provider:` | Nothing with one platform. With several, alias `Symfony\AI\Platform\PlatformInterface` to `@ai.platform.<name>` in `config/services.yaml` ([details](configuration.md#several-platforms-in-a-symfony-application)) |
-| `provider: claudecode` or `codex` | `cli_agent.platform: claudecode` or `codex`, with `symfony/ai-claude-code-platform` or `symfony/ai-codex-platform` required; a `cli_binary:` setting becomes `cli_agent.cli_binary`; `effort:` has no bundle equivalent yet |
+| `provider: claudecode` or `codex` | `cli_agent.platform: claudecode` or `codex`, with `symfony/ai-claude-code-platform` or `symfony/ai-codex-platform` required; a `cli_binary:` setting becomes `cli_agent.cli_binary` and an `effort:` setting `cli_agent.effort` |
 | `http_timeout:` | `framework.http_client.default_options.timeout` |
 
 ### Update commands, CI and MCP

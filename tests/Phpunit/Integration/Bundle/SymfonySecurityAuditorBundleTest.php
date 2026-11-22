@@ -252,6 +252,35 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
+    public function test_the_claude_code_cli_its_cli_agent_names_runs_a_full_claude_model_id(): void
+    {
+        $kernel = $this->boot(['model' => 'claude-opus-5-5', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        self::assertSame('OK', $llmClient->complete('sys', 'usr')->content());
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_claude_code_cli_its_cli_agent_names_runs_at_the_configured_effort(): void
+    {
+        $kernel = $this->boot(['model' => 'opus', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->argumentRecordingClaudeCli(), 'effort' => 'high']], registerPlatform: false);
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+        $llmClient->complete('sys', 'usr');
+
+        self::assertStringContainsString("--effort\0high\0", (string) file_get_contents($this->tmpDir.'/claude-arguments'));
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_the_calls_to_the_platform_of_the_application_are_streamed(): void
     {
         $kernel = $this->boot(['model' => 'claude-sonnet-4-5'], registerPlatform: false, registerHostServices: $this->servedBy('anthropic'));
@@ -2504,6 +2533,15 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder->getParameterBag()->resolve();
 
         return $containerBuilder;
+    }
+
+    private function argumentRecordingClaudeCli(): string
+    {
+        $cli = $this->tmpDir.'/claude-recording';
+        (new Filesystem())->dumpFile($cli, \sprintf("#!/bin/sh\nprintf '%%s\\0' \"\$@\" > %s\necho '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"OK\",\"usage\":{\"input_tokens\":3,\"output_tokens\":1}}'\n", escapeshellarg($this->tmpDir.'/claude-arguments')));
+        (new Filesystem())->chmod($cli, 0o755);
+
+        return $cli;
     }
 
     private function fakeClaudeCli(): string

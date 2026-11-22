@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatformFactory;
 
 /**
@@ -25,8 +26,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatfo
  */
 final readonly class InitEffortQuestion
 {
-    public const array LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
-
     private const string DEFAULT_LEVEL = 'medium';
 
     public static function ask(SymfonyStyle $symfonyStyle, ProviderKey $providerKey): ?string
@@ -35,7 +34,7 @@ final readonly class InitEffortQuestion
             return null;
         }
 
-        return NumberedChoice::ask($symfonyStyle, 'Which effort should the model think at? Higher finds more and uses more of the subscription', self::LEVELS, self::DEFAULT_LEVEL);
+        return NumberedChoice::ask($symfonyStyle, 'Which effort should the model think at? Higher finds more and uses more of the subscription', CliAgentPlatforms::EFFORT_LEVELS, self::DEFAULT_LEVEL);
     }
 
     public static function takesEffort(ProviderKey $providerKey): bool
