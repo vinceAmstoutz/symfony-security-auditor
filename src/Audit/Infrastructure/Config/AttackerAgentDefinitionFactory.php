@@ -31,9 +31,8 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
 /**
- * The single source of `AttackerAgent`'s constructor argument shape, shared by
- * the primary and escalation (cheap-model) service definitions so they cannot
- * drift out of sync with each other or with the constructor itself.
+ * The single source of `AttackerAgent`'s constructor arguments, shared by its
+ * primary and escalation service definitions.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

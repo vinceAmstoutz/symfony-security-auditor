@@ -17,12 +17,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\ProjectConfigUserOnlyKeyException;
 
 /**
- * How long the standalone binary's HTTP client waits for a provider that sends
- * nothing, in seconds: the idle timeout of every request; how long a request
- * takes in total is not bounded. Without it the client falls back to PHP's
- * `default_socket_timeout` (60 seconds) and gives up on a non-streamed answer
- * that a slow local model or a self-hosted gateway takes longer to start
- * sending.
+ * How long, in seconds, the standalone binary's HTTP client waits for a
+ * provider that sends nothing: the idle timeout of every request, whose total
+ * time is not bounded.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -47,8 +44,7 @@ final readonly class HttpTimeout
     }
 
     /**
-     * A repository may give a slow provider more time, never less: a shorter
-     * timeout than the user's could cut every call of its own audit short.
+     * Refuses a timeout shorter than the user's.
      *
      * @param array<array-key, mixed> $projectConfig
      *

@@ -62,8 +62,7 @@ final class CostCalculatorTest extends TestCase
     {
         $costCalculator = new CostCalculator($this->fixedPricing(0.1, 0.4));
 
-        // 7 input tokens @ 0.1/1M = 7e-7 = 0.0000007 (unrounded mathematically;
-        // ~7.000000000000001e-7 due to float representation).
+        // 7 input tokens @ 0.1/1M = 7e-7, give or take float representation.
         self::assertEqualsWithDelta(7.0e-7, $costCalculator->costForCall(7, 0, 'model'), 1e-15);
     }
 

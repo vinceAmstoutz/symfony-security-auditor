@@ -50,15 +50,9 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     public const int DEFAULT_MAX_FILE_SIZE_KB = 512;
 
     /**
-     * Default allow-list of project-relative paths scanned for security
-     * findings. Matches the Symfony Flex skeleton (`src/` for PHP, `config/`
-     * for YAML/XML, `templates/` for Twig, `public/index.php` for the HTTP
-     * front controller, plus the root dotenv files where committed secrets
-     * hide; the gitignored `.env.local` variants are pruned by the default
-     * `respect_gitignore: true`). Anything outside this list is silently
-     * skipped, including ad-hoc root-level scripts, `bin/`, custom `app/`
-     * or `lib/` trees and the build artefacts in `var/`, `public/build`,
-     * `vendor/`. Override via `scan.included_paths` for non-standard layouts.
+     * The paths scanned unless `scan.included_paths` replaces them: the
+     * sources, configuration, templates, front controller and root dotenv
+     * files of the Symfony Flex skeleton.
      *
      * @var list<string>
      */
@@ -76,11 +70,11 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     ];
 
     /**
-     * @param list<string>                  $includedPaths          project-relative directories and files to scan; defaults to the Symfony skeleton layout
-     * @param ?Closure(SplFileInfo): string $fileReader             defaults to SplFileInfo::getContents; tests inject a stub
-     * @param ?GitTrackedIgnoredFiles       $gitTrackedIgnoredFiles the files git tracks although a `.gitignore` pattern matches them are scanned too, so pass it only with `$respectGitignore`; none runs no git process
-     * @param bool                          $includeDotfiles        whether a directory walk also reads dot files and dot directories; version-control directories (`.git`, `.svn`, `CVS`, …) are left out either way
-     * @param ?ScannedContents              $scannedContents        what the scans of one run share, set by {@see sharingReads()}; none shares nothing between scans
+     * @param list<string>                  $includedPaths          project-relative directories and files to scan
+     * @param ?Closure(SplFileInfo): string $fileReader             defaults to SplFileInfo::getContents
+     * @param ?GitTrackedIgnoredFiles       $gitTrackedIgnoredFiles also scans the files git tracks although a `.gitignore` pattern matches them, so pass it only with `$respectGitignore`; null runs no git process
+     * @param bool                          $includeDotfiles        whether a directory walk also reads dot files and dot directories; version-control directories are left out either way
+     * @param ?ScannedContents              $scannedContents        shared by the scans of one run, set by {@see sharingReads()}
      */
     public function __construct(
         private LoggerInterface $logger,
@@ -165,8 +159,8 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     }
 
     /**
-     * The configured scan stops at the first file it would keep, given an
-     * empty content in place of reading and scrubbing each one.
+     * Stops at the first file the configured scan would keep, without reading
+     * any.
      */
     #[Override]
     public function reachesAFile(string $projectPath): bool
@@ -182,8 +176,6 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     }
 
     /**
-     * What the scan finds in each file the roots reach, one file at a time.
-     *
      * @param list<string>                         $directories
      * @param list<string>                         $explicitFiles
      * @param Closure(SplFileInfo, string): string $contentOf
@@ -198,8 +190,8 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     }
 
     /**
-     * Paths that overlap (a directory and one inside it, a directory and a
-     * file in it) reach the same file more than once.
+     * Keeps once a file that overlapping paths reach twice. Reports another
+     * file sharing its relative path as ambiguous.
      */
     private function eachFileOnce(ProjectFileScan $projectFileScan): ProjectFileScan
     {
@@ -241,9 +233,8 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     }
 
     /**
-     * A filesystem lists a directory in its own storage order, which differs
-     * between machines; the chunks built from this list (and the prompts and
-     * cache keys built from those) must not.
+     * Sorts by relative path, so chunks, prompts and cache keys do not depend
+     * on the order a filesystem lists a directory in.
      */
     private function inRelativePathOrder(ProjectFileScan $projectFileScan): ProjectFileScan
     {
@@ -323,7 +314,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
 
     /**
      * @param Closure(SplFileInfo, string): string $contentOf
-     * @param list<string>                         $trackedIgnored files git tracks although a .gitignore pattern matches them: still part of the repository, so still audited
+     * @param list<string>                         $trackedIgnored files git tracks although a .gitignore pattern matches them, scanned anyway
      *
      * @return Generator<ProjectFile|SkippedFile>
      */
@@ -373,9 +364,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     }
 
     /**
-     * A glob's `*` never matches a leading dot, so each extension is matched
-     * as `.*.ext` too: the dot files a walk reads when `$includeDotfiles`
-     * asks for them.
+     * Also matches `.*.ext`, since a glob's `*` never matches a leading dot.
      *
      * @return list<string>
      */
@@ -390,10 +379,8 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     }
 
     /**
-     * Containment is decided on real paths, not on spellings: a symlink
-     * committed in the audited repository can point anywhere on the machine
-     * and a lexical check would call `src/link/` or `src/link/deep/..` part of
-     * the project while the filesystem walks into the link's target.
+     * Decides containment on real paths: a lexical check would take
+     * `src/link/` for part of the project while the walk follows the link.
      *
      * @param list<string> $roots
      *
@@ -476,11 +463,8 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     }
 
     /**
-     * Finder's `files()` leaves out directories alone, so a named pipe, a
-     * socket or a device node named like a source file reaches this point:
-     * opening a pipe waits for a writer forever and a device may never end,
-     * so anything but a regular file is reported unreadable without being
-     * opened.
+     * Reports anything but a regular file (a pipe, a socket, a device)
+     * unreadable without opening it.
      *
      * @param Closure(SplFileInfo, string): string $contentOf
      */
@@ -523,8 +507,7 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     }
 
     /**
-     * A scrubber that reads the name of the file as well gets it: the name of a secrets-vault key
-     * file says what its content holds.
+     * Gives a path-aware scrubber the file's relative path as well.
      */
     private function scrubbed(string $relativePath, string $content): string
     {
@@ -536,9 +519,8 @@ final readonly class ProjectFileScanner implements ScopedProjectFileScannerInter
     }
 
     /**
-     * The content the scanned file holds, kept once for the file and the
-     * reads the scans share; bytes that would read two ways once repaired are
-     * kept as read, so the scan still leaves the file out as ambiguous.
+     * Repairs invalid UTF-8, except in content that would read two ways once
+     * repaired: it stays as read, so the scan leaves the file out as ambiguous.
      */
     private function heldContent(string $content, string $relativePath): string
     {

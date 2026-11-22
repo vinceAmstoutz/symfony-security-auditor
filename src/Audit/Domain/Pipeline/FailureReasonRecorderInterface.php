@@ -14,11 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline;
 
 /**
- * Opt-in companion of {@see CoverageRecorderInterface} for a recorder that
- * keeps why a file ended `errored` (the answer was cut short, the call failed)
- * so progress output can name the cause of a failed chunk instead of only
- * the fact. The analyzers check for it with `instanceof`, so a recorder
- * without it keeps working.
+ * Optional companion of {@see CoverageRecorderInterface}, checked with
+ * `instanceof`: keeps why a file ended `errored`, so progress output names the
+ * cause of a failed chunk.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

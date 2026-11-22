@@ -174,9 +174,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     }
 
     /**
-     * Every autoconfigured service implementing an extension point joins the
-     * tagged iterator that collects it, the application's own services
-     * included, not only the ones `config/services.php` defines.
+     * Every autoconfigured service implementing an extension point joins its
+     * tagged iterator, the application's own services included.
      */
     private function registerForAutoconfiguration(ContainerBuilder $containerBuilder): void
     {
@@ -187,10 +186,9 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     }
 
     /**
-     * The scan lists the files git tracks although a `.gitignore` pattern
-     * matches them only when `scan.include_tracked_ignored` asks for it under
-     * `scan.respect_gitignore`; otherwise no such service exists, the scanner
-     * is handed none and no git process runs.
+     * Lists the files git tracks although a `.gitignore` pattern matches them
+     * only when `scan.include_tracked_ignored` and `scan.respect_gitignore` are
+     * both on; otherwise no git process runs.
      */
     private function registerTrackedIgnoredFiles(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
     {
@@ -204,9 +202,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     }
 
     /**
-     * Each configured `audit.custom_skills` entry becomes a tagged
-     * `ConfiguredAttackerSkill`, so `AttackerSkillRegistry`'s tagged iterator
-     * collects it beside the built-in skills with no registry change.
+     * Tags each `audit.custom_skills` entry as a `ConfiguredAttackerSkill`,
+     * which `AttackerSkillRegistry` collects beside the built-in skills.
      */
     private function registerCustomSkills(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
     {
@@ -305,9 +302,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     }
 
     /**
-     * An application may wire its own client in place of either one; its
-     * decorator wraps the client the id ends up naming before any decorator of
-     * the application's own does, so the usage is booked once.
+     * Books the usage of a client the application wires in place of either one
+     * exactly once: this decorator wraps it before any of the application's.
      */
     private function bookUsageOfReplacedClients(ServicesConfigurator $servicesConfigurator): void
     {
@@ -369,11 +365,10 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     }
 
     /**
-     * With `audit.triage_memory` enabled, the reviewer's own rejections
-     * persist across runs and merge with any baseline-sourced feedback via
-     * {@see CompositeReviewerFeedbackProvider}; disabled (the default), the
-     * feedback seam is exactly the baseline-only behaviour of earlier
-     * releases.
+     * With `audit.triage_memory` on, the reviewer's rejections persist across
+     * runs and merge with the baseline feedback through
+     * {@see CompositeReviewerFeedbackProvider}; off, the default, only the
+     * baseline feeds the reviewer.
      */
     private function registerTriageMemory(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
     {
@@ -390,9 +385,9 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     }
 
     /**
-     * With `scan.import_sarif` configured, the effective pre-scanner is the
-     * SARIF importer decorating whichever scanner `audit.static_prescan`
-     * selected: imports work even with the regex pre-scan disabled.
+     * With `scan.import_sarif` set, the SARIF importer decorates whichever
+     * pre-scanner `audit.static_prescan` selected, so imports work even with
+     * the regex pre-scan off.
      */
     private function registerStaticPreScanner(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
     {
@@ -456,10 +451,9 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     }
 
     /**
-     * The cheap attacker must never share cache entries with the primary
-     * attacker: both would otherwise read and write the same keys. A
-     * cheap-model "no findings" result cached during an escalation run would
-     * later be served to the full-price attacker as its own analysis.
+     * The cheap attacker never shares cache entries with the primary one,
+     * which would otherwise be served a cheap model's empty result as its own
+     * analysis.
      */
     private function registerCheapAttackerCache(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
     {
@@ -480,8 +474,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     }
 
     /**
-     * A coding agent's CLI answers in one piece, whatever the platform the
-     * application configures, so only that platform's calls are streamed.
+     * Streams only the calls to the application's own platform: a coding
+     * agent's CLI answers in one piece.
      */
     private function streamsCalls(string $platformServiceId): bool
     {

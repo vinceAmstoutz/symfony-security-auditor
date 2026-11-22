@@ -14,11 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate;
 
 /**
- * The only shape of release tag the updater trusts: `X.Y.Z`, optionally a
- * SemVer pre-release (`X.Y.Z-rc.1`) and optionally a leading `v`. A tag is
- * pasted into download URLs and printed to the terminal, so anything else
- * (a path, a query, a URL, a control character) is refused outright rather
- * than escaped.
+ * The only release tag shape the updater trusts: `X.Y.Z`, an optional SemVer
+ * pre-release and an optional leading `v`. Anything else is refused, not
+ * escaped: a tag goes into download URLs and the terminal.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

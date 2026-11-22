@@ -17,10 +17,8 @@ use JsonException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\MalformedAdvisoryPayloadException;
 
 /**
- * The shape `composer audit --format=json` must have for an advisory lookup to
- * use it: a JSON object holding an `advisories` map, plus the optional
- * `ignored-advisories` map composer reports the advisories the audited
- * project filters out under.
+ * A `composer audit --format=json` payload: an `advisories` map and the optional
+ * `ignored-advisories` map of the advisories the audited project filters out.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

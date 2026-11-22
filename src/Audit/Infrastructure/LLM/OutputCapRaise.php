@@ -16,9 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 use Symfony\AI\Platform\PlatformOptions;
 
 /**
- * The options of a tool request asked again after the output cap cut its tool
- * call off: the same request with twice the cap. Null for a request that
- * offered no tool or sent no cap, which a higher cap cannot help.
+ * Doubles the output cap of a tool request whose tool call the cap cut off;
+ * null for a request that offered no tool or sent no cap.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

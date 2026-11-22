@@ -29,13 +29,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 
 /**
- * Reviews findings one at a time, collecting each verdict through a
- * schema-enforced `record_review` tool call, or reading it from the answer, as
- * the JSON path does, when the client never offered the tool. Cache hits
- * short-circuit the LLM.
- *
- * A finding the model cannot review with its whole file in the prompt is
- * recorded as errored and the review goes on with the next one.
+ * Reviews findings one at a time through a `record_review` tool call, or the
+ * JSON answer when the client never offered the tool, serving cache hits
+ * without calling the LLM. Records a finding the model cannot take in with
+ * its whole file as errored and goes on with the next one.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -146,11 +143,9 @@ final readonly class StructuredReviewAnalyzer
     }
 
     /**
-     * A conversation cut short (tool-loop cap, token limit, content filter,
-     * no content) that recorded no verdict is an error, not a rejection: the
-     * finding is recorded as errored and left out of the cache. A verdict the
-     * model did record before the cut-off is genuine and applied as usual,
-     * though one given at the tool-call limit is not cached.
+     * Records the finding errored and uncached, never rejected, when a
+     * degraded answer holds no verdict. Applies a verdict recorded before the
+     * cut-off, uncached when given at the tool-call limit.
      *
      * @param array<string, mixed>|null $verdict
      */

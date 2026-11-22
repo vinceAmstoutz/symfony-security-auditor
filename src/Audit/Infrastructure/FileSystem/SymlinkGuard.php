@@ -16,18 +16,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 use Symfony\Component\Filesystem\Path;
 
 /**
- * `Filesystem::dumpFile()` and `readFile()` transparently follow a symlink
- * anywhere on the way to their target, so a predictable path committed as a
- * symlink by a malicious change (`report.sarif`, `.security-baseline.json`,
- * a cache shard, or a directory above them such as `build -> /elsewhere`)
- * would redirect the read or write out of the project. A path is refused when
- * its file, its directory or any directory between the trusted root (the
- * process working directory by default) and the file is a symlink. Directories
- * above that root are the user's own, the operating system's included
- * (`/var -> /private/var` on macOS) and are left alone. A relative path or
- * root is read against the working directory, as the filesystem calls read
- * it. A trailing slash is dropped first: `link/` names the directory `link`
- * points to, so `is_link()` would look straight through it.
+ * Refuses a path whose file, directory or any directory between the trusted
+ * root (the working directory by default) and the file is a symlink, so a
+ * symlink committed to the project cannot redirect a read or a write.
+ * Directories above the root are trusted. A relative path or root is read
+ * against the working directory and a trailing slash is ignored.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -60,10 +53,7 @@ final readonly class SymlinkGuard
     }
 
     /**
-     * The audited checkout is as untrusted below its root as below the
-     * working directory, so a path into it given from outside the working
-     * directory has every directory between the project root and the file
-     * checked too, not only its own directory.
+     * Refuses a symlink below the working directory or below `$projectRoot`.
      */
     public static function isThroughSymlinkIntoProject(string $path, ?string $projectRoot): bool
     {
@@ -72,14 +62,9 @@ final readonly class SymlinkGuard
     }
 
     /**
-     * Walks the directory prefixes of the path as written rather than as
-     * canonicalized: the kernel reads `build/link/../report.sarif` through
-     * `build/link` before it climbs back up, so collapsing the `..` first
-     * would hide the link. This runs before the `canonicalize()` collapse
-     * below precisely because a `..` can climb back ABOVE the root, which
-     * would otherwise take the "outside the root" branch and skip the walk
-     * that catches the symlinked prefix. Prefixes above the root and the root
-     * itself stay unchecked, as before.
+     * Walks the path as written, not canonicalized: the kernel reads
+     * `build/link/../report.sarif` through `build/link`, even when the `..`
+     * climbs above the root.
      */
     private static function traversesSymlinkBelowRoot(string $absolutePath, string $canonicalRoot): bool
     {

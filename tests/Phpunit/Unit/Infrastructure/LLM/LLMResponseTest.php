@@ -116,10 +116,8 @@ final class LLMResponseTest extends TestCase
     }
 
     /**
-     * `BudgetTracker::recordCall()` sums `totalTokens()` across every call to
-     * enforce `audit.budget.max_tokens`; a provider serves a cache-read or
-     * cache-creation token at a different price than a fresh one, but it is
-     * still a token the request consumed and the cap is meant to bound.
+     * Cache tokens count toward `audit.budget.max_tokens` like fresh ones,
+     * whatever their price.
      *
      * @throws InvalidTokenUsageException
      */
@@ -224,8 +222,6 @@ final class LLMResponseTest extends TestCase
      */
     public function test_it_extracts_balanced_json_array_with_nested_objects_from_prose(): void
     {
-        // Validates that the extractor's balanced-brace walker correctly handles
-        // nested `{` / `}` inside the outer `[ ... ]` block.
         $content = 'Found these issues: [{"id":1,"meta":{"score":0.9}}] — done.';
         $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
@@ -239,8 +235,6 @@ final class LLMResponseTest extends TestCase
      */
     public function test_it_ignores_brackets_inside_strings_when_extracting(): void
     {
-        // String contents must not affect depth counting: `]` inside a JSON
-        // string would otherwise close the outer array prematurely.
         $content = 'note: [{"title":"contains ] bracket"}] end';
         $llmResponse = LLMResponse::of($content, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
@@ -621,9 +615,6 @@ final class LLMResponseTest extends TestCase
      */
     public function test_it_throws_when_prose_contains_unbalanced_bracket_with_no_closer(): void
     {
-        // Prose mentions `[` but no matching `]` ever appears: every opener
-        // candidate fails to scan a balanced block, so the original
-        // `JsonException` propagates rather than masking the failure.
         $llmResponse = LLMResponse::of('prose with [no real json here', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $this->expectException(JsonException::class);
@@ -635,8 +626,6 @@ final class LLMResponseTest extends TestCase
      */
     public function test_it_throws_when_prose_surrounds_no_balanced_json_block(): void
     {
-        // Unbalanced braces (`{{{` with no matching closers): extractor returns
-        // null and the original JsonException is rethrown.
         $llmResponse = LLMResponse::of('invalid json {{{', 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
         $this->expectException(JsonException::class);
@@ -670,7 +659,6 @@ final class LLMResponseTest extends TestCase
      */
     public function test_parse_json_succeeds_at_511_nesting_levels(): void
     {
-        // depth=512 allows up to 511 levels; depth=511 mutant would reject this → kills DecrementInteger
         $json = str_repeat('[', 511).str_repeat(']', 511);
         $llmResponse = LLMResponse::of($json, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
@@ -684,7 +672,6 @@ final class LLMResponseTest extends TestCase
      */
     public function test_parse_json_throws_at_512_nesting_levels(): void
     {
-        // depth=512 rejects 512 levels; depth=513 mutant would accept it → kills IncrementInteger
         $json = str_repeat('[', 512).str_repeat(']', 512);
         $llmResponse = LLMResponse::of($json, 'claude', 'end_turn', TokenUsageSnapshot::of(10, 5));
 
@@ -709,8 +696,6 @@ final class LLMResponseTest extends TestCase
      */
     public function test_parse_json_strips_null_bytes_before_decoding(): void
     {
-        // trim() removes \x00 (null byte); json_decode does NOT handle null bytes.
-        // MethodCallRemoval on trim() would leave \x00 in content → JsonException.
         $llmResponse = LLMResponse::of("\x00[1, 2, 3]\x00", 'test', 'end_turn', TokenUsageSnapshot::of(0, 0));
 
         self::assertSame([1, 2, 3], $llmResponse->parseJson());

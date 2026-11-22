@@ -39,8 +39,7 @@ final class UnreadableCredentialStoreException extends RuntimeException
     }
 
     /**
-     * The command is meant to be pasted into a POSIX shell (the only kind the
-     * permission check runs under), so the path survives spaces and quotes.
+     * Quotes the path for the POSIX shell the suggested command is pasted into.
      */
     private static function shellQuoted(string $path): string
     {

@@ -16,11 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge;
 use Composer\InstalledVersions;
 
 /**
- * The `symfony/ai-platform` release this binary was built with, read from the
- * installed-package data of this package's own vendor tree, never from the
- * bridge tree, whose autoloader is registered first and may carry the very
- * mismatch being prevented. Null when that dependency is not installed as a
- * tagged release (a branch checkout), where there is nothing to pin.
+ * The `symfony/ai-platform` release this binary was built with, read from its
+ * own vendor tree, never from the bridge tree. Null when that package is not
+ * installed as a tagged release.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -48,8 +46,8 @@ final readonly class BundledAiPlatformVersion
     }
 
     /**
-     * The `symfony/ai-platform` version a vendor tree's installed-package data
-     * records, whatever its form (a bridge tree's included).
+     * Returns the `symfony/ai-platform` version installed-package data records,
+     * a branch version included.
      *
      * @param array<array-key, mixed> $installed
      */

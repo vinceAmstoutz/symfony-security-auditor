@@ -14,11 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 
 /**
- * Reads the `accepted` flag of a reviewer verdict. Beside the JSON booleans it
- * takes the spellings a provider that stringifies JSON booleans, or a model
- * answering in words, plausibly sends. Anything else (`"rejected"`, `"maybe"`,
- * an empty string, a number other than 0 or 1) reads as null: not a verdict.
- * PHP's `(bool)` cast would read every one of those as an acceptance.
+ * Reads the `accepted` flag of a reviewer verdict: the JSON booleans and the
+ * spellings a provider that stringifies them, or a model answering in words,
+ * plausibly sends. Anything else (`"rejected"`, `"maybe"`, an empty string, a
+ * number other than 0 or 1) reads as null, not a verdict.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

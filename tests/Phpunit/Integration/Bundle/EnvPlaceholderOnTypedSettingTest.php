@@ -207,9 +207,8 @@ final class EnvPlaceholderOnTypedSettingTest extends TestCase
     }
 
     /**
-     * Symfony checks every placeholder against the configuration tree while
-     * a kernel compiles its container, with the default its variable
-     * declares, or with an empty string when it declares none.
+     * Returns what Symfony's placeholder check throws while a kernel compiles,
+     * the variable holding its declared default or else an empty string.
      *
      * @param array<string, mixed> $config
      */

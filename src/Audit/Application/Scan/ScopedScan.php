@@ -21,20 +21,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ScopedProjectFileScan
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SkippedFileReportingProjectFileScannerInterface;
 
 /**
- * The files a run covers, given its `--path` values. Without a path it is the
- * configured scan surface. With paths, the paths replace `scan.included_paths`
- * for the run: a scanner that can be told where to look scans them themselves,
- * under every other rule it applies, so `--path src` audits all of `src` even
- * when the configuration narrows the scope to `src/Controller`. A path equal
- * to the project root names no path and keeps the configured scope. A scanner
- * that cannot be told where to look keeps the part of the configured surface
- * under the paths, as it always did.
- * The files the Symfony mapping is read from are a wider set: the configured
- * scope plus the files the paths reached, each once, so the security
- * configuration, voters and forms that decide how each audited route is
- * guarded are still read when `--path` names a single folder. A scanner that
- * can share its reads scans both through the scanner sharing them, so a file
- * both reach is read and scrubbed once.
+ * The files a run covers. Without `--path`, the configured scan surface. With
+ * it, a scanner that can be told where to look scans the paths in place of
+ * `scan.included_paths`, under its other rules; any other scanner keeps the
+ * configured files under the paths. A path equal to the project root keeps
+ * the configured scope. The Symfony mapping reads the configured scope
+ * besides, so a `--path` run still sees the security configuration, voters
+ * and forms. A scanner that shares its reads reads and scrubs each file once.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

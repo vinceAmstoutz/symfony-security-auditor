@@ -24,9 +24,8 @@ final class InitRefusalTest extends TestCase
     private const string CONFIG_FILE = '/home/you/.config/symfony-security-auditor/config.yaml';
 
     /**
-     * Each case pairs a provider that breaks two rules at once with the rule
-     * the user should hear about, so a reordering that sends someone into a
-     * second refusal fails here rather than in a support thread.
+     * Each case pairs a provider breaking two rules with the rule the user
+     * should hear about first.
      */
     #[DataProvider('competingRefusalCases')]
     public function test_it_names_the_refusal_that_leaves_the_user_somewhere_to_go(string $provider, InitCommandInput $initCommandInput, string $expected): void

@@ -16,13 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 
 /**
- * The settings a user fills with prose or a regex (a risk pattern, a scrubbing
- * pattern, a skill's instructions) and the names a user gives (a risk-pattern
- * bucket or label, a skill), which the container reads too, where a `%` is far
- * more likely to be text than a container reference. A path setting is left
- * alone on purpose: a `%LOCALAPPDATA%` there is an environment reference the
- * user meant and taking it literally would create a folder of that name
- * instead of stopping.
+ * The settings a user fills with prose, a regex or a name, where a `%` is
+ * text rather than a container reference: risk and scrubbing patterns, skill
+ * instructions, risk-pattern buckets and labels, skill names. A path setting
+ * is not one: a `%LOCALAPPDATA%` there is a reference the user meant.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

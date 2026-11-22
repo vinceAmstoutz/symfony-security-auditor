@@ -19,11 +19,9 @@ use Symfony\AI\Platform\Platform;
 use Symfony\Component\Filesystem\Filesystem;
 
 /**
- * Builds the platform of a coding agent's CLI, started in a directory of its
- * own that only the user running the audit can open: the CLI reads its
- * settings, hooks included, from the directory it starts in, so a shared one
- * such as the system temp directory would let another local user configure
- * it.
+ * Builds the platform of a coding agent's CLI, started in a fresh directory
+ * only the user running the audit can open, since the CLI reads its
+ * settings, hooks included, from the directory it starts in.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

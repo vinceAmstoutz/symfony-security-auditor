@@ -16,13 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\GitChangedFilesUnavailableException;
 
 /**
- * Resolves the set of project-relative file paths that have changed (added,
- * modified, renamed) between the given git ref and the current working tree.
- *
- * Used by diff-mode audits where CI integrations want to scan only the files
- * touched by a pull request instead of the whole project tree. Implementations
- * must include uncommitted changes (so a local dev `audit:run --since=main`
- * sees their in-flight edits).
+ * Resolves the project-relative paths of the files added, modified or renamed
+ * between a git ref and the working tree. Implementations MUST include
+ * uncommitted changes.
  *
  * @throws GitChangedFilesUnavailableException when the project path is not a
  *                                             git working tree, the ref does

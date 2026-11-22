@@ -17,11 +17,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\FormBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /**
- * Extracts FormType bindings (`$this->createForm(SomeFormType::class, ...)`
- * call sites) from a controller file. One `FormBinding` is emitted per call
- * site so the same controller method may produce multiple entries when it
- * builds several forms. Implementations must degrade silently (return empty
- * list) when the file cannot be parsed.
+ * Extracts one `FormBinding` per `$this->createForm(SomeFormType::class, ...)`
+ * call site of a controller file. Implementations MUST return an empty list
+ * for a file they cannot parse.
  */
 interface FormBindingParserInterface
 {

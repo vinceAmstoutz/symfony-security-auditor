@@ -17,9 +17,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
 
 /**
- * Persists a rejected finding's reviewer explanation to triage memory in one
- * step, so every review path (single, structured, concurrent and batched)
- * records the same cross-run feedback instead of only some of them.
+ * Saves a rejected finding's reviewer explanation to triage memory, the same
+ * way on every review path.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

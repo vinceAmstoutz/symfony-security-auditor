@@ -16,13 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /**
- * Per-chunk vulnerability cache. The key is derived from the sorted set of
- * (relativePath, contentHash) tuples in the chunk. A cache hit short-circuits
- * the LLM call entirely.
- *
- * Stored payloads are raw vulnerability dicts ready for VulnerabilityFactory::fromList().
- * The factory tolerates partially malformed entries, so cache implementations are
- * not required to validate structure beyond JSON parsing.
+ * Per-chunk cache of the attacker's raw findings, keyed by the chunk's sorted
+ * (relative path, content hash) pairs. A hit skips the LLM call. Payloads go
+ * to VulnerabilityFactory::fromList(), which drops malformed entries, so an
+ * implementation validates nothing beyond JSON.
  */
 interface AttackerCacheInterface
 {

@@ -55,10 +55,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\FixedFindingPipeline;
 
 /**
- * Drives {@see AuditCommand} with a fixed, already-validated finding injected
- * directly into the pipeline (bypassing the attacker/reviewer loop, whose own
- * baseline handling is covered by AuditOrchestratorTest), to verify the
- * command's SARIF-specific baseline-suppression wiring in isolation.
+ * Checks the SARIF baseline suppression of {@see AuditCommand} in isolation,
+ * with an already-validated finding injected into the pipeline.
  */
 final class AuditCommandSarifBaselineSuppressionTest extends TestCase
 {

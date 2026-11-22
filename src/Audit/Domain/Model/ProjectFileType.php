@@ -39,10 +39,7 @@ enum ProjectFileType: string
     case OTHER = 'other';
 
     /**
-     * The framework-neutral shape of this type, for logic that asks a structural
-     * question rather than a Symfony-specific one. Every case maps to exactly
-     * one archetype; the precise type stays available for prompts and skill
-     * lookup, which do need the Symfony vocabulary.
+     * The framework-neutral shape of this type. Every case maps to exactly one.
      */
     public function archetype(): SurfaceArchetype
     {
@@ -52,9 +49,7 @@ enum ProjectFileType: string
             self::AUTHENTICATOR, self::LDAP_SERVICE => SurfaceArchetype::AUTHENTICATION,
             self::ENTITY => SurfaceArchetype::DOMAIN_MODEL,
             self::REPOSITORY => SurfaceArchetype::PERSISTENCE_QUERY,
-            // A Sonata `AbstractAdmin` self-declares its own routes and
-            // per-action roles too; `INPUT_BINDING` is the closest fit short
-            // of widening `HTTP_ENTRYPOINT`, which `isControllerLike()` locks.
+            // A Sonata admin declares its own routes, yet `HTTP_ENTRYPOINT` stays reserved for route-guarded actions.
             self::FORM, self::SONATA_ADMIN => SurfaceArchetype::INPUT_BINDING,
             self::USE_CASE => SurfaceArchetype::APPLICATION_SERVICE,
             self::MESSENGER_HANDLER, self::WEBHOOK_CONSUMER, self::SCHEDULER => SurfaceArchetype::ASYNC_HANDLER,
@@ -67,13 +62,9 @@ enum ProjectFileType: string
     }
 
     /**
-     * A `#[AsLiveComponent]`/`#[ApiResource]` class classifies as its own
-     * dedicated type (to keep its specialized attacker-skill treatment), but
-     * may still declare `#[Route]`/`#[IsGranted]`-guarded actions when it also
-     * extends `AbstractController`, the documented pattern for reusing
-     * `denyAccessUnlessGranted()`/`addFlash()`. Those actions still need to
-     * reach the access-control/form-binding map, which is exactly what
-     * {@see SurfaceArchetype::HTTP_ENTRYPOINT} designates.
+     * Whether files of this type reach the access-control and form-binding
+     * maps: a Live Component or an API resource may declare route-guarded
+     * actions too.
      */
     public function isControllerLike(): bool
     {

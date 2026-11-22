@@ -31,27 +31,23 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Symlink
 use function Symfony\Component\String\u;
 
 /**
- * Filesystem-backed reviewer-verdict cache. The key is the SHA-256 of the
- * finding's stable content (its `toArray()` minus the non-deterministic `id`
- * and `detected_at`) plus the reviewed code context, folded behind an
- * optional key salt (reviewer model + cache version) so a model or contract
- * change invalidates every stored verdict.
+ * Reviewer verdicts keyed by the SHA-256 of the finding without its `id` and
+ * `detected_at`, the reviewed code context, the optional key salt (reviewer
+ * model and cache version) and the reviewer feedback.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
 {
     /**
-     * Folded into the key salt so a reviewer-prompt or verdict-contract change
-     * invalidates every previously cached verdict. Bump when the reviewer prompt
-     * or the applied-review semantics change in a way that should re-run review.
+     * Bump to invalidate every cached verdict when the reviewer prompt or the
+     * verdict contract changes.
      */
     public const int CACHE_VERSION = 1;
 
     /**
-     * Version of the feedback part of the key, bumped when the way the reviewer
-     * prompt presents feedback changes: only the verdicts cached under feedback
-     * are then reviewed again, while every feedback-free verdict stays valid.
+     * Bump when the prompt presents feedback differently: it invalidates only
+     * the verdicts cached under feedback.
      */
     private const string FEEDBACK_KEY_VERSION = 'v2';
 
@@ -126,13 +122,9 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
     }
 
     /**
-     * `Filesystem::dumpFile()` transparently writes through a symlink at its
-     * destination and `Filesystem::mkdir()` treats a symlinked directory as
-     * already existing: a cache path derived entirely from the finding's own
-     * content (attacker-influenced file paths and descriptions) lets a
-     * malicious contributor pre-plant a symlink at the exact path this cache
-     * will write to, turning a routine audit run into an arbitrary-file
-     * overwrite.
+     * Refuses a path through a symlink: the path derives from the finding,
+     * which the audited project influences, so a planted link would redirect
+     * the write.
      *
      * @throws UnsafeCacheWriteException
      */
@@ -144,15 +136,8 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
     }
 
     /**
-     * Mirrors {@see self::assertSafeToWrite()}'s check for the read side:
-     * `Filesystem::readFile()` also transparently follows a symlink, so the
-     * same pre-planted symlink that would otherwise corrupt a write turns an
-     * ordinary cache read into an arbitrary-file read whose content is
-     * trusted as a real, previously-computed verdict. The configured
-     * `cache.dir`, this cache's parent, is the trusted root: it and the
-     * directories above it are taken as configured, so a symlinked `var/` or
-     * `~/.cache` does not turn the cache off, while a symlinked `reviewer/`
-     * or anything planted below it is still refused.
+     * Trusts the configured `cache.dir` (this cache's parent) and every
+     * directory above it, on read and on write.
      */
     private function isSymlinkedPath(string $path): bool
     {
@@ -185,7 +170,6 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
     {
         $finding = $vulnerability->toArray();
         unset($finding['id']);
-        // detected_at is stamped fresh on every construction; keeping it in the key would make every cache entry a same-run-only hit.
         unset($finding['detected_at']);
 
         $signature = \sprintf("%s\0%s", json_encode($finding, \JSON_THROW_ON_ERROR), $codeContext);
@@ -193,7 +177,6 @@ final readonly class FilesystemReviewerCache implements ReviewerCacheInterface
             $signature = \sprintf("%s\0%s", $this->keySalt, $signature);
         }
 
-        // An empty-feedback digest is the empty string, keeping pre-feedback cache entries valid.
         $feedbackDigest = $this->reviewerFeedbackProvider->feedback()->digest();
         if ('' !== $feedbackDigest) {
             $signature = \sprintf("%s\0feedback-%s-%s", $signature, self::FEEDBACK_KEY_VERSION, $feedbackDigest);

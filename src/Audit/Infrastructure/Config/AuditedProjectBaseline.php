@@ -17,11 +17,9 @@ use Symfony\Component\Filesystem\Path;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 
 /**
- * The baseline the audited project's own config names is read whole and
- * decoded. The repository chose it, so it must be a regular file inside
- * the project, by its real path (a link to `/dev/zero` or to a file of the
- * user's is refused, as for `composer.lock`) and small enough to decode
- * within the binary's memory. One that does not exist yet is never read.
+ * Refuses a baseline named by the audited project's config unless its real
+ * path is a regular file inside the project, small enough to decode. One
+ * that does not exist yet passes.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

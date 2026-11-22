@@ -17,12 +17,9 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * An instance name as `symfony/config` will store it. `ArrayNode::preNormalize()`
- * rewrites a key holding a hyphen and no underscore. An instance is a
- * prototyped key like any other, so `generic.my-gateway` registers the service
- * under `my_gateway`. Writing the name the user typed into `provider:` would
- * then point at a service that does not exist, so the name is folded here the
- * same way the framework will fold it.
+ * An instance name as `symfony/config` stores it: a name holding a hyphen and
+ * no underscore has its hyphens turned into underscores, so `generic.my-gateway`
+ * names the `my_gateway` service.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -42,14 +39,9 @@ final readonly class ConfigKeyInstanceName
     }
 
     /**
-     * A name only works if the config file still holds it after `init` writes
-     * it, so the same dumper and parser that will handle the file are asked
-     * about a block nested the way the writer nests one: `0` is dumped as a
-     * sequence entry the prototype cannot take a name from, symfony/yaml
-     * releases before 7.4.21 dump `.inf` and `.nan` unquoted and refuse them on
-     * the way back in and a name read as a YAML tag or, on those releases, as
-     * the merge key comes back as something else entirely, which would leave
-     * `provider:` pointing at an instance the block does not hold.
+     * True when the name reads back unchanged from the config file `init`
+     * writes, through the YAML dumper and parser that handle it: `0`, `.inf`
+     * or a YAML tag may not.
      */
     public static function isUsable(string $instance): bool
     {
@@ -67,9 +59,6 @@ final readonly class ConfigKeyInstanceName
     }
 
     /**
-     * The instance level is keyed by `array-key` rather than by `string`
-     * because PHP stores `'0'` as the integer key that makes the block a list.
-     *
      * @return array<string, array<string, array<array-key, array<never, never>>>>
      */
     private static function nestedTheWayItIsWritten(string $key): array

@@ -14,12 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat;
 
 /**
- * The pull requests, as `#123`, that the `CHANGELOG.md` bullets of the release
- * about to ship link: those under `## [Unreleased]` and, once that release is
- * promoted but the suite still holds the recordings of the one before it,
- * those of every release above the recorded one. A difference from the last
- * release is accepted only when the release about to ship announces it, not
- * when an older release happened to word it.
+ * The pull requests the `CHANGELOG.md` bullets of the release about to ship
+ * link: those under `## [Unreleased]` and, once that release is promoted while
+ * the suite holds the previous recordings, those of every release above the
+ * recorded one.
  */
 final readonly class UnreleasedChangelog
 {

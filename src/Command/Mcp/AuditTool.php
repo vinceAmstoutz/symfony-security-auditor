@@ -60,13 +60,9 @@ final readonly class AuditTool
     ) {}
 
     /**
-     * `mcp/sdk` answers a tool that throws anything but its own
-     * `ToolCallException` with a bare "Error while executing tool", so every
-     * failure (a relative path, an exhausted budget, a refused credential, a
-     * run with no verdict) is rethrown as one and its reason reaches the
-     * client that asked. A run a budget cap or a provider failure stopped
-     * keeps the findings it had validated: its reason is followed by the
-     * partial report, as `audit:run` still writes it.
+     * Rethrows every failure as a `ToolCallException`, the only one whose
+     * reason `mcp/sdk` passes to the client. A run a budget cap or a provider
+     * failure stopped adds its partial report after the reason.
      *
      * @throws ToolCallException
      */
@@ -109,13 +105,9 @@ final readonly class AuditTool
     }
 
     /**
-     * Runs the audit as `audit:run` does without options: the configured
-     * baseline's reasons reach the reviewer and the findings it accepts skip
-     * the reviewer and leave the report, the muted finding types leave it too.
-     * A run with no verdict returns no report. A budgeted run on a model
-     * with no published price still runs (as it always did) and the log says
-     * the cap cannot be enforced; `audit:run` refuses it under
-     * `--no-interaction`.
+     * Runs the audit as `audit:run` does without options, the configured
+     * baseline and muted types included. A budgeted run on an unpriced model
+     * still runs and logs that the cap cannot be enforced.
      *
      * @throws AuditAbortedByBudgetException
      * @throws AuditAbortedByProviderException
@@ -142,9 +134,8 @@ final readonly class AuditTool
     }
 
     /**
-     * `audit:run` fails a run whose scan found no file, or that analyzed none
-     * of its files and found nothing: a SAFE report there vouches for code
-     * nobody read. A run that holds a finding returns its incomplete report.
+     * Refuses a run with no verdict, as `audit:run` fails it. An incomplete run
+     * that holds a finding passes.
      *
      * @throws AuditWithoutVerdictException
      */

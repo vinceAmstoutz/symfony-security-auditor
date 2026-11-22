@@ -142,7 +142,6 @@ final class RetryAfterHeaderParserTest extends TestCase
 
     public function test_typed_exception_wins_over_message_text(): void
     {
-        // Wrapper's message claims 999 but the typed cause says 5: typed cause wins.
         $rateLimitExceededException = new RateLimitExceededException(retryAfter: 5);
         $runtimeException = new RuntimeException('retry-after: 999', previous: $rateLimitExceededException);
 

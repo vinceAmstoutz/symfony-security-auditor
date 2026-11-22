@@ -16,11 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 use Closure;
 
 /**
- * `preg_replace_callback()` that hands the callback where each group sits in the content.
- *
- * The callback of `preg_replace_callback()` receives the text of a match, not its position and
- * its `PREG_OFFSET_CAPTURE` flag changes the shape of what the callback receives in a way static
- * analysis does not follow.
+ * `preg_replace_callback()` that hands the callback the offset of each group.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -37,8 +33,8 @@ final readonly class OffsetCaptureReplacer
     }
 
     /**
-     * {@see replace()} for a replacement that needs what only the whole content tells: `$shared`
-     * works it out once, before the first match is replaced and not at all when nothing matches.
+     * {@see replace()} with a value worked out from the whole content: `$shared` runs once before
+     * the first replacement and never when nothing matches.
      *
      * @template TShared
      *

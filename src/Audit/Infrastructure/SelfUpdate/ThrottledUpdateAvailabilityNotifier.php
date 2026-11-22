@@ -19,13 +19,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\UnsupportedSelfUpdatePlatformException;
 
 /**
- * Resolves the latest released version through the shared self-update machinery,
- * throttling the network call to at most once per `throttleSeconds` by caching
- * the answer. The GitHub call only ever happens when the cache is missing or
- * stale and the store can record the new throttle window; a failed call falls
- * back to the last cached answer (or no notice) and still refreshes that
- * window, so the check is silent when offline and never blocks a run more than
- * once a day.
+ * Looks the latest release up at most once per `throttleSeconds`. A failed
+ * lookup keeps the last known answer and still starts a new window, so the
+ * check stays silent offline.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -71,10 +67,8 @@ final readonly class ThrottledUpdateAvailabilityNotifier implements UpdateAvaila
     }
 
     /**
-     * The throttle window is claimed before the lookup: a store that cannot
-     * record it (an unwritable or unresolvable cache directory) would
-     * otherwise send every single command to GitHub, so the lookup is skipped
-     * and the last known answer stands.
+     * Skips the lookup when the store cannot record the throttle window, so an
+     * unwritable cache never sends every command to GitHub.
      */
     private function refreshedLatestVersion(string $currentVersion, ?UpdateCheckState $updateCheckState): string
     {

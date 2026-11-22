@@ -17,10 +17,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 
 /**
- * Which environment variable the user's configuration reads the API key from,
- * so the credential commands default to the same name the audit will look up
- * instead of asking the user to repeat it. A configuration that is missing,
- * unreadable or not yet written simply has no answer.
+ * Which environment variable the user's configuration reads the API key from;
+ * none for a configuration that is missing or unreadable.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -32,8 +30,8 @@ final readonly class ConfiguredCredentialVariable
     ) {}
 
     /**
-     * Why the directory the configuration lives under cannot be used (a
-     * relative `SYMFONY_SECURITY_AUDITOR_HOME`), or null when it can.
+     * Returns why the configuration's directory cannot be used (a relative
+     * `SYMFONY_SECURITY_AUDITOR_HOME`), or null when it can.
      */
     public function applicationHomeRefusal(): ?string
     {
@@ -46,9 +44,8 @@ final readonly class ConfiguredCredentialVariable
     }
 
     /**
-     * The placeholder the configuration reads the key through (the key of the
-     * platform `provider:` selects when several are configured), or null for
-     * a literal key, a platform needing none, or no configuration at all.
+     * Returns the placeholder the configuration reads the key of the platform
+     * `provider:` selects through, else null.
      */
     public function placeholder(): ?EnvPlaceholder
     {

@@ -14,11 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 /**
- * Pre-flight token-count estimator for `--dry-run`.
- *
- * Estimates are coarse (typically a chars-per-token heuristic) and exist
- * only to let users gauge cost before paying for a real audit. Production
- * token counts come from `LLMResponse::inputTokens()` / `outputTokens()`.
+ * Coarse token-count estimate for `--dry-run`. Real counts come from
+ * `LLMResponse::inputTokens()` / `outputTokens()`.
  */
 interface TokenEstimatorInterface
 {

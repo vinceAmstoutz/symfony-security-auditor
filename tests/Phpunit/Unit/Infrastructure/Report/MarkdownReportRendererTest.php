@@ -284,12 +284,8 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
-     * A CommonMark inline code span cannot contain a blank line: a blank line
-     * is resolved as a block separator before inline parsing, so it ends the
-     * span no matter how wide the backtick delimiter is. An LLM-sourced
-     * `filePath` with an embedded `\n\n` therefore breaks out of the Location
-     * code span and renders the remainder as live Markdown/HTML (a forged
-     * heading, a raw `<script>`), unless the path is collapsed to one line.
+     * A CommonMark code span cannot contain a blank line, so a `\n\n` in the
+     * path would break out of it into live Markdown.
      *
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
@@ -307,10 +303,8 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
-     * Unicode bidirectional-override characters let a crafted finding visually
-     * reorder its own rendered text (a Trojan-Source spoof) when the Markdown
-     * is viewed or rendered downstream: the sibling HTML renderer already
-     * strips them, so the Markdown renderer must too.
+     * Bidirectional overrides would let a finding reorder its own rendered text
+     * (Trojan Source).
      *
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
@@ -375,11 +369,8 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
-     * CommonMark's `[display text](target)` link syntax needs no code fence
-     * or heading marker to work: a title containing it forges a live,
-     * clickable link straight into the rendered report, which the tool's PR
-     * comment / `$GITHUB_STEP_SUMMARY` use case renders to real users
-     * reviewing security findings.
+     * CommonMark `[display text](target)` syntax in a title would forge a live
+     * link.
      *
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
@@ -449,11 +440,8 @@ final class MarkdownReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
-     * A pre-existing backslash immediately before a backtick would otherwise
-     * combine with the backslash `escapeFences()` inserts to escape the
-     * backtick itself, forming an escaped-backslash-then-live-backtick
-     * sequence a CommonMark parser reads as an open code span, instead of the
-     * intended literal text.
+     * A backslash before a backtick would combine with the one `escapeFences()`
+     * inserts and reopen a code span.
      *
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException

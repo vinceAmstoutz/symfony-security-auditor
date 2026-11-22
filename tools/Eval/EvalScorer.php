@@ -16,12 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tooling\Eval;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EchoedFilePath;
 
 /**
- * Scores an audit run against its ground-truth manifest at (file, type)
- * granularity: a seeded finding the run reproduced is a true positive, one it
- * missed a false negative and a reported finding with no matching seed a
- * false positive, so safe "decoy" files raise the false-positive count when
- * the auditor flags them. Precision and recall are reported overall and per
- * vulnerability class.
+ * Scores an audit run against its ground-truth manifest per (file, type): a
+ * reproduced seed is a true positive, a missed one a false negative and a
+ * finding no seed matches a false positive, a flagged decoy file included.
+ * Reported overall and per vulnerability class.
  */
 final readonly class EvalScorer
 {
@@ -81,9 +79,8 @@ final readonly class EvalScorer
     }
 
     /**
-     * Deduplicates to a set of file-keys per type, so a class is scored as
-     * present-or-absent per file rather than double-counting repeated findings.
-     * A path the model echoed with a leading `./` names the same file.
+     * One set of file-keys per type, so repeated findings count once. A
+     * leading `./` names the same file.
      *
      * @param list<array{file: string, type: string}> $findings
      *

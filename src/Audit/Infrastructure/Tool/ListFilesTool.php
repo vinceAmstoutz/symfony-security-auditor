@@ -21,9 +21,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 
 /**
- * Lists project files, optionally filtered by ProjectFile::type(). Lets the
- * attacker survey the project topology without consuming context for the actual
- * file contents.
+ * Lists the scanned project files, optionally of one ProjectFile::type(), up
+ * to `MAX_FILES`.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -88,12 +87,6 @@ final readonly class ListFilesTool implements ToolInterface
     }
 
     /**
-     * `ProjectFileScanner` bounds an individual file's size but never the
-     * total number of scanned files, so an unfiltered listing on a large
-     * project (or one deliberately padded with many small stub files) could
-     * otherwise blow the token budget with no mitigation, unlike this tool's
-     * siblings ({@see ReadFileTool}, {@see GrepTool}).
-     *
      * @param list<ProjectFile> $matched
      */
     private function render(array $matched): string

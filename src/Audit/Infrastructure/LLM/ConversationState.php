@@ -19,16 +19,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 
 /**
- * One tool-using conversation's position: its message bag and platform
- * options, the token counters accumulated across rounds, whether a tool has
- * already run (a conversation that ran one cannot be restarted from scratch),
- * the finalized response once it has one, the running estimate the rate
- * limiter reserves against, how many rounds it has left (the one in flight
- * included) and whether the model ever called a tool that does not record (a
- * conversation that only recorded lost nothing to the round limit).
- *
- * Updates are copy-on-write: `$bag` is a mutable collaborator whose contents
- * are appended in place, but every scalar transition returns a new instance.
+ * The state of one tool conversation. `$roundsLeft` counts the round in
+ * flight; `$askedToRead` tells whether the model called a tool that does not
+ * record. `$bag` is appended in place; every other change returns a new
+ * instance.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -60,9 +54,6 @@ final readonly class ConversationState
     }
 
     /**
-     * Whether every conversation of a window has its answer, so another round
-     * would dispatch nothing.
-     *
      * @param array<int, self> $states
      */
     public static function allAnswered(array $states): bool

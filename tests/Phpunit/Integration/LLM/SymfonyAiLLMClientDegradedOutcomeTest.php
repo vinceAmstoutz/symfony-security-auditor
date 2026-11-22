@@ -70,13 +70,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedT
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingConverter;
 
 /**
- * Some providers deliver "the model answered with nothing usable" as a typed
- * failure instead of a stop reason: the output-limit cut-off, the content
- * filter. Every call path answers those with the degraded response a stop
- * reason would have produced, without retrying the same prompt, while a
- * malformed tool call (a sampling glitch) is retried. The JSON batch window
- * answers a request the model or the rate-limit window cannot fit on its own
- * and a failure that ends it cancels the requests still in flight.
+ * A typed failure meaning no usable answer (the output-limit cut-off, the
+ * content filter) becomes the degraded response a stop reason would give,
+ * never retried, while a malformed tool call is retried. The JSON batch window
+ * answers a request it cannot fit alone and cancels the requests in flight
+ * when a failure ends it.
  */
 final class SymfonyAiLLMClientDegradedOutcomeTest extends TestCase
 {

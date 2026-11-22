@@ -30,42 +30,32 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
 
 /**
- * Extends the bare Symfony `Application` to append the bundled
- * `symfony/models-dev` pricing-catalog version to `--version`, to put the
- * identity banner in front of every command and to echo the failing command
- * line under a rendered error. The base class offers no extension point for
- * any of the three. `--version` never reaches a command at all, so an event
- * listener could not cover it.
+ * Appends the bundled `symfony/models-dev` pricing-catalog version to
+ * `--version`, puts the identity banner in front of every command and echoes
+ * the failing command line under a rendered error.
  *
- * Mutable by design: non-readonly because the invocation is captured on the
- * way in and read back later: the command line if something throws, whether
- * the run needs provider credentials when the audit command is built, whether
- * it only describes the commands it would build and which project it names.
- * See .claude/rules/php-classes.md for the opt-out policy.
+ * Mutable by design: it captures the invocation on the way in and reads it
+ * back later. See .claude/rules/php-classes.md for the opt-out policy.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final class StandaloneApplication extends Application
 {
     /**
-     * `_complete` runs on every TAB press and `completion` emits a script the
-     * shell evaluates, so neither may print chrome on any stream.
+     * Commands whose output the shell reads, which print no chrome on any stream.
      */
     private const array COMPLETION_COMMANDS = ['_complete', 'completion'];
 
     /**
-     * Commands that read other commands' definitions without running them,
-     * matched the way the base class resolves an abbreviation. Running with
-     * no command name runs `list`. Shell completion reads definitions
-     * too.
+     * Commands that describe other commands without running them.
      */
     private const array DESCRIBING_COMMANDS = ['help', 'list'];
 
     private const string COMPLETION_REQUEST = '_complete';
 
     /**
-     * The option naming the variable a key is read from, where a key pasted
-     * by mistake would otherwise be echoed back.
+     * The option naming the variable a key is read from, whose value is masked
+     * when echoed.
      */
     private const string VARIABLE_NAME_OPTION = '--env-var';
 
@@ -122,11 +112,8 @@ final class StandaloneApplication extends Application
     }
 
     /**
-     * The base class runs `hel audit` as `help audit`, matching an abbreviation
-     * case-insensitively when nothing else does. No other command starts
-     * like `help` or `list`. Matching the prefix here, rather than through
-     * `find()`, keeps the lookup from building a command out of the
-     * configuration before this flag is set.
+     * Matches an abbreviation of `help` or `list` case-insensitively, as the
+     * base class does, without building a command from the configuration.
      */
     private function abbreviatesADescribingCommand(string $name): bool
     {
@@ -140,11 +127,8 @@ final class StandaloneApplication extends Application
     }
 
     /**
-     * A `--dry-run` estimates cost from the scanned files and `--show-scanned`
-     * lists them. Neither reaches the provider, so the standalone
-     * configuration does not have to resolve a provider credential for them.
-     * Read here rather than from the command, because the failure it
-     * prevents happens while that command is still being built.
+     * False for a `--dry-run` or a `--show-scanned` run, neither of which
+     * reaches the provider.
      */
     public function needsProviderCredentials(): bool
     {
@@ -152,12 +136,9 @@ final class StandaloneApplication extends Application
     }
 
     /**
-     * The `project-path` the command line gives the audit, read by binding a
-     * copy of it to the command's own definition (the only way to tell that
-     * argument from the value of an option) before the command is built from
-     * the configuration, which is where the audited project's own file has to
-     * be chosen. Null when none is given or the line does not bind, which the
-     * command itself then reports.
+     * Returns the `project-path` the command line gives the audit, read before
+     * the command is built, or null when none is given or the line does not
+     * bind.
      */
     public function projectPathGivenTo(Command $command): ?string
     {
@@ -167,9 +148,8 @@ final class StandaloneApplication extends Application
     }
 
     /**
-     * The `--path` values the command line gives the audit command, read
-     * before the command is built so the project they lie in can supply its
-     * own configuration.
+     * Returns the `--path` values the command line gives the audit command,
+     * read before the command is built.
      *
      * @return list<string>
      */
@@ -216,10 +196,8 @@ final class StandaloneApplication extends Application
     }
 
     /**
-     * Help, a listing and shell completion only describe commands, so a
-     * command built from the configuration can be described from its class
-     * instead, before `init` has written a configuration or with one that
-     * would not boot. Mirrors the `--help` detection of the base class.
+     * True for help, a listing or shell completion, which describe a command
+     * from its class instead of building it from the configuration.
      */
     public function describesCommandsOnly(): bool
     {
@@ -227,9 +205,8 @@ final class StandaloneApplication extends Application
     }
 
     /**
-     * The error block alone does not say what produced it, which is what a
-     * pasted CI log or bug report is missing. Only a real command line is
-     * echoed: a programmatic `ArrayInput` has no invocation to reproduce.
+     * Echoes the command line under the error block, unless the input is a
+     * programmatic `ArrayInput`.
      */
     #[Override]
     public function renderThrowable(Throwable $throwable, OutputInterface $output): void
@@ -247,10 +224,8 @@ final class StandaloneApplication extends Application
     }
 
     /**
-     * The command line as it is echoed under an error, with the value of
-     * `--env-var` shown the way a refused variable name is: a key pasted
-     * there instead of its variable's name is masked, never printed into a
-     * terminal or a CI log.
+     * Returns the command line to echo under an error, masking a key pasted as
+     * the `--env-var` value so it never reaches a terminal or a CI log.
      */
     private function echoable(ArgvInput $argvInput): string
     {

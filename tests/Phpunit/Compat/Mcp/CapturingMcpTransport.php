@@ -17,10 +17,8 @@ use Mcp\Server\Transport\BaseTransport;
 use Override;
 
 /**
- * An MCP client that sends a fixed list of requests to `mcp:serve` (one at a
- * time) and keeps every message the server sends back, in order, in a JSON
- * file: the replies the server queues for the session are read after each
- * request, as the stdio transport does between two lines of input.
+ * An MCP client that sends `mcp:serve` a fixed list of requests one at a time
+ * and writes every message the server sends back, in order, to a JSON file.
  *
  * @extends BaseTransport<null>
  */

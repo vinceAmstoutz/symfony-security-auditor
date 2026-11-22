@@ -54,9 +54,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\Re
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Pipeline\Fixture\RecordingProgressReporter;
 
 /**
- * Drives the orchestrator end-to-end via real AttackerAgent + ReviewerAgent,
- * stubbing only the LLMClientInterface boundary (per testing.md: mock at
- * system boundaries only, never internal Application/Domain collaborators).
+ * Drives the orchestrator through the real AttackerAgent and ReviewerAgent,
+ * stubbing only the LLMClientInterface boundary.
  */
 final class AuditOrchestratorTest extends TestCase
 {
@@ -597,11 +596,8 @@ final class AuditOrchestratorTest extends TestCase
     }
 
     /**
-     * A single accepted baseline fingerprint grants exactly one credit for the
-     * *whole run*, not one per attacker/reviewer iteration: recomputing the
-     * remaining budget fresh on every call would let the same accepted
-     * occurrence skip a different, never-reviewed finding that merely shares
-     * its fingerprint in a later iteration.
+     * Otherwise one accepted occurrence would skip a later, never-reviewed
+     * finding sharing its fingerprint.
      *
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
@@ -741,12 +737,8 @@ final class AuditOrchestratorTest extends TestCase
     }
 
     /**
-     * `recordBaselineSkip()` only logs/reports the first skip event per
-     * fingerprint per run: a genuine second baseline credit for the
-     * identical fingerprint (two originally-accepted findings that happen to
-     * collide) still consumes its own budget slot, but must not emit a
-     * duplicate log line or progress event for what looks, from the outside,
-     * like the same finding being skipped twice.
+     * A second credit for the same fingerprint still consumes its own slot,
+     * without a duplicate log line or progress event.
      *
      * @throws InvalidTokenUsageException
      * @throws InvalidAuditContextException
@@ -1133,7 +1125,6 @@ final class AuditOrchestratorTest extends TestCase
 
         $auditOrchestrator->orchestrate($auditContext);
 
-        // Both unique vulnerabilities should be persisted (not just the first after encountering dup)
         self::assertCount(2, $auditContext->vulnerabilities());
     }
 
@@ -1146,14 +1137,10 @@ final class AuditOrchestratorTest extends TestCase
      */
     public function test_lines_overlap_detects_touching_ranges(): void
     {
-        // linesOverlap: $start1 <= $end2 && $start2 <= $end1
-        // With <= changed to <: touching ranges (end1==start2) would NOT be treated as overlapping.
-        // This test ensures end1==start2 IS treated as overlapping (i.e. duplicate).
         $attackerLlm = self::createStub(LLMClientInterface::class);
         $reviewerLlm = self::createStub(LLMClientInterface::class);
         $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
             $this->attackerResponse([$this->vulnPayload(title: 'SQL A', lineStart: 10, lineEnd: 20)]),
-            // start2==20 == end1==20 → touching, should be treated as overlap (duplicate)
             $this->attackerResponse([$this->vulnPayload(title: 'SQL B', lineStart: 20, lineEnd: 30)]),
         );
         $reviewerLlm->method('complete')->willReturn($this->reviewerAcceptResponse());
@@ -1163,7 +1150,6 @@ final class AuditOrchestratorTest extends TestCase
 
         $auditOrchestrator->orchestrate($auditContext);
 
-        // vuln2 overlaps with vuln1 (touching at line 20) → deduplicated → only 1 stored
         self::assertCount(1, $auditContext->vulnerabilities());
     }
 
@@ -1176,8 +1162,6 @@ final class AuditOrchestratorTest extends TestCase
      */
     public function test_lines_overlap_does_not_deduplicate_non_overlapping_ranges(): void
     {
-        // linesOverlap with &&→|| mutation: would treat ALL pairs as overlapping.
-        // This test verifies truly separate ranges (1-5 and 10-15) are NOT deduplicated.
         $attackerLlm = self::createStub(LLMClientInterface::class);
         $reviewerLlm = self::createStub(LLMClientInterface::class);
         $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
@@ -1192,7 +1176,6 @@ final class AuditOrchestratorTest extends TestCase
 
         $auditOrchestrator->orchestrate($auditContext);
 
-        // Non-overlapping ranges → both should be stored
         self::assertCount(2, $auditContext->vulnerabilities());
     }
 
@@ -1339,7 +1322,6 @@ final class AuditOrchestratorTest extends TestCase
             ]),
             $this->emptyResponse(),
         );
-        // Reviewer batchSize=1 → one LLM call per vuln. Accept the first, reject the second.
         $reviewerLlm->method('complete')->willReturnOnConsecutiveCalls(
             $this->reviewerAcceptResponse(),
             $this->reviewerRejectResponse(),
@@ -1403,8 +1385,6 @@ final class AuditOrchestratorTest extends TestCase
      */
     public function test_lines_overlap_detects_touching_ranges_on_left_boundary(): void
     {
-        // Covers $start1 <= $end2 boundary (mutant: <= → <).
-        // existing vuln1 (10-20) persisted first; then vuln2 (5-10), touching at start1==end2==10.
         $attackerLlm = self::createStub(LLMClientInterface::class);
         $reviewerLlm = self::createStub(LLMClientInterface::class);
         $attackerLlm->method('complete')->willReturnOnConsecutiveCalls(
@@ -1418,7 +1398,6 @@ final class AuditOrchestratorTest extends TestCase
 
         $auditOrchestrator->orchestrate($auditContext);
 
-        // start1==end2==10 → touching → overlap → dup → only 1 stored
         self::assertCount(1, $auditContext->vulnerabilities());
     }
 
@@ -1560,8 +1539,6 @@ final class AuditOrchestratorTest extends TestCase
             'c',
         );
 
-        // Returns the same finding every iteration; iteration 1 persists it (0 previous),
-        // iteration 2 sees it as previous (1) and re-finds a duplicate → loop stops.
         $recordingAttackerAgent = new RecordingAttackerAgent([$vulnerability]);
 
         $reviewerLlm = self::createStub(LLMClientInterface::class);
@@ -1598,9 +1575,6 @@ final class AuditOrchestratorTest extends TestCase
             'c',
         );
 
-        // Returns the same finding every iteration, so the reviewer is called
-        // twice (iteration 2's re-find is a duplicate that stops the loop) -
-        // each call records into the coverage recorder's pending buffer.
         $recordingAttackerAgent = new RecordingAttackerAgent([$vulnerability]);
 
         $reviewerLlm = self::createStub(LLMClientInterface::class);
@@ -1667,9 +1641,8 @@ final class AuditOrchestratorTest extends TestCase
     }
 
     /**
-     * A review that failed reached no verdict: telling the attacker the
-     * reviewer rejected that finding would stop it from ever reporting it
-     * again and the reviewer from getting another chance at it.
+     * A failed review reached no verdict, so the finding may be reported and
+     * reviewed again.
      *
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException

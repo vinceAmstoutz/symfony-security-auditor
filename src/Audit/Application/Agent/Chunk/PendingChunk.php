@@ -16,10 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /**
- * One cache-miss chunk awaiting a dispatched batch call: the files it covers,
- * its assembled context (the rendered prompts and the cache coordinates its
- * findings are stored under) and the collection session the
- * `record_vulnerability` calls land in.
+ * A cache-miss chunk awaiting its batch call, with its context and the
+ * collection session its `record_vulnerability` calls land in.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

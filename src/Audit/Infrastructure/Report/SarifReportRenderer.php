@@ -103,9 +103,8 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
     }
 
     /**
-     * An accepted baseline entry accepts one finding, as in
-     * {@see AuditReport::withoutFingerprints()}, which decides here which
-     * findings the baseline does not accept.
+     * Each baseline entry accepts one finding, as
+     * AuditReport::withoutFingerprints() decides.
      *
      * @param list<string> $baselinedFingerprints
      *
@@ -140,7 +139,7 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
                     ],
                 ],
             ],
-            // `security-severity` is the numeric score GitHub Code Scanning ranks alerts by; the CVSS vector rides alongside for consumers that display it.
+            // GitHub Code Scanning ranks alerts by the numeric `security-severity`.
             'properties' => [
                 'security-severity' => \sprintf('%.1f', $vulnerability->cvssEstimate()->baseScore()),
                 'cvssV4_0Vector' => $vulnerability->cvssEstimate()->vector(),
@@ -160,10 +159,8 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
     }
 
     /**
-     * A suggested fix that reads as a unified diff becomes one SARIF `fix`:
-     * each hunk deletes the whole lines it expects and inserts the lines that
-     * replace them, so a viewer that applies fixes needs no diff of its own. A
-     * fix that does not read as a diff is left to the formats that show it.
+     * Returns a suggested fix that reads as a unified diff as one SARIF `fix`
+     * replacing whole lines; none for a fix that does not.
      *
      * @return list<array<string, mixed>>
      */
@@ -200,15 +197,8 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
     }
 
     /**
-     * The SARIF 2.1.0 spec lets a plain-text `message.text` field embed a
-     * CommonMark-style `[display text](target)` hyperlink and mandates
-     * that every viewer (even one with no Markdown support) render it as
-     * a clickable link. `Vulnerability::title()` is free LLM-influenced
-     * text with no character restrictions, so an unescaped title lets a
-     * crafted finding forge a live link into a report a reviewer trusts.
-     * Escaping the backslash first, then the two characters that open the
-     * link syntax, neutralizes it the same way CommonMark's own
-     * backslash-escape mechanism does.
+     * Escapes the backslash, then `[` and `]`, so a title cannot forge the
+     * hyperlink every SARIF viewer must render in `message.text`.
      */
     private function escapeEmbeddedLinkSyntax(string $title): string
     {
@@ -216,11 +206,8 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
     }
 
     /**
-     * The SARIF spec requires `artifactLocation.uri` to be a valid RFC 3986
-     * URI reference; a raw file path can contain `#`/`?`, which a
-     * spec-compliant consumer would parse as a fragment/query delimiter
-     * rather than literal path content. Percent-encoding each segment (while
-     * preserving `/` as the path separator) keeps the path intact.
+     * Percent-encodes each segment, so a `#` or `?` in a path is not read as
+     * a URI fragment or query.
      */
     private function encodeArtifactUri(string $filePath): string
     {
@@ -233,12 +220,8 @@ final readonly class SarifReportRenderer implements ReportRendererInterface, Bas
     }
 
     /**
-     * When multiple `VulnerabilityType`s share an OWASP category (they can
-     * have different `category()` values, e.g. `broken_access_control` vs
-     * `path_traversal` both under A01), the representative used for `name`
-     * and `shortDescription` is picked by sorting on the type's own value so
-     * it stays stable across runs instead of following whichever finding
-     * happens to be most severe.
+     * Names the rule after the contributing type with the lowest value, so it
+     * stays stable across runs.
      *
      * @param non-empty-array<string, VulnerabilityType> $contributingTypes
      *

@@ -19,14 +19,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use function Symfony\Component\String\u;
 
 /**
- * Keeps every `ProjectFile` whose relative path lives under any of the
- * configured scan paths. Used by the `--path` option on the CLI to restrict
- * audits to one or several subdirectories of a monorepo without changing the
- * `ProjectFileScannerInterface` contract.
- *
- * Path comparison is byte-exact on a normalized form (forward slashes, no
- * trailing separator): a path of `apps/api` matches `apps/api/src/X.php`
- * but not `apps/api-shared/X.php`.
+ * Keeps the files under any of the scan paths, comparing normalized paths
+ * byte for byte: `apps/api` matches `apps/api/src/X.php`, not
+ * `apps/api-shared/X.php`.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -34,8 +29,7 @@ final readonly class ScanPathFilter
 {
     /**
      * @param list<ProjectFile> $files
-     * @param list<string>      $scanPaths empty list returns the input
-     *                                     unchanged
+     * @param list<string>      $scanPaths empty keeps every file
      *
      * @return list<ProjectFile>
      */
@@ -58,9 +52,8 @@ final readonly class ScanPathFilter
     }
 
     /**
-     * Whether a file at `$relativePath` lies under any of the scan paths, by
-     * the same rule {@see apply()} keeps files by, so a report's recorded
-     * scope reads back exactly as its scan applied it.
+     * Tells whether `$relativePath` lies under a scan path, by the rule
+     * `apply()` keeps files by.
      *
      * @param list<string> $scanPaths empty list covers every file
      */
@@ -72,13 +65,9 @@ final readonly class ScanPathFilter
     }
 
     /**
-     * The scan paths in the one form the filter compares and a scanner scans:
-     * trimmed, with forward slashes and with their `.`, `..` and empty
-     * segments resolved, so `src/../src`, `./src//` and `src` are one path:
-     * the scanner resolves them through the filesystem and a spelling the
-     * filter read literally would scan a directory while its skipped files
-     * went unrecorded. The project root itself and blank entries name no path
-     * to narrow to and are dropped.
+     * Trims each path, writes it with forward slashes and resolves its `.`,
+     * `..` and empty segments as the scanner does, so `src/../src`, `./src//`
+     * and `src` are one path. Drops blank entries and the project root.
      *
      * @param list<string> $scanPaths
      *

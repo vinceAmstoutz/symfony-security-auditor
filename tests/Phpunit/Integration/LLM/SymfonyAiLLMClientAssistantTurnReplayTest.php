@@ -41,10 +41,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FixedResu
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedResultPlatform;
 
 /**
- * A tool-using conversation sends the model's own answer back with the tool
- * results. A model that reasons before it calls a tool answers with a signed
- * thinking block, the tool calls and sometimes text in between. Anthropic
- * refuses the next request unless that very turn comes back unmodified.
+ * A tool-using conversation sends the model's own turn (a signed thinking
+ * block, the tool calls and any text between them) back with the tool results
+ * unmodified, as Anthropic requires.
  */
 final class SymfonyAiLLMClientAssistantTurnReplayTest extends TestCase
 {

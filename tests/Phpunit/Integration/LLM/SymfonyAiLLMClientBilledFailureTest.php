@@ -66,14 +66,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedT
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingConverter;
 
 /**
- * A provider bills a call it answered even when its bridge cannot turn the
- * answer into a result: a tool call the output token limit cut off mid-way
- * through its arguments, a tool call whose arguments the model garbled, an
- * answer the bridge reports as an error. The cut-off is a degraded `length`
- * answer, never retried (every attempt would hit the same cap). Every
- * attempt that was billed is booked against the budget, the report's token
- * totals and the rate-limit window, at the usage the provider reported when
- * its raw answer carries one.
+ * A call the provider answered but its bridge could not convert (a tool call
+ * cut off by the output limit or garbled, an answer reported as an error) is
+ * booked against the budget, the token totals and the rate-limit window, at
+ * the reported usage when the raw answer carries one. The cut-off is a
+ * degraded `length` answer, never retried.
  */
 final class SymfonyAiLLMClientBilledFailureTest extends TestCase
 {

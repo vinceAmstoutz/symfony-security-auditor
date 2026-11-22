@@ -14,10 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 
 /**
- * The review comments of a `github-comment` body, for the GitHub Action to
- * post as one pull-request review: a JSON list, base64-encoded so no text of
- * it can close the HTML comment that hides it. The list stops before it
- * would push the comment past what GitHub accepts.
+ * The review comments the GitHub Action posts as one review, hidden in a
+ * `github-comment` body as a base64 JSON list, so no text of it can close
+ * the HTML comment around it. The list stops before the comment outgrows
+ * what GitHub accepts.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

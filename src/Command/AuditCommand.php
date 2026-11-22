@@ -139,9 +139,6 @@ final readonly class AuditCommand
     }
 
     /**
-     * Refuses a project that is not a directory before anything is scanned or
-     * warned about, so the one thing wrong is the one thing printed.
-     *
      * @throws InvalidAuditContextException
      */
     private function assertProjectIsDirectory(string $projectPath): void
@@ -211,9 +208,6 @@ final readonly class AuditCommand
     }
 
     /**
-     * Refuses a report or baseline path the run could never save to, before
-     * the audit spends anything on it.
-     *
      * @throws UnsafeReportWriteException
      * @throws ReportWriteFailedException
      * @throws UnsafeBaselineWriteException
@@ -228,12 +222,6 @@ final readonly class AuditCommand
         }
     }
 
-    /**
-     * Human-facing presentation (header, warnings, scanned-file listing,
-     * dry-run sections) moves to stderr when stdout carries a
-     * machine-readable document, so `--format=json > report.json` and piping
-     * into `jq` receive the document alone.
-     */
     private function displayStyle(SymfonyStyle $symfonyStyle, AuditCommandInput $auditCommandInput): SymfonyStyle
     {
         return $auditCommandInput->isMachineReadableToStdout() ? $symfonyStyle->getErrorStyle() : $symfonyStyle;
@@ -312,14 +300,10 @@ final readonly class AuditCommand
     }
 
     /**
-     * Baseline fingerprints threaded into the pipeline so accepted findings
-     * skip the reviewer. Empty while (re)generating a baseline: every
-     * finding must then be collected, not suppressed. Also empty for SARIF
-     * output: a pipeline-skipped finding never reaches the report, so it
-     * could not be rendered as a suppressed result. SARIF trades the
-     * review-skip saving for suppressed results GitHub/GitLab can display.
-     * The baseline is read whatever the format, so a malformed entry stops
-     * the run before the first model call instead of after the whole audit.
+     * The fingerprints whose findings skip the reviewer: none while generating
+     * a baseline, none for SARIF, which reports them as suppressed results.
+     * Any other run reads the baseline, SARIF included, so a malformed entry
+     * stops it before the first model call.
      *
      * @return list<string>
      */
@@ -335,10 +319,8 @@ final readonly class AuditCommand
     }
 
     /**
-     * The report is written whatever becomes of the baseline: the audit has
-     * already run and paid for it. A run with no verdict writes no baseline
-     * (its empty result would replace every accepted finding and its reason)
-     * and fails.
+     * Writes the report whatever becomes of the baseline. A run with no verdict
+     * writes no baseline and fails.
      *
      * @throws UnsupportedOutputFormatException
      * @throws UnsafeReportWriteException
@@ -408,11 +390,8 @@ final readonly class AuditCommand
     }
 
     /**
-     * A budget abort gets its own dedicated exit code (partial report still
-     * emitted, but the run stopped on purpose); every other abort cause
-     * shares the generic failure code. A partial report that cannot be saved
-     * is kept on the console by the writer and the abort still says why it
-     * stopped and keeps its code.
+     * Writes the partial report. One that cannot be saved is reported and the
+     * abort keeps its exit code.
      *
      * @throws UnsupportedOutputFormatException
      */

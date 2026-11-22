@@ -54,10 +54,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingC
 
 /**
  * The rate-limit window is reconciled with the input a provider counts
- * against its input-tokens-per-minute limit, whatever share of it the cost
- * books at the cache rate: OpenAI-style providers count the cached tokens
- * inside the prompt, Anthropic counts its input and its cache writes, not
- * its cache reads.
+ * against its limit: OpenAI-style providers count the cached tokens inside
+ * the prompt, Anthropic its input and cache writes but not its cache reads.
  */
 final class SymfonyAiLLMClientRateLimitedInputTest extends TestCase
 {

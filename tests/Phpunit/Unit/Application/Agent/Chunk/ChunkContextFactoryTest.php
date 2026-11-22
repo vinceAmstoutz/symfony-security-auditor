@@ -77,11 +77,8 @@ final class ChunkContextFactoryTest extends TestCase
     }
 
     /**
-     * A chunk's persisted cache entry is keyed by file content and this
-     * context key, never by the mapping, so a `security.yaml` edit, a voter
-     * added or removed, or a form binding discovered elsewhere in the project
-     * would otherwise replay a verdict computed under the old mapping for a
-     * file whose own content never changed.
+     * A chunk's cache entry is keyed by file content and this context key, so
+     * a mapping change that left the key alone would replay an old verdict.
      *
      * @throws InvalidProjectFileException
      */
@@ -178,9 +175,7 @@ final class ChunkContextFactoryTest extends TestCase
     }
 
     /**
-     * Project scanning makes no ordering guarantee, so two scans of the same
-     * unchanged codebase must not produce different cache keys merely because
-     * the parsers visited the same form bindings in a different order.
+     * Project scanning guarantees no order.
      *
      * @throws InvalidProjectFileException
      */

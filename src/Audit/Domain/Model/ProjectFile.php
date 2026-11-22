@@ -62,10 +62,8 @@ final readonly class ProjectFile
     }
 
     /**
-     * Preserves the original `fileType()` instead of reclassifying: a
-     * `CodeSlicer`-elided version of a content-detected component (e.g. a
-     * voter matched via `implements VoterInterface`) must not lose its type
-     * just because the slicer dropped the telltale line.
+     * Keeps the original `fileType()`, so a sliced file whose telltale line was
+     * dropped keeps its type.
      */
     public function withContent(string $content): self
     {
@@ -89,9 +87,8 @@ final readonly class ProjectFile
     }
 
     /**
-     * The framework-neutral shape of this file: what core logic switches on so
-     * it need not name a Symfony concept. {@see fileType()} stays the precise
-     * taxonomy for prompts and skill lookup.
+     * The framework-neutral shape of this file. {@see fileType()} stays the
+     * precise type for prompts and skill lookup.
      */
     public function archetype(): SurfaceArchetype
     {
@@ -110,8 +107,8 @@ final readonly class ProjectFile
 
     /**
      * Whether the secret scrubber could not vouch for this file and replaced
-     * its content with the line-count-preserving `unscannable` placeholder:
-     * nothing of the file itself is left to analyze.
+     * its content with the `unscannable` placeholder, leaving nothing of it to
+     * analyze.
      */
     public function isWithheld(): bool
     {

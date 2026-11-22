@@ -16,9 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 interface AdvisoryDatabaseInterface
 {
     /**
-     * Look up known security advisories that affect the given package at the
-     * given version constraint. Implementations may consult FriendsOfPHP,
-     * GitHub Security Advisories, Snyk, or any other source.
+     * The known security advisories that affect the package at that version,
+     * from any source.
      *
      * @return list<array{cve: ?string, title: string, summary: string, affected_versions: string, link: ?string}>
      */

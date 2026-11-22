@@ -96,10 +96,9 @@ final readonly class RouteAccessControl
     }
 
     /**
-     * Every voter attribute name this route is guarded by, from any recognized
-     * guard: a method-level or class-level `#[IsGranted(...)]`, or a reachable
-     * `denyAccessUnlessGranted()`/`isGranted()` call. Lets a changed voter's
-     * dependents be found regardless of which guard form the controller uses.
+     * Every voter attribute guarding this route, from a method-level or
+     * class-level `#[IsGranted(...)]` or a reachable
+     * `denyAccessUnlessGranted()`/`isGranted()` call.
      *
      * @return list<string>
      */
@@ -114,9 +113,7 @@ final readonly class RouteAccessControl
 
     /**
      * The class constants a guard names instead of a literal attribute
-     * (`#[IsGranted(PostVoter::EDIT)]`, `denyAccessUnlessGranted(PostVoter::EDIT)`),
-     * each as `Fully\Qualified\Class::NAME`, for the caller that knows the
-     * value the constant holds.
+     * (`#[IsGranted(PostVoter::EDIT)]`), each as `Fully\Qualified\Class::NAME`.
      *
      * @return list<string>
      */
@@ -126,10 +123,9 @@ final readonly class RouteAccessControl
     }
 
     /**
-     * Returns a copy routed from the enclosing class's `#[Route]`, the way
-     * Symfony routes an invokable single-action controller's `__invoke()` when
-     * the method carries no route of its own. All access-control flags are
-     * preserved; only the route identity and `hasRouteAttribute` change.
+     * Returns a copy routed from the enclosing class's `#[Route]`, as Symfony
+     * routes an `__invoke()` that has no route of its own. Only the route
+     * identity and `hasRouteAttribute` change.
      *
      * @param list<string> $routeMethods
      */

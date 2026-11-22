@@ -18,8 +18,7 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 
 /**
- * No-op rate limiter wired when none of the `audit.rate_limit.*` dimensions
- * are configured. Preserves the pre-existing reactive-retry-only behavior.
+ * No-op rate limiter wired when no `audit.rate_limit.*` limit is configured.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

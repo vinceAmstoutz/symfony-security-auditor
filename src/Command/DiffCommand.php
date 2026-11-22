@@ -52,11 +52,6 @@ final readonly class DiffCommand
         return ExitCode::Success->value;
     }
 
-    /**
-     * Human-facing error messages move to stderr when stdout carries a
-     * machine-readable document, so `--format=json > diff.json` receives the
-     * document alone. This mirrors `AuditCommand::displayStyle()`.
-     */
     private function errorStyle(SymfonyStyle $symfonyStyle, DiffOutputFormat $diffOutputFormat): SymfonyStyle
     {
         return DiffOutputFormat::Json === $diffOutputFormat ? $symfonyStyle->getErrorStyle() : $symfonyStyle;

@@ -16,10 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 
 /**
- * The command that starts this application again in a process of its own:
- * the standalone binary alone, by the absolute path phpmicro's
- * `micro_get_self_filename()` gives on every platform, or the PHP running
- * the entry script and that script.
+ * The command that starts this application again: the standalone binary
+ * alone, by its absolute path, or the PHP binary and the entry script.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

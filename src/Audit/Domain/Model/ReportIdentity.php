@@ -18,11 +18,10 @@ use DateTimeImmutable;
 /**
  * Identity, timing and scope header of an audit report.
  *
- * `filesDiscovered` is what the scan found, `filesScanned` what was actually
- * audited. They differ only for a `--since` run, where the diff narrows the
- * second. So `filesDiscovered === 0` means the scan itself came up empty and
- * no verdict was reached, which is not the same as a diff run finding nothing
- * changed. `costEstimate` marks a `--dry-run`, which analyzes no file.
+ * `filesDiscovered` is what the scan found, `filesScanned` what was audited:
+ * only a `--since` diff narrows the second. No file discovered means no
+ * verdict, unlike a diff that changed nothing. `costEstimate` marks a
+ * `--dry-run`, which analyzes no file.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

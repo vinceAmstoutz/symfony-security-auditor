@@ -17,9 +17,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 /**
- * Immutable input snapshot of one concurrency window: the per-finding requests
- * and the parallel collections (collection sessions, vulnerabilities,
- * contexts) keyed so each pending index resolves to its finding.
+ * The per-finding requests of one concurrency window with their sessions,
+ * findings and code contexts, keyed by pending index.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -42,9 +41,7 @@ final readonly class ConcurrentReviewBatch
     ) {}
 
     /**
-     * `null` when caching is bypassed for this run: the caller passes it
-     * straight through to `ReviewOutcomeRecorder::recoverDrainedVerdict()`,
-     * which caches a recovered verdict only when given a non-null context.
+     * Returns null when the run bypasses the cache.
      */
     public function codeContextForCache(int $index): ?string
     {

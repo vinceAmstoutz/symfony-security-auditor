@@ -21,12 +21,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\WorkflowCom
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /**
- * Append-only, line-oriented reporter for non-interactive output (CI logs,
- * pipes, redirected files). Emits one clean line per meaningful event (no
- * carriage returns, no cursor control, no progress bar) so the audit narrates
- * itself in environments where an animated ProgressBar would be noise. Streams
- * findings as the attacker records them, which also keeps the log alive on long
- * runs. The decorated counterpart is `ConsoleProgressReporter`.
+ * Writes one plain line per progress event, with no carriage return or cursor
+ * control, for non-interactive output (CI logs, pipes, redirected files).
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -34,9 +30,6 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
 {
     public function __construct(private OutputInterface $output) {}
 
-    /**
-     * {@inheritDoc}
-     */
     #[Override]
     public function report(string $event, array $context = []): void
     {
@@ -56,8 +49,8 @@ final readonly class PlainProgressReporter implements ProgressReporterInterface
     }
 
     /**
-     * Every line starts with a prefix of ours, but a finding's file or title
-     * may still carry a legacy `##[command]` a CI runner would act on.
+     * Defuses a legacy `##[command]` a finding's file or title may carry, which
+     * a CI runner would act on.
      */
     private function writeln(string $line): void
     {

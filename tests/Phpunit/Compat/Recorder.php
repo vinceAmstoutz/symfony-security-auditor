@@ -83,11 +83,9 @@ final readonly class Recorder
     }
 
     /**
-     * Why this checkout cannot record the scenario here, if it cannot: a
-     * release that saves a report through a temporary file and a rename
-     * replaces the discard device it writes to, so a scenario writing to it is
-     * recorded only by a process that cannot write `/dev`, or from a release
-     * that writes a device in place.
+     * Returns why this checkout cannot record the scenario here, or null. A
+     * scenario writing to the discard device is recorded only by a process
+     * that cannot write `/dev` or from a release that writes a device in place.
      */
     public function refusal(Scenario $scenario): ?string
     {

@@ -450,7 +450,6 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $message = $this->attackerPromptBuilder->buildUserMessage([$projectFile], $symfonyMapping);
 
-        // Two roles pin the comma separator in the rendered marker.
         self::assertStringContainsString('COVERED_BY access_control[ROLE_ADMIN,ROLE_SUPER_ADMIN]', $message);
         self::assertStringNotContainsString('LACKS_ACCESS_CHECK', $message);
     }
@@ -640,12 +639,9 @@ final class AttackerPromptBuilderTest extends TestCase
     }
 
     /**
-     * A second `access_control` rule for the same path is recorded as a
-     * single `or: ...`-prefixed entry appended to the first rule's own list
-     * (see `SymfonyYamlSecurityConfigParser::recordAccessControlEntry()`):
-     * this route is only reachable via POST, which only the second
-     * (`ROLE_ADMIN`/`methods: POST`) rule covers, not the first
-     * (`ROLE_USER`/`methods: GET`) one.
+     * A second `access_control` rule for the same path is appended to the
+     * first's list as an `or: ...` entry; only that second rule
+     * (`methods: POST`) covers this POST-only route.
      *
      * @throws InvalidProjectFileException
      */
@@ -1533,8 +1529,6 @@ final class AttackerPromptBuilderTest extends TestCase
     {
         $attackerPromptBuilder = new AttackerPromptBuilder(emitAllSkills: true);
 
-        // The whole point of stable mode: the system prompt prefix is identical
-        // regardless of the chunk, so provider prompt caching reads it every call.
         self::assertSame(
             $attackerPromptBuilder->buildSystemPrompt([ProjectFile::create('src/Controller/UserController.php', '/app/c', '<?php class UserController {}')]),
             $attackerPromptBuilder->buildSystemPrompt([ProjectFile::create('src/Security/PostVoter.php', '/app/v', '<?php class PostVoter {}')]),
@@ -1759,7 +1753,6 @@ final class AttackerPromptBuilderTest extends TestCase
 
         $prompt = $this->attackerPromptBuilder->buildSystemPrompt([$projectFile, $controller]);
 
-        // Controller has higher attack-surface priority than Voter: must appear first regardless of input order.
         $controllerPos = strpos($prompt, '<skills role="controller">');
         $voterPos = strpos($prompt, '<skills role="voter">');
 
@@ -1773,7 +1766,6 @@ final class AttackerPromptBuilderTest extends TestCase
      */
     public function test_template_skill_appears_before_config_skill_under_priority_order(): void
     {
-        // Under alphabetical sort, config (c) would precede template (t). Priority order flips this.
         $projectFile = ProjectFile::create(
             'templates/base.html.twig',
             '/app/templates/base.html.twig',
@@ -1894,7 +1886,6 @@ final class AttackerPromptBuilderTest extends TestCase
     {
         $prompt = $this->attackerPromptBuilder->buildSystemPrompt();
 
-        // The critical tier is anchored to concrete impact, not left as freeform.
         $criticalLineStart = strpos($prompt, '- critical:');
         self::assertNotFalse($criticalLineStart);
 
@@ -1980,8 +1971,6 @@ final class AttackerPromptBuilderTest extends TestCase
             SymfonyMapping::of(ProjectFileInventory::fromGroups([]), new AccessControlMap()),
         );
 
-        // Lock both per-line numbering AND the "\n" separator between lines:
-        // mutating implode's separator to "" would collapse these into one string.
         self::assertStringContainsString("  1 | <?php\n  2 | \n  3 | class Multi {}", $message);
     }
 

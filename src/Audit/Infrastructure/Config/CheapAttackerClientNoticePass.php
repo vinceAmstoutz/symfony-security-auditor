@@ -19,12 +19,10 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 
 /**
- * Adds a configuration notice when `audit.escalation` runs its cheap first
- * pass on the bundled client although the application wired its own client
- * in place of the attacker or reviewer one: the cheap pass has a client of
- * its own, which still sends the code to the symfony/ai platform. It runs
- * before the bundle's usage-booking decorators, while each id still names the
- * client the application wired.
+ * Adds a configuration notice when `audit.escalation` runs its cheap pass on
+ * the bundled client although the application replaced the attacker or
+ * reviewer client. Runs before the bundle's usage-booking decorators, while
+ * each id still names the application's client.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

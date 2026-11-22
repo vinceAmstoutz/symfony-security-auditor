@@ -140,9 +140,8 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
     }
 
     /**
-     * Unlike {@see self::indentChunks()}, this does not word-wrap: `proof` is
-     * often a literal command or request that would be corrupted by
-     * mid-line wrapping, so every existing line is simply prefixed as-is.
+     * Indents each line without wrapping it, so a literal command or request
+     * stays intact.
      */
     private function indentLines(string $text): string
     {
@@ -153,11 +152,8 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
     }
 
     /**
-     * `title`/`filePath` render on a single template line, unlike
-     * `description`/`attackVector`/`proof`/`remediation`, which are
-     * legitimately multi-line and rendered inside their own indented block:
-     * an embedded newline here would let a crafted finding forge a fake
-     * `[ID] SEVERITY` finding block as unguarded top-level output.
+     * Collapses the text to one line, so a title or a path cannot forge a
+     * finding block below it.
      */
     private function sanitizeSingleLineField(string $text): string
     {

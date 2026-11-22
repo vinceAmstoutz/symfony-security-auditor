@@ -21,15 +21,9 @@ use PhpParser\Node\Stmt\ClassMethod;
 /**
  * @internal not part of the BC promise, see docs/versioning.md
  *
- * Answers, for any method of one class, which of the calls a parser looks for
- * the method reaches through `$this->helper()` calls, in the order a
- * depth-first walk from it meets them, each helper once. Built once per class
- * by {@see ThisCallReachability::indexCalls()}, so that asking every public
- * action costs a walk over the few methods that matter to it, not over every
- * helper it ever reaches: a helper from which no relevant call is reachable
- * is never entered and a helper that only forwards to one other is stepped
- * over. A chain of thousands of single-call helpers then costs the same for
- * its first method as for its last.
+ * For any method of one class, the calls a parser looks for that the method
+ * reaches through `$this->helper()` calls, in depth-first order, each helper
+ * once. Built by {@see ThisCallReachability::indexCalls()}.
  */
 final readonly class ReachableCallIndex
 {
@@ -189,8 +183,7 @@ final readonly class ReachableCallIndex
     }
 
     /**
-     * Follows every forward to the method it ends at, pointing each forward it
-     * passes straight at that end so no later one walks the same stretch again.
+     * Follows every forward to the method it ends at.
      *
      * @param array<string, string> $forwarded
      *

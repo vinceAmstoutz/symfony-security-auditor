@@ -17,14 +17,10 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\WorkflowCommandText;
 
 /**
- * On a GitHub Actions runner a report printed to the job log quotes the
- * audited code and what the model wrote about it; an error message may
- * quote a checkout path. Either could carry a workflow command. Each is
- * defused as its format allows, so a document piped into `jq` or redirected
- * into the step summary still reads the same: the JSON formats keep their
- * meaning byte for byte once decoded, the others only lose the markers and
- * any byte that is not UTF-8 reads as `?`. The `github` format's annotations
- * are the ones meant for the runner.
+ * Defuses the workflow commands a report or an error message could carry on a
+ * GitHub Actions runner, as each format allows: the JSON formats decode to the
+ * same value, the others lose only the markers and read each byte that is not
+ * UTF-8 as `?`. The `github` format is left as is.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

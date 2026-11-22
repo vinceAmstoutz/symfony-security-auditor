@@ -14,9 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 /**
- * The outcome of planning a baseline merge: the existing entries to keep
- * (raw payloads preserved), the report findings not yet covered by any
- * entry and how many stale entries a prune dropped.
+ * The outcome of planning a baseline merge.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

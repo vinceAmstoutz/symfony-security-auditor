@@ -19,16 +19,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CompoundPla
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKeyedPlatforms;
 
 /**
- * `AiBundle` answers a platform whose bridge is not installed with "Try
- * running composer require <package>", advice that installs into the audited
- * project's vendor directory, which the binary never loads. The advice is
- * replaced with the command that installs the bridge where the binary looks,
- * for the platform the message names (or, for a platform wrapping others
- * that no standalone configuration can boot, with that reason, since `init`
- * refuses it). The bundle's exception is not chained: the console renders
- * every previous exception too and would print the advice replaced here.
- * Any other failure of the bundle is not this exception's business and keeps
- * its own message.
+ * Replaces the "composer require" advice `AiBundle` gives for a missing bridge
+ * with the command that installs it where the binary looks, or with the
+ * reason a platform wrapping others cannot boot standalone. Never chains the
+ * bundle's exception, whose advice the console would print too.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

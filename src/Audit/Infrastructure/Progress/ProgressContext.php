@@ -16,9 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /**
- * Typed, defensive reads of a progress-event context array. Reporters never
- * trust the payload shape (a custom emitter may pass anything), so a missing or
- * wrongly-typed key resolves to a neutral default rather than throwing.
+ * Reads a progress-event context: a missing or wrongly typed key yields a
+ * neutral default, never an exception.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -43,10 +42,8 @@ final readonly class ProgressContext
     }
 
     /**
-     * Renders an elapsed duration as a trailing " (Ns)" suffix in whole seconds,
-     * or an empty string when the value is missing, not a float, or rounds below
-     * one second (e.g. cache hits and concurrently-dispatched chunks, which have
-     * no meaningful per-chunk wall time).
+     * Returns an elapsed-time suffix in whole seconds, empty when the value is
+     * not a float or is under one second.
      *
      * @param array<string, mixed> $context
      */
@@ -62,8 +59,8 @@ final readonly class ProgressContext
     }
 
     /**
-     * Renders the reason a chunk failed as a trailing `" — reason"` suffix on one
-     * line, or an empty string when the event names none.
+     * Returns the reason a chunk failed as a one-line suffix, empty when the
+     * event names none.
      *
      * @param array<string, mixed> $context
      */
@@ -75,9 +72,8 @@ final readonly class ProgressContext
     }
 
     /**
-     * Whether a `review.finding.reviewed` event reports a review that reached
-     * no verdict (its call failed, or an abort stopped it) rather than a
-     * finding the reviewer validated or rejected.
+     * Whether a `review.finding.reviewed` event reports a review that failed
+     * or was aborted, so neither validated nor rejected the finding.
      *
      * @param array<string, mixed> $context
      */
@@ -87,8 +83,8 @@ final readonly class ProgressContext
     }
 
     /**
-     * The tally of a `review.completed` event: the findings validated and
-     * rejected, then how many reviews failed when some did.
+     * The validated and rejected counts of a `review.completed` event, then
+     * the failed count when it is not zero.
      *
      * @param array<string, mixed> $context
      */

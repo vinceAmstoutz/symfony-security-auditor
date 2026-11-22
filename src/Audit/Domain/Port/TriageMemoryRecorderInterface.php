@@ -14,11 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 /**
- * Records a reviewer-rejected finding's own stated reason so a future run's
- * {@see ReviewerFeedbackProviderInterface} can surface it back to the
- * reviewer as a negative example: the reviewer's rejections becoming its
- * own cross-run memory, without requiring a maintainer to hand-curate a
- * baseline entry for every recurring false positive.
+ * Records the reason the reviewer gave for rejecting a finding, which a later
+ * run's {@see ReviewerFeedbackProviderInterface} hands back to the reviewer as
+ * a negative example.
  */
 interface TriageMemoryRecorderInterface
 {

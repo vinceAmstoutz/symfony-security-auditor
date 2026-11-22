@@ -91,20 +91,15 @@ final readonly class SymfonyYamlSecurityConfigParser implements ImportAwareSecur
     }
 
     /**
-     * Public marker recorded for an `access_control` entry that matches but
-     * carries no requirement at all (e.g. an explicit `roles: []`): a
-     * deliberate "this path is public" rule. Recording it (instead of
-     * skipping the entry) preserves first-match-wins: a later rule for the
-     * same path must not silently present as the sole governing rule when an
-     * earlier, unconditional public rule already claims the path.
+     * Recorded for an `access_control` entry with an empty requirement
+     * (`roles: []`), so a later rule for the same path does not read as the
+     * one that governs it.
      */
     private const string PUBLIC_ACCESS_MARKER = 'PUBLIC';
 
     /**
-     * Symfony evaluates `access_control` first-match-wins, so a later rule for
-     * an already-seen path applies only to requests the earlier rule's
-     * constraints (methods, ips, …) did not match: it is appended as a single
-     * `or: …` requirement instead of silently replacing the earlier rule.
+     * Appends a later rule for a path already seen as one `or: …` requirement:
+     * Symfony applies it only to the requests the earlier rule did not match.
      *
      * @param array<string, mixed>        $section
      * @param array<string, list<string>> $routeAccessMap
@@ -193,12 +188,9 @@ final readonly class SymfonyYamlSecurityConfigParser implements ImportAwareSecur
     }
 
     /**
-     * The `security` blocks of the document the production kernel reads, in the
-     * order it loads them: the root one, then the `when@prod` override,
-     * wherever the document writes them. A `when@test` or `when@dev` block
-     * protects nothing in production. A bare root-level
-     * `access_control`/`firewalls` document (an imported partial) also counts
-     * as a section.
+     * The `security` blocks the production kernel reads, in load order: the
+     * root one, then the `when@prod` one. A document holding `access_control`
+     * or `firewalls` at its root (an imported partial) counts as one too.
      *
      * @return list<array<string, mixed>>
      */

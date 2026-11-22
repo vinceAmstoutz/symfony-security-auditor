@@ -18,11 +18,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Patch\DiffHunk;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Patch\UnifiedDiff;
 
 /**
- * A suggested fix written as a GitHub `suggestion` block: the lines it puts
- * in place of the lines it names. GitHub can express only one run of
- * replaced lines, so a fix that touches several hunks or files, or only adds
- * lines, gets none. The fence is one backtick longer than any run of
- * backticks the code holds, so the code cannot close it early.
+ * A suggested fix as a GitHub `suggestion` block, which replaces one run of
+ * lines: a fix that touches several hunks or files, or only adds lines, gets
+ * none. Its fence outlasts any backtick run in the code.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -55,10 +53,9 @@ final readonly class GithubSuggestion
     }
 
     /**
-     * The review comment GitHub turns into a one-click fix on the lines it
-     * replaces, with the lines it expects there (so a workflow can check the
-     * commit it comments on still holds them) and a key naming the finding and
-     * those lines so a rerun does not post it twice.
+     * Returns the review comment GitHub turns into a one-click fix, with the
+     * lines it expects to replace and a key that keeps a rerun from posting
+     * it twice.
      *
      * @return array{key: string, path: string, start_line: int, line: int, expected: list<string>, body: string}
      */

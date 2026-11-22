@@ -16,9 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 
 /**
- * The severity partition shared by the SARIF and GitHub-annotations
- * renderers: CRITICAL/HIGH map to `error` and MEDIUM to `warning` in both
- * formats; only the low tier's label differs (SARIF `note`, GitHub `notice`).
+ * Maps a severity to the level the SARIF and GitHub annotation formats share,
+ * with the label each gives the low tier.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

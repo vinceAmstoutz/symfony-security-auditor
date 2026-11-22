@@ -24,9 +24,7 @@ final readonly class EnvironmentVariableName
     private const string PATTERN = '/^[A-Za-z_]\w*$/D';
 
     /**
-     * A value longer than this is more likely the API key itself, pasted into
-     * the wrong option, than a mistyped name: it is masked rather than echoed
-     * into a terminal or a CI log.
+     * A longer value is more likely an API key than a name, so it is masked.
      */
     private const int LONGEST_NAME_SHOWN = 23;
 
@@ -45,8 +43,8 @@ final readonly class EnvironmentVariableName
     }
 
     /**
-     * How a refused name is quoted back: as typed with control bytes escaped,
-     * or masked when it is long enough to be a key.
+     * Returns a refused name as typed with its control bytes escaped, or
+     * masked when it is long enough to be a key.
      */
     public static function shown(string $name): string
     {

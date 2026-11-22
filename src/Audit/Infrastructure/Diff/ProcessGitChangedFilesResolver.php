@@ -28,53 +28,12 @@ use function Symfony\Component\String\u;
 /**
  * @internal not part of the BC promise, see docs/versioning.md
  *
- * Resolves the set of changed files via four git invocations:
- *
- *   1. `git diff --relative --name-only --diff-filter=ACMRT <ref>...HEAD`
- *      lists committed changes that diverge from the ref's merge base. The triple
- *      dot semantics handle topic branches diverged from the ref correctly:
- *      only changes ON the branch are returned, not changes the ref accrued
- *      since branch point. Pure tree-to-tree comparison: never touches the
- *      working tree, so it cannot invoke a `.gitattributes` content filter.
- *
- *   2. `git diff-index --relative --name-only --diff-filter=ACMRT --cached HEAD`
- *      lists staged changes against HEAD (including files already `git add`ed):
- *      index vs tree, both already-hashed objects, so no working-tree content
- *      filter runs either.
- *
- *   3. `git diff-files --relative --name-only --diff-filter=ACMRT`
- *      lists unstaged edits to already-tracked files: working tree vs index.
- *      Deliberately the plumbing form rather than `git diff HEAD`: the
- *      porcelain form normalizes a working-tree file through its
- *      `.gitattributes` `filter=<name>` `clean` command before comparing it.
- *      Both the attribute assignment and the `filter.<name>.clean`
- *      command live in the audited (untrusted) repo's own `.gitattributes`/
- *      `.git/config`, making it as exploitable as the `core.fsmonitor` hook
- *      neutralized below. `diff-files` reports the same "did this tracked
- *      file change" answer from the stat data alone and re-hashes a file
- *      (through that filter) only when its stat matches a racily clean index
- *      entry: the stat check forced below makes a checkout shipped with its
- *      own `.git` directory never match.
- *
- *   4. `git ls-files --others --exclude-standard`
- *      lists new files never staged at all, minus what a `.gitignore` leaves out.
- *      Plumbing again, so no content filter runs: it lists the working tree's
- *      directory entries and reads no file content.
- *
- *      Together, invocations 2, 3 and 4 let a local dev running
- *      `audit:run --since=main` see their staged, already-tracked and brand-new
- *      in-flight work too.
- *
- * The `T` of each filter keeps a type change: a committed symlink replaced by
- * a regular file holds code the scan never read.
- *
- * `--relative` rewrites paths relative to `$projectPath` instead of the git
- * root and excludes changes outside it, required so the result lines up
- * with `ProjectFile::relativePath()` when the audited project is a
- * subdirectory of a larger repository (a monorepo layout).
- *
- * All four lists are merged, deduplicated and returned in deterministic
- * order.
+ * Returns, sorted and deduplicated, the files committed on the branch since
+ * its merge base with the ref and the staged, unstaged and untracked files
+ * no `.gitignore` excludes, relative to the project path and only under it.
+ * A type change counts: a symlink replaced by a regular file holds code the
+ * scan never read. Never runs a `.gitattributes` content filter of the
+ * audited repository.
  */
 final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesResolverInterface
 {
@@ -85,7 +44,7 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
     private const string NOT_A_REPOSITORY = 'not a git repository';
 
     /**
-     * @param ?Closure(list<string>, string): Process $gitDiffProcessFactory defaults to a plain `new Process(...)`; tests inject a stub to make a `git diff` call deterministically slow
+     * @param ?Closure(list<string>, string): Process $gitDiffProcessFactory defaults to the hardened git process
      */
     public function __construct(
         private Filesystem $filesystem = new Filesystem(),
@@ -126,8 +85,7 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
     }
 
     /**
-     * `--verify --quiet` exits 1 for a ref that names no object; any other
-     * failure is git refusing the repository, not the ref.
+     * Returns false for a ref that names no object.
      *
      * @throws GitChangedFilesUnavailableException
      */
@@ -139,9 +97,8 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
     }
 
     /**
-     * False when git found no repository at all; a failure for any other
-     * reason (a repository owned by another user, one it cannot read)
-     * carries git's own message.
+     * Returns false when git finds no repository; throws with git's own
+     * message on any other failure.
      *
      * @throws GitChangedFilesUnavailableException
      */
@@ -186,18 +143,11 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
     }
 
     /**
-     * `-z` NUL-terminates each path instead of newline-terminating it and disables
-     * git's C-style quoting of non-ASCII bytes AND of literal quotes/backslashes/
-     * control characters alike; `core.quotepath=off` alone only covers the former.
-     * `core.fsmonitor=` neutralizes the audited (untrusted) repo's own local config:
-     * otherwise a hostile `core.fsmonitor` hook set in its `.git/config` runs as an
-     * arbitrary command on this working-tree comparison. `core.checkStat=default`
-     * and `core.trustctime=true` restore git's own stat check over that config:
-     * relaxed to what an extraction keeps, it lets an archived index entry match
-     * the extracted file, which git then re-hashes through the repo's
-     * `filter.<name>.clean` command. `--` ends the revisions: a
-     * file of the audited repo named `HEAD` or `main...HEAD` would otherwise make git
-     * refuse the argument as both a revision and a filename.
+     * Overrides the audited repository's config so neither its `core.fsmonitor`
+     * hook nor its `clean` filter runs: the stat check it may relax would let
+     * an archived index entry match and be re-hashed through that filter.
+     * `-z` turns off git's quoting of paths; `--` keeps a file named `HEAD`
+     * from being read as a revision.
      *
      * @param list<string> $argv
      */

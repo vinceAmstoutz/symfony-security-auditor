@@ -243,13 +243,9 @@ final class PlatformResultExtractorTest extends TestCase
     }
 
     /**
-     * A negative count is a compromised or malfunctioning provider response.
-     * `$tokenUsageRecorder` is optional and defaults to `null`
-     * ({@see PlatformAccountingConfig}),
-     * so this guard must reject the value itself rather than relying on the
-     * recorder's own validation: every caller depends on it running before
-     * the value ever reaches `RateLimiterInterface::record()`, whose
-     * mutable window counters have no lower bound of their own.
+     * The extractor refuses a negative count itself: `$tokenUsageRecorder` is
+     * optional ({@see PlatformAccountingConfig}) and
+     * `RateLimiterInterface::record()` has no lower bound.
      *
      * @throws NegativeTokenCountException
      */

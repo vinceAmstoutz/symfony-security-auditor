@@ -17,9 +17,7 @@ use Override;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * The product identity line, shared by every entry point that shows it: the
- * `audit` command through `AuditPresenter::header()` and every other
- * standalone-binary command through `StandaloneApplication::doRun()`.
+ * The product identity banner.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -40,21 +38,11 @@ final readonly class ConsoleBanner implements ConsoleBannerInterface
     /** Sampled from the circular bug glyph in `assets/banner.webp`. */
     private const string BANNER_PINK = '#e71c55';
 
-    /**
-     * Brightened from the wordmark's `#242d5c` in `assets/banner.webp`: that
-     * navy sits on the banner image's light background, but as terminal
-     * foreground text it degrades toward black on a 16-colour palette and
-     * disappears on the dark background most terminals default to.
-     */
+    /** Brighter than the wordmark's `#242d5c`, which vanishes on a dark terminal. */
     private const string BANNER_NAVY = '#5b6fd6';
 
     /**
-     * One code path for both terminal states: `OutputFormatter` drops the
-     * style tags when the output is not decorated, so CI logs and a colour
-     * terminal show the same layout rather than two different headers. Every
-     * character is ASCII, so a Windows console on a legacy code page renders
-     * it without substitution and without the double-width cells that break
-     * column alignment.
+     * Prints the same layout whether the output is decorated or not.
      */
     #[Override]
     public function render(OutputInterface $output): void
@@ -84,9 +72,7 @@ final readonly class ConsoleBanner implements ConsoleBannerInterface
     }
 
     /**
-     * `◉` is outside CP437/CP850/CP1252, so a console on a legacy code page
-     * substitutes it. Dropping the mark there keeps the colour and the
-     * wordmark, which carry the identity on their own.
+     * `◉` is outside the CP437, CP850 and CP1252 code pages.
      */
     private function scanMark(): string
     {
@@ -94,10 +80,8 @@ final readonly class ConsoleBanner implements ConsoleBannerInterface
     }
 
     /**
-     * The locale variables are the portable signal and a Windows console
-     * sets none of them unless the shell is UTF-8 aware, so Windows lands on
-     * the ASCII wordmark without this needing a platform branch, which could
-     * only ever be exercised on one platform's CI leg.
+     * A Windows console sets no locale variable unless its shell is UTF-8
+     * aware.
      */
     private function consoleRendersUtf8(): bool
     {

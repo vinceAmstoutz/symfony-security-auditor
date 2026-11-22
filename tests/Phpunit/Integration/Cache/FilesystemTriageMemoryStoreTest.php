@@ -246,8 +246,7 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
     }
 
     /**
-     * A malicious contributor could pre-plant a symlink at the exact
-     * (config-fixed) memory path, turning a routine audit run into an
+     * A symlink pre-planted at the memory path would turn a run into an
      * arbitrary-file write.
      *
      * @throws InvalidCacheConfigurationException
@@ -269,8 +268,8 @@ final class FilesystemTriageMemoryStoreTest extends TestCase
     }
 
     /**
-     * Mirrors the write-side guard: reading through a pre-planted symlink
-     * would trust its content as a genuine, previously-recorded entry.
+     * Reading through a pre-planted symlink would trust its content as a
+     * recorded entry.
      *
      * @throws InvalidCacheConfigurationException
      */

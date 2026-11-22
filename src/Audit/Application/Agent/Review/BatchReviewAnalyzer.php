@@ -31,14 +31,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilder
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 /**
- * Reviews findings in batches of `batchSize`: one LLM call per batch, verdicts
- * matched back to findings by id. The structured mode collects verdicts
- * through a `record_review` tool; the JSON mode parses the model's array
- * response, optionally with the investigation tool registry, as does a
- * structured batch whose client never offered the tool. Cached verdicts
- * are served first; only the cache-miss findings are batched and dispatched to
- * the LLM. A batch the model cannot take in whole is split rather than
- * aborting the review.
+ * Reviews the cache-miss findings in batches of `batchSize`, one LLM call per
+ * batch, matching verdicts back to findings by id. Splits a batch the model
+ * cannot take in whole instead of aborting the review.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -316,9 +311,8 @@ final readonly class BatchReviewAnalyzer
     }
 
     /**
-     * The verdicts the model recorded through `record_review`, or (when the
-     * client never offered the tool) the ones its answer carries, read as the
-     * JSON path reads them.
+     * Reads the verdicts recorded through `record_review`, or those of the
+     * JSON answer when the client never offered the tool.
      *
      * @param list<Vulnerability>   $batch
      * @param array<string, string> $cacheContexts
@@ -340,11 +334,8 @@ final readonly class BatchReviewAnalyzer
     }
 
     /**
-     * A batch response cut short (by the output token limit, a content
-     * filter, the tool-loop cap or a call that produced no content) never
-     * considered the members it does not name: they are recorded as errored
-     * (never as implicitly rejected and cached), while the verdicts it did
-     * reach are applied as usual.
+     * Applies the verdicts of a degraded answer and records the members it
+     * does not name as errored, never as rejected and cached.
      *
      * @param list<Vulnerability>      $batch
      * @param array<int|string, mixed> $rawData
@@ -364,14 +355,9 @@ final readonly class BatchReviewAnalyzer
     }
 
     /**
-     * A batch member absent from `$rawData` because the conversation was cut
-     * off before it was ever considered must not be routed through
-     * {@see BatchVerdictApplier::applyBatchReview()}, which warns about a
-     * verdict the model left out. It is marked errored quietly instead, like
-     * a fully-empty drain. `mergeBatchIntoReviewed()` maps this method's return
-     * value back to the caller's findings purely by position, so the result
-     * is reassembled in `$batch`'s original order rather than concatenating
-     * the reviewed and errored groups.
+     * Marks a member absent from `$rawData` errored without the warning about
+     * a verdict left out. Returns the findings in `$batch` order, which
+     * `mergeBatchIntoReviewed()` maps back by position.
      *
      * @param list<Vulnerability>      $batch
      * @param array<int|string, mixed> $rawData
@@ -412,17 +398,9 @@ final readonly class BatchReviewAnalyzer
     }
 
     /**
-     * Recovers any verdicts the LLM already recorded via `record_review` tool
-     * calls in an earlier round of this batch's conversation before a later
-     * round aborted it. Otherwise they vanish with the exception even
-     * though they were genuinely reached. A batch member with no matching
-     * verdict is marked not-reached rather than routed through
-     * {@see BatchVerdictApplier::applyBatchReview()}, which would otherwise
-     * warn about its absence as a verdict the model left out: right when the
-     * model finished the batch, wrong when the conversation was cut off
-     * before it was ever considered. Falls back to
-     * the existing not-reached handling for the whole batch only when
-     * nothing was recorded at all.
+     * Keeps the verdicts recorded through `record_review` before the batch's
+     * conversation aborted and marks each member without one as `$status`,
+     * without the warning about a verdict left out.
      *
      * @param list<Vulnerability>   $batch
      * @param array<string, string> $cacheContexts

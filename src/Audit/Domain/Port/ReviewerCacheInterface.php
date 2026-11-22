@@ -16,16 +16,13 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
- * Per-finding reviewer-verdict cache. The key is derived from the finding's
- * stable content (everything the reviewer sees except the non-deterministic
- * `id`) plus the reviewed file's code context, so a repeated audit of unchanged
- * code reuses the prior verdict instead of paying for another reviewer LLM
- * call. A cache hit short-circuits the call entirely.
+ * Per-finding cache of reviewer verdicts, keyed by everything the reviewer
+ * sees of the finding but its `id`, plus the code context. A hit skips the LLM
+ * call.
  *
- * Stored payloads are the raw review dicts the reviewer produces (`accepted`,
- * `adjusted_severity`, `corrected_type`, …), ready to be re-applied. The agent
- * tolerates partial payloads, so implementations need not validate beyond JSON
- * parsing.
+ * Payloads are the raw review dicts (`accepted`, `adjusted_severity`,
+ * `corrected_type`, …). The agent tolerates partial payloads, so an
+ * implementation validates nothing beyond JSON.
  */
 interface ReviewerCacheInterface
 {

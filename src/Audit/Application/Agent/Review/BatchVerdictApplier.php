@@ -22,10 +22,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInter
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
 
 /**
- * Turns a batch review outcome into the reviewed findings plus their reviewer
- * coverage entries: matches verdicts to findings by id (a finding with no
- * verdict is recorded as errored, never as rejected) and degrades a whole
- * failed batch to errored.
+ * Applies a batch review outcome to its findings and their coverage entries,
+ * matching verdicts by id. A finding with no verdict is recorded as errored,
+ * never as rejected.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -40,9 +39,7 @@ final readonly class BatchVerdictApplier
     ) {}
 
     /**
-     * A finding whose id appears in `$codeContexts` has its matched verdict
-     * persisted to the reviewer cache, so a subsequent batched run reuses it
-     * instead of calling the LLM again. Bypassed runs pass no contexts. A
+     * Caches the verdict of each finding whose id is in `$codeContexts`. A
      * rejection given at the tool-call limit is left out of triage memory.
      *
      * @param list<Vulnerability>      $batch
@@ -70,11 +67,7 @@ final readonly class BatchVerdictApplier
     }
 
     /**
-     * The set of finding ids a review conversation actually produced a
-     * verdict for. Lets a caller recovering from a mid-conversation abort
-     * distinguish a batch member the model genuinely reviewed from one it
-     * never reached, instead of {@see self::applyBatchReview()} warning about
-     * every id absent from `$rawData` as a verdict the model left out.
+     * Returns the ids of the findings `$rawData` holds a verdict for.
      *
      * @param array<int|string, mixed> $rawData
      *
@@ -108,9 +101,8 @@ final readonly class BatchVerdictApplier
     }
 
     /**
-     * A batch of one may come back as a bare review object instead of a
-     * one-element array: treat it as a single-entry list rather than
-     * iterating its scalar values.
+     * Reads a bare review object, which a batch of one may come back as, as a
+     * one-entry list.
      *
      * @param array<int|string, mixed> $rawData
      *
@@ -185,8 +177,8 @@ final readonly class BatchVerdictApplier
     }
 
     /**
-     * A batch answer that ended normally yet holds nothing reviewed no
-     * finding: the whole batch is recorded as errored, never as rejected.
+     * Records the whole batch as errored, never as rejected, when an answer
+     * that ended normally holds nothing.
      *
      * @param list<Vulnerability> $batch
      *
@@ -217,10 +209,8 @@ final readonly class BatchVerdictApplier
     }
 
     /**
-     * Marks every finding in a batch the reviewer never reached because a
-     * budget/provider abort unwound the batch loop before a verdict for it
-     * was produced: no logging, no persisted verdict, unlike
-     * `markBatchErrored()`, whose findings did get a (failed) verdict.
+     * Marks the findings a budget or provider abort kept the reviewer from
+     * reaching, without logging or caching anything.
      *
      * @param list<Vulnerability> $batch
      */
@@ -232,9 +222,7 @@ final readonly class BatchVerdictApplier
     }
 
     /**
-     * Logs a failed batch LLM call and marks every finding in the batch
-     * errored, so the error log + coverage live in a single tested place for
-     * both the JSON batch path and the structured `record_review` batch path.
+     * Logs a failed batch call and marks every finding of the batch errored.
      *
      * @param list<Vulnerability> $batch
      *

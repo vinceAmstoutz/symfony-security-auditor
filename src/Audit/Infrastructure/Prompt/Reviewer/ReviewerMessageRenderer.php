@@ -82,9 +82,8 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
     }
 
     /**
-     * A file several findings share is given once, with the first of them; the
-     * others point to it, so a batch costs one copy of each file instead of
-     * one per finding.
+     * Gives a file several findings share once, with the first of them; the
+     * others point to it.
      *
      * @param list<Vulnerability>   $vulnerabilities
      * @param array<string, string> $codeContexts
@@ -191,11 +190,8 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
     }
 
     /**
-     * The attacker LLM supplies `file_path` as a free-form tool argument,
-     * indirectly influenced by whatever text lives in the audited source it
-     * just analyzed. A crafted value containing `"` or a `\n`/bare `\r` could
-     * otherwise close the `<file path="...">` tag early or forge fake
-     * standalone instruction paragraphs in the plain `File: ...` line.
+     * Folds line breaks and `"` in the model-written path, so it cannot close
+     * the `<file path="...">` tag or forge a paragraph of the prompt.
      */
     private function sanitizeFilePath(string $filePath): string
     {
@@ -203,12 +199,8 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
     }
 
     /**
-     * `title` lands in the bare, single-line `Title: ...` slot with no
-     * surrounding fence or heading to contain it, unlike the fenced/heading
-     * -guarded narrative fields `escapeFences()` protects. A raw `\n` or bare
-     * `\r` here would forge a fake standalone instruction paragraph as
-     * unguarded top-level prompt text, the same class of injection
-     * `sanitizeFilePath()` already guards `File: ...` against.
+     * Keeps a one-line field such as `Title:` from forging a paragraph of the
+     * prompt.
      */
     private function stripEmbeddedNewline(string $text): string
     {
@@ -216,11 +208,8 @@ final readonly class ReviewerMessageRenderer implements ReviewerMessageRendererI
     }
 
     /**
-     * The attacker LLM's narrative fields are interpolated into this prompt's
-     * own ```-delimited code fence and `###`-prefixed section headers; an
-     * unescaped backtick would break out of the fence and an unescaped `#`
-     * would let the finding forge a fake section (e.g. a bogus
-     * `### SYSTEM OVERRIDE`) as unguarded top-level prompt text.
+     * Escapes backticks and `#`, so a model-written field cannot leave its code
+     * fence or forge a `###` section of the prompt.
      */
     private function escapeFences(string $text): string
     {

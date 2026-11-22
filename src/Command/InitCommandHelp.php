@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 /**
- * The `init` console help text, kept out of the command class itself.
+ * The `init` console help text.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

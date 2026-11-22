@@ -18,12 +18,9 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\UnreadableYamlException;
 
 /**
- * Parses YAML the audited repository supplies, with its custom tags such as
- * `!tagged_iterator`, as the Symfony kernel does. Symfony YAML copies the
- * rest of a block-style document at every level it descends, so a file is
- * refused before the parse when its size or its nesting could exhaust the
- * memory of the run and any failure of the parse refuses the file instead
- * of ending the run.
+ * Parses YAML the audited repository supplies, custom tags included, as the
+ * Symfony kernel does. Refuses a file over `MAX_BYTES` or nested deeper than
+ * `MAX_NESTING_DEPTH` before parsing it. Refuses a file the parser fails on.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -83,9 +80,6 @@ final readonly class RepositoryYamlReader
     }
 
     /**
-     * The open blocks are indented further at each level, so those a line of
-     * this indent leaves open are the ones indented less than it.
-     *
      * @param list<int> $openIndents
      *
      * @return list<int> the blocks still open at a line of this indent, that line's own last

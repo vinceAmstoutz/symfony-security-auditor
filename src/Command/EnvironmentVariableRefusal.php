@@ -17,8 +17,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EnvironmentVariableName;
 
 /**
- * The credential commands give `init`'s answer to a variable name no `%env()%`
- * placeholder could ever read back: say why and exit `2` instead of acting.
+ * Prints why no `%env()%` placeholder can read a variable name back, as `init`
+ * does. The credential commands then exit `2`.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

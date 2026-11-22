@@ -14,10 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 /**
- * The findings a report left out because the baseline accepted them or their
- * type is muted, one entry per occurrence: under the fingerprint a report
- * lists the finding under, and, in the same order, under the baseline
- * fingerprint that left it out.
+ * The findings a report left out as accepted by the baseline or muted by
+ * type, one entry per occurrence in each list.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

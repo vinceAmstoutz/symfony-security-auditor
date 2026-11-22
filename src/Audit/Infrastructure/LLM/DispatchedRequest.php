@@ -17,9 +17,9 @@ use Symfony\AI\Platform\Result\DeferredResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 
 /**
- * One request of a batch window after dispatch: the deferred answer when the
- * platform took it, null when the dispatch itself failed, or the answer it
- * already has when the rate-limit window refused it as too large to send.
+ * One request of a batch window after dispatch. `$deferredResult` is null
+ * when the dispatch failed; `$answer` is set when the rate-limit window
+ * refused the request as too large.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

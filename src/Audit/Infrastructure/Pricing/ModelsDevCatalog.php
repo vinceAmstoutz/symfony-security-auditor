@@ -16,9 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing;
 use JsonException;
 
 /**
- * What a decoded `symfony/models-dev` catalog must hold for the auditor to
- * price a call from it: one definition shared by the refresh that writes the
- * override and the provider that reads whichever catalog is in place.
+ * Decides what a decoded `symfony/models-dev` catalog must hold to price a
+ * call, for the refresh that writes one and the provider that reads it.
  *
  * @phpstan-type PricedCost array{input: float|int, output?: mixed, cache_read?: mixed, cache_write?: mixed}
  *
@@ -71,9 +70,8 @@ final readonly class ModelsDevCatalog
     }
 
     /**
-     * Whether the catalog in `$path` is a strictly newer snapshot than the one
-     * in `$otherPath`. One that cannot be read, or whose models carry no date,
-     * is neither newer nor older than anything.
+     * Returns true when the catalog in `$path` is strictly newer than the one
+     * in `$otherPath`; false when either cannot be read or carries no date.
      */
     public static function isFileNewer(?string $path, ?string $otherPath): bool
     {
@@ -88,9 +86,8 @@ final readonly class ModelsDevCatalog
     }
 
     /**
-     * The newest `last_updated` any model of the catalog carries: how fresh a
-     * snapshot is, since the file itself holds no version. A catalog whose
-     * models carry none has no date.
+     * Returns the newest `last_updated` of the catalog's models, the only date
+     * a snapshot holds; null when none carries one.
      *
      * @param array<array-key, mixed> $catalog
      */
@@ -113,8 +110,7 @@ final readonly class ModelsDevCatalog
     }
 
     /**
-     * A model whose cost is not a priced one keeps its entry but loses the
-     * cost, which leaves it unpriced instead of billed at a rate nobody set.
+     * Drops each cost that is not a priced one, leaving its model unpriced.
      *
      * @param array<array-key, mixed> $catalog
      *

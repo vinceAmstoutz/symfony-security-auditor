@@ -26,18 +26,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProfileAwareAttackerP
 use WeakMap;
 
 /**
- * Assembles the per-chunk system/user prompts (risk markers + cross-iteration
- * preambles), slices each file to its security-relevant lines and derives
- * cacheability from the cache key {@see ChunkContextKeyDeriver} computes.
- * Shared by the sequential and concurrent chunk analyzers.
+ * Builds the cache key of a chunk and its system and user prompts, with its
+ * files sliced to their security-relevant lines.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ChunkContextFactory
 {
     /**
-     * The rejected and previous preambles of every request this factory has
-     * seen, dropped with it: they are the same for every chunk of a request.
+     * The rejected and previous preambles of each request, shared by all its
+     * chunks and released with it.
      *
      * @var WeakMap<AttackerAnalysisRequest, array{string, string}>
      */
@@ -72,8 +70,7 @@ final readonly class ChunkContextFactory
     }
 
     /**
-     * What {@see self::create()} would key the chunk's cache entry by, without
-     * building the prompts that make up most of a context.
+     * Returns the cache key `create()` would use, without building the prompts.
      *
      * @param list<ProjectFile> $chunk
      */
@@ -150,10 +147,8 @@ final readonly class ChunkContextFactory
     }
 
     /**
-     * Only the candidates on the chunk's own files are rendered: the deep pass
-     * analyzes exactly the files the first pass flagged, so none is lost, the
-     * prompt carries only what the chunk needs and the cache key stays the
-     * chunk's own instead of changing with every candidate elsewhere.
+     * Renders only the candidates on the chunk's own files, so its cache key
+     * does not change with the candidates elsewhere.
      *
      * @param list<ProjectFile> $chunk
      */
@@ -199,14 +194,9 @@ final readonly class ChunkContextFactory
     }
 
     /**
-     * Replaces each file in the chunk with a version whose content is sliced
-     * down to security-relevant lines. The slicer preserves the original line
-     * count by replacing elided lines with a `// elided` placeholder, so the
-     * line-numbering protocol in the prompt stays accurate against the source.
-     * Any line the static pre-scanner already flagged as a risk marker and the
-     * rest of the call it leaves open are restored verbatim afterward by
-     * {@see RiskMarkerLineRestorer}, since the slicer's own keyword list is
-     * independently maintained and can miss patterns the pre-scanner catches.
+     * Slices each file to its security-relevant lines, keeping its line count.
+     * Restores verbatim every risk-marker line with the rest of the call it
+     * leaves open.
      *
      * @param list<ProjectFile> $chunk
      *

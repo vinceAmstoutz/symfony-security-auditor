@@ -30,10 +30,8 @@ final readonly class McpServeCommand
     ) {}
 
     /**
-     * STDOUT is the JSON-RPC channel the client parses and the CLI SAPI
-     * displays notices and warnings there by default: one stray notice would
-     * corrupt the protocol stream, so PHP's error display goes to STDERR while
-     * the server runs.
+     * Sends PHP's error display to STDERR while the server runs, so no notice
+     * corrupts the JSON-RPC stream on STDOUT.
      */
     public function __invoke(): int
     {

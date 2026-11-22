@@ -17,22 +17,17 @@ use Symfony\Component\Filesystem\Filesystem;
 use UnexpectedValueException;
 
 /**
- * The directory a scenario runs in, created afresh, under a name no other run
- * shares, for each run. Its path differs from one run to the next, so the
- * normalizer replaces it with `<WORKSPACE>`, but always has the same length,
- * so the console wraps a line that holds it at the same place:
+ * The directory a scenario runs in, created afresh for each run under a unique
+ * name of constant length, which the normalizer writes `<WORKSPACE>`:
  *
  * - `project/` the audited project
  * - `home/` the standalone binary's XDG directories (`config/`, `cache/`, `data/`)
  * - `kernel/` the bundle kernel's project, cache and log directories
  * - `bin/` the executables put first on `PATH`
  *
- * A scenario reads and writes nothing outside it: a path a step, a setup action
- * or an artifact names outside the workspace is refused. The one exception is
- * `{null-device}`, the discard device a report can be written to: the real
- * `/dev/null` for a process that cannot write `/dev` and a device node of its
- * own under the workspace for one that can, so a release that replaces its
- * output file through a rename never replaces the system's.
+ * Refuses a path a step, a setup action or an artifact names outside it,
+ * except `{null-device}`: the real `/dev/null` for a process that cannot write
+ * `/dev`, a device node under the workspace otherwise.
  */
 final readonly class Workspace
 {

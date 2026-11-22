@@ -37,8 +37,8 @@ final readonly class ChunkCoverageRecorder
     }
 
     /**
-     * Records every file in a chunk as errored and, when the recorder keeps
-     * them, why, so the progress output can name the cause.
+     * Records every file in a chunk as errored, with the reason when the
+     * recorder keeps one.
      *
      * @param list<ProjectFile> $chunk
      */
@@ -56,9 +56,9 @@ final readonly class ChunkCoverageRecorder
     }
 
     /**
-     * Records every file in a chunk as analyzed on a partial look and, when
-     * the recorder keeps them, marks each one so the answer is neither cached
-     * nor read as a verdict.
+     * Records every file in a chunk as analyzed and, when the recorder keeps
+     * them, as inconclusive, so the answer is neither cached nor read as a
+     * verdict.
      *
      * @param list<ProjectFile> $chunk
      */

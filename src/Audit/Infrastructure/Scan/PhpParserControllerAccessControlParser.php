@@ -36,18 +36,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessContr
 /**
  * @internal not part of the BC promise, see docs/versioning.md
  *
- * Walks a controller-like file's AST to extract one RouteAccessControl per
- * stacked `#[Route(path:, methods:)]` attribute on each public action method
- * (via {@see RouteAttributeParser}), plus `#[IsGranted(...)]`/`#[Security(...)]`
- * on both class and method level and `denyAccessUnlessGranted()` calls in
- * method bodies (a first-class callable reference to it does not count: it
- * is never actually invoked). Attribute names are resolved against their
- * imports (`NameResolver`) before short-name matching, so an aliased import
- * (`use Route as Get;`) is still recognised. "Controller-like" also covers
- * `#[AsLiveComponent]`/`#[ApiResource]` classes ({@see
- * ProjectFileType::isControllerLike()}), which may still declare routed,
- * access-controlled actions. Returns [] for any other file type or any parse
- * error: the mapping stage must never abort because of a single broken file.
+ * Extracts one RouteAccessControl per stacked `#[Route]` on each public
+ * action of a controller-like file ({@see ProjectFileType::isControllerLike()}),
+ * with the class and method `#[IsGranted]` or `#[Security]` and the
+ * `denyAccessUnlessGranted()` calls the action reaches. Resolves attribute
+ * names against their imports, so an aliased import still matches. Returns []
+ * for any other file type or a file that does not parse.
  */
 final readonly class PhpParserControllerAccessControlParser implements ControllerAccessControlParserInterface
 {
@@ -142,12 +136,8 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     }
 
     /**
-     * Symfony's `AttributeClassLoader` routes an invokable controller's
-     * `__invoke()` from the class-level `#[Route]` when no method carries its
-     * own route. Without this the action is parsed as route-less and dropped
-     * from the access-control map, so an unguarded single-action controller is
-     * never flagged. Mirror that: when the class has a route and nothing routed
-     * a method, the `__invoke()` entry inherits the class route.
+     * Gives `__invoke()` the class-level `#[Route]` when no method carries its
+     * own, as Symfony's `AttributeClassLoader` does.
      *
      * @param list<RouteAccessControl>                                                  $entries
      * @param array{present: bool, path: ?string, methods: list<string>, name: ?string} $classRouteData
@@ -190,12 +180,8 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     }
 
     /**
-     * A class-level `#[Route('/admin', name: 'admin_')]` acts as a path and
-     * name prefix for every action's own `#[Route]`: Symfony's own attribute
-     * route loader concatenates them, so a security.yaml `access_control`
-     * rule keyed on the full `/admin/dashboard` path or `admin_dashboard`
-     * route name must be matched against the same joined values, not the
-     * method's own attribute in isolation.
+     * Prefixes each route path and name with those of the class-level
+     * `#[Route]`, as Symfony's attribute route loader does.
      *
      * @param array{classHasIsGranted: bool, classLevelIsGranted: list<string>, methodHasDenyAccess: bool, denyAccessAttributes: list<string>, classGuardConstants: list<string>, denyAccessConstants: list<string>} $accessFlags
      * @param array{present: bool, path: ?string, methods: list<string>, name: ?string}                                                                                                                              $classRouteData
@@ -259,11 +245,8 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     }
 
     /**
-     * The `denyAccessUnlessGranted()`/`isGranted()` calls an action reaches,
-     * including ones moved behind a shared private/protected helper (a common
-     * refactor for a repeated check), which would otherwise be invisible since
-     * the action method's own body only calls the helper, never the guard
-     * directly.
+     * The `denyAccessUnlessGranted()` and `isGranted()` calls each action
+     * reaches, through its own helpers too.
      */
     private function denyAccessCallIndex(Class_ $class): ReachableCallIndex
     {
@@ -271,15 +254,9 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     }
 
     /**
-     * The attributes guarded by the given `denyAccessUnlessGranted()`/
-     * `isGranted()` calls, as `$attributeOf` reads the first argument of each:
-     * a string literal, or the class constant it names. Any other attribute
-     * (enum case, variable, `new Expression(...)`) is left out rather than
-     * guessed at, mirroring how route paths are only resolved from literals.
-     * Each distinct attribute is kept once, in the order it first appears and
-     * only the first {@see self::MAX_GUARD_ATTRIBUTES_PER_ROUTE} are kept, so a
-     * chain of actions each reaching every later one cannot hold a quadratic
-     * number of names.
+     * The attributes the guard calls name, as `$attributeOf` reads them, each
+     * once in the order first seen, at most
+     * {@see self::MAX_GUARD_ATTRIBUTES_PER_ROUTE}.
      *
      * @param list<MethodCall|NullsafeMethodCall|StaticCall>                   $denyAccessCalls
      * @param Closure(MethodCall|NullsafeMethodCall|StaticCall): (string|null) $attributeOf
@@ -304,14 +281,9 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     }
 
     /**
-     * `isGranted()` is recognized the same way `denyAccessUnlessGranted()`
-     * is (by presence alone, not by verifying it actually guards a
-     * `throw`), matching this parser's existing heuristic style (the class-
-     * level `#[IsGranted]` attribute check applies the identical "presence
-     * is sufficient" rule). `isGranted()` + a manual
-     * `throw $this->createAccessDeniedException(...)` is an equally standard
-     * Symfony idiom to the shorthand `denyAccessUnlessGranted()`, used
-     * whenever the action wants a custom denial message.
+     * Counts `isGranted()` like `denyAccessUnlessGranted()`, by presence
+     * alone. Neither a first-class callable nor a call granting only public
+     * access counts.
      */
     private function isDenyAccessCall(MethodCall|NullsafeMethodCall|StaticCall $methodCall): bool
     {

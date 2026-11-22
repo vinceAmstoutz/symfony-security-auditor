@@ -80,8 +80,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 
 /**
- * Proves `audit:diff` correctly consumes the JSON `audit:run` actually emits,
- * not just hand-crafted fixtures: the two commands must agree on schema.
+ * Checks that `audit:diff` reads the JSON `audit:run` really emits.
  */
 final class DiffCommandEndToEndTest extends TestCase
 {

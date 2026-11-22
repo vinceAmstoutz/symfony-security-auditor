@@ -16,11 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 
 /**
- * A project-defined attacker skill loaded from configuration: an extra expert
- * skill block injected into the attacker prompt whenever a file of its
- * {@see $fileType} appears in the chunk. Lets a project encode team-specific
- * rules ("all queries to LegacyDb must go through SafeQuery") without owning a
- * PHP attacker-skill implementation.
+ * An `audit.custom_skills` block, added to the attacker prompt whenever a file
+ * of its {@see $fileType} is in the chunk.
  */
 final readonly class CustomAttackerSkill
 {

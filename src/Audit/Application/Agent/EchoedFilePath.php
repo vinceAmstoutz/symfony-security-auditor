@@ -16,11 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 use function Symfony\Component\String\b;
 
 /**
- * `Vulnerability::filePath()` is free text echoed back by the LLM (the
- * `record_vulnerability` schema only constrains it to a non-blank string, with
- * no cross-check against the chunk's real file list), so a model quirk like a
- * leading `./` must not keep a finding from matching its `ProjectFile`
- * ({@see KnownFiles::name()}).
+ * Puts a file path the LLM echoes, free text, in a form comparable with a
+ * project file's, so a leading `./` does not keep a finding from its file.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -32,9 +29,8 @@ final readonly class EchoedFilePath
     }
 
     /**
-     * The comparable forms of the file `$relativePath` of the project at
-     * `$projectPath`: a path names it exactly when its own comparable form is
-     * one of them.
+     * Returns the comparable forms of the project file `$relativePath`. A path
+     * names it exactly when its own comparable form is one of them.
      *
      * @return array{string, string}
      */
@@ -44,8 +40,7 @@ final readonly class EchoedFilePath
     }
 
     /**
-     * The path on forward slashes without a leading `./` or `/`, the form two
-     * spellings of one file share.
+     * Returns the path on forward slashes without a leading `./` or `/`.
      */
     public static function comparable(string $path): string
     {

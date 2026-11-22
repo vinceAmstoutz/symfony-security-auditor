@@ -43,10 +43,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 
 /**
- * `--min-score` gates on the normalized score, which only spans 0 to 100: a
- * value outside it fails every run or gates nothing. It has always been
- * accepted, so the audit runs as given and the command says what the value
- * does instead of refusing it.
+ * A `--min-score` outside the 0 to 100 range of the normalized score runs the
+ * audit as given, the command saying what the value does instead of refusing
+ * it.
  */
 final class AuditCommandMinScoreRangeTest extends TestCase
 {

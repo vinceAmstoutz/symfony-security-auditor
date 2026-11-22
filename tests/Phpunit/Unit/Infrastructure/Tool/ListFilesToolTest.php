@@ -82,8 +82,6 @@ final class ListFilesToolTest extends TestCase
      */
     public function test_execute_continues_past_filtered_files_to_reach_matching_ones(): void
     {
-        // Kills Continue_→break: with `break`, iteration stops at first non-matching file and the
-        // matching one further down the list never appears in output.
         $projectFile = ProjectFile::create('src/Entity/Foo.php', '/app/y', '<?php');
         $controller = ProjectFile::create('src/Controller/AController.php', '/app/x', '<?php');
         $listFilesTool = new ListFilesTool([$projectFile, $controller]);

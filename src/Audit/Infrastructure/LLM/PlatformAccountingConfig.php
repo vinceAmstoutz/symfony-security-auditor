@@ -16,11 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageRecorder;
 
-/**
- * The optional token-usage and budget bookkeeping sinks.
- *
- * @internal not part of the BC promise, see docs/versioning.md
- */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class PlatformAccountingConfig
 {
     public function __construct(

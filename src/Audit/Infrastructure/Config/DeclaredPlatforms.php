@@ -17,9 +17,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
 
 /**
  * The platforms the bundled `symfony/ai-bundle` declares under `ai.platform`,
- * as its `config/options.php` imports them. A configuration naming any other
- * stops the container outright (`Unrecognized option "meta" under
- * "ai.platform"`), so `init` writes nothing for it and installs no bridge.
+ * as its `config/options.php` imports them: the container refuses any other.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -41,9 +39,8 @@ final readonly class DeclaredPlatforms
     }
 
     /**
-     * Every platform `init` takes on (the ones wrapping others it refuses
-     * outright) spelled the way a provider naming it must be, so a reader
-     * picking one is not refused again for leaving out the instance.
+     * Returns the platforms `init` takes on, compound ones left out, as a
+     * provider must spell them, with an `<instance>` for an instance-keyed one.
      *
      * @return list<string>
      */

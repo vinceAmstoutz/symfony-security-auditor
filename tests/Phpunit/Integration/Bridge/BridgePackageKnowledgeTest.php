@@ -18,10 +18,9 @@ use Symfony\Component\Finder\Finder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
 
 /**
- * `ComposerBridgeInstaller` derives a bridge package name from the platform key,
- * hyphenating the ones `symfony/ai-bundle` spells differently. A wrong slug
- * fails only at `composer require`, on the user's machine, so every name `init`
- * could ask for is checked against the packages the bundle itself declares.
+ * Checks every bridge package name `ComposerBridgeInstaller` derives for a
+ * platform `init` could ask for against the packages `symfony/ai-bundle`
+ * declares.
  */
 final class BridgePackageKnowledgeTest extends TestCase
 {
@@ -63,11 +62,8 @@ final class BridgePackageKnowledgeTest extends TestCase
     }
 
     /**
-     * The bundle names each bridge with the platform key hyphenated, so
-     * `symfony/ai-open-ai-platform` belongs to `openai`. Keying the declared
-     * packages that way pairs each platform with its own package, rather than
-     * only asking whether the requested name exists somewhere in the list: a
-     * slug pointing at another platform's real bridge would pass that.
+     * Returns the packages the bundle declares keyed by their platform, the
+     * hyphens dropped (`symfony/ai-open-ai-platform` under `openai`).
      *
      * @return array<string, string>
      */

@@ -16,12 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 use Symfony\Component\Filesystem\Path;
 
 /**
- * The directories of a list that no other directory of it holds, each once and
- * in the order the list gives them: a directory inside another listed one is
- * already walked by it. A directory holds another when the other's path
- * starts with its own, as {@see Path::isBasePath()} decides. Each
- * directory looks only its own parents up among those listed, so thousands of
- * listed directories cost no more than reading each path once.
+ * The listed directories that no other listed directory holds, as
+ * {@see Path::isBasePath()} decides, each once and in list order.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

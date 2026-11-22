@@ -20,11 +20,9 @@ use Symfony\Component\Config\Definition\NodeInterface;
 use Symfony\Component\Config\Definition\PrototypedArrayNode;
 
 /**
- * The smallest configuration that sets one path to a value: the model the
- * bundle requires, the required siblings of every section on the way and a
- * prototype's entry as the first item of a list, or the `controller` item of
- * a map keyed by name: a file type, so a map keyed by file type, such as
- * `scan.custom_risk_patterns`, takes it as well as one keyed by any name.
+ * The smallest configuration that sets one path to a value. A prototype's
+ * entry is the first item of a list, or the `controller` item of a map keyed
+ * by name, which a map keyed by file type takes too.
  */
 final readonly class ProbeConfiguration
 {

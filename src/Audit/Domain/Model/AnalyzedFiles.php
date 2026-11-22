@@ -14,11 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
- * Reads a coverage ledger for the files the attacker analyzed, or served from
- * its cache, at least once. The attacker is the stage that reads a file whole,
- * so only its word says a file was looked at: the absence of a finding in any
- * other file (one the lean pre-scan skipped, one outside a `--since` or
- * `--path` scope, one whose call failed) proves nothing.
+ * The files a coverage ledger says the attacker analyzed, or served from its
+ * cache, at least once. Only the attacker reads a file whole, so no other
+ * stage's entry counts.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

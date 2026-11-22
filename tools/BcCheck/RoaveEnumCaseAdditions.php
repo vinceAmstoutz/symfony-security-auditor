@@ -16,11 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tooling\BcCheck;
 use VinceAmstoutz\SymfonySecurityAuditor\Tooling\BcCheck\Exception\UnpatchableEnumCasesCheckException;
 
 /**
- * docs/versioning.md lets an enum gain cases in a MINOR release, so the API
- * compatibility job no longer fails on a case added to an enum: its install
- * removes, from the changes the enum cases check of
- * roave/backward-compatibility-check returns, the one line that adds the
- * added cases. A removed case still fails the job.
+ * Removes the line that adds cases from the changes the enum cases check of
+ * roave/backward-compatibility-check returns, since docs/versioning.md lets an
+ * enum gain cases in a MINOR release. A removed case still fails the job.
  */
 final readonly class RoaveEnumCaseAdditions
 {

@@ -57,8 +57,8 @@ final readonly class MinimumLineCoverageSubscriber implements FinishedSubscriber
     }
 
     /**
-     * A percentage says a gate failed; the lines say why. Long lists are
-     * truncated so one badly-covered file cannot bury the rest of the log.
+     * Names the uncovered lines, truncating a long list so one file cannot
+     * bury the rest of the log.
      */
     private function uncoveredDetail(string $report): string
     {

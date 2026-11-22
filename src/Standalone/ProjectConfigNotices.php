@@ -18,11 +18,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerPa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 
 /**
- * The audited repository may tune the run through the config files it ships,
- * so the audit header says which ones were layered in (lowest priority first)
- * and which one was left out and why: a stricter `fail_on` or another model
- * coming from the checkout rather than from the user's own file would
- * otherwise be silent.
+ * Names in the audit header each config file layered in (lowest priority
+ * first) and the one left out with its reason.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

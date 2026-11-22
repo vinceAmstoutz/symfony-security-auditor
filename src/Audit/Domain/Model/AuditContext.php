@@ -85,20 +85,17 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     }
 
     /**
-     * @param list<string> $scanPaths            optional project-relative subdirectories
-     *                                           that the scan should be restricted to;
-     *                                           empty list scans the whole project
-     * @param bool         $cacheBypassed        when true, agents should skip the
-     *                                           attacker cache entirely for this run
-     *                                           (no reads, no writes)
-     * @param ?string      $diffSinceRef         when set, the IngestionStage filters
-     *                                           discovered files down to those changed
-     *                                           against this git ref (diff mode); null
-     *                                           (default) audits every file in scope
+     * @param list<string> $scanPaths            project-relative subdirectories the
+     *                                           scan is restricted to; empty scans
+     *                                           the whole project
+     * @param bool         $cacheBypassed        skips the attacker cache, reads and
+     *                                           writes alike
+     * @param ?string      $diffSinceRef         narrows the run to the files changed
+     *                                           against this git ref; null audits
+     *                                           every file in scope
      * @param list<string> $acceptedFingerprints
      *                                           baseline fingerprints of accepted
-     *                                           findings; matching attacker findings
-     *                                           are dropped before the reviewer runs
+     *                                           findings, dropped before review
      *
      * @throws InvalidAuditContextException
      */
@@ -127,12 +124,9 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     }
 
     /**
-     * Spends one baseline credit for `$fingerprint`, shared across every
-     * caller and every attacker/reviewer iteration of this run. The budget
-     * is seeded once from `$acceptedFingerprints` (`array_count_values()`
-     * semantics: an accepted fingerprint repeated N times grants N credits)
-     * and decrements monotonically, so the same accepted occurrence can never
-     * be spent twice regardless of how many times or where it is offered.
+     * Spends one baseline credit for `$fingerprint`; false when none is left.
+     * A fingerprint accepted N times grants N credits for the whole run, so no
+     * accepted occurrence is ever spent twice.
      */
     public function consumeBaselineCredit(string $fingerprint): bool
     {
@@ -140,9 +134,8 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     }
 
     /**
-     * Spends one baseline credit on `$vulnerability`: its own fingerprint's
-     * first, then the other ones a baseline written before may hold for it
-     * (`Vulnerability::fingerprintCandidates()`).
+     * Spends one baseline credit on `$vulnerability`, trying each of its
+     * `Vulnerability::fingerprintCandidates()` in order.
      */
     public function consumeBaselineCreditFor(Vulnerability $vulnerability): bool
     {
@@ -193,9 +186,8 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     }
 
     /**
-     * Remembers a finding whose baseline credit was spent before review, so
-     * a later iteration that re-reports it is skipped again instead of being
-     * reviewed against an already-exhausted budget.
+     * Remembers a finding whose baseline credit was spent before review, so a
+     * later iteration that re-reports it is skipped again.
      */
     public function recordBaselineSkippedFinding(Vulnerability $vulnerability): void
     {
@@ -235,9 +227,8 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     }
 
     /**
-     * Marks the run as a cost estimate: a `--dry-run` reads the files in scope
-     * to price the audit and analyzes none of them, so its report can never
-     * read as complete.
+     * Marks the run as a `--dry-run` cost estimate, which analyzes no file, so
+     * its report never reads as complete.
      */
     public function markAsCostEstimate(): void
     {
@@ -261,12 +252,9 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     }
 
     /**
-     * The files `MappingStage` builds `SymfonyMapping`/`AccessControlMap`
-     * from: the full scan scope, unlike {@see self::projectFiles()}, which
-     * a `--since` diff-mode run narrows to only the changed files. Falls
-     * back to {@see self::projectFiles()} when `IngestionStage` never calls
-     * {@see self::setMappingFiles()} (a full, non-diff run, or a test that
-     * only sets `projectFiles`), since the two are identical in that case.
+     * The files the mapping is built from: the full scan scope, which a
+     * `--since` run does not narrow. Equals {@see self::projectFiles()} until
+     * {@see self::setMappingFiles()} is called.
      *
      * @return list<ProjectFile>
      */
@@ -276,11 +264,9 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     }
 
     /**
-     * How many files the scan found in the run's scope, before a `--since`
-     * diff narrowed them: what the report calls the files discovered. Falls
-     * back to the count of {@see self::mappingFiles()} when `IngestionStage`
-     * never calls {@see self::setFilesDiscovered()}, since a `--path`-less
-     * run maps exactly the files its scan found.
+     * How many files the scan found in scope before a `--since` diff narrowed
+     * them. The count of {@see self::mappingFiles()} until
+     * {@see self::setFilesDiscovered()} is called.
      */
     public function filesDiscovered(): int
     {
@@ -293,8 +279,7 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     }
 
     /**
-     * The mapping under framework-neutral names: what pipeline stages should
-     * read, so core orchestration never names a Symfony concept.
+     * The mapping under the framework-neutral names pipeline stages read.
      */
     public function securityMap(): ?ApplicationSecurityMap
     {
@@ -438,8 +423,8 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     }
 
     /**
-     * Whether the reviewer rejected this finding: reached that verdict, as
-     * opposed to a review that failed and reached none.
+     * Whether the reviewer reached a rejecting verdict on this finding, as
+     * opposed to a review that failed.
      */
     public function wasRejectedByReviewer(Vulnerability $vulnerability): bool
     {

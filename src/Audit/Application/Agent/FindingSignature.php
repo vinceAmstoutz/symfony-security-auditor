@@ -14,13 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
 /**
- * What a record call says about the finding it names: the file, type and line
- * its id is derived from and its title. A field the call leaves out or gives
- * as another kind of value is not stated and never stands in for one the
- * other call states: a call the recording tool refused for lacking a field is
- * repeated only by a call that names its file and either its title or the
- * type and line both calls state, so another finding of its file is never
- * taken for it.
+ * The file, type, line and title a record call states about its finding; a
+ * missing or mistyped field states nothing. A refused call is repeated only
+ * by a call that names its file and either its title or the type and line
+ * both calls state, so another finding of the file is never taken for it.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -35,7 +32,7 @@ final readonly class FindingSignature
 
     /**
      * @param array<string, mixed> $payload
-     * @param KnownFiles           $knownFiles the files the call's path may name, so it reads as the file its finding is named by
+     * @param KnownFiles           $knownFiles the files the call's path may name
      */
     public static function of(array $payload, KnownFiles $knownFiles): self
     {

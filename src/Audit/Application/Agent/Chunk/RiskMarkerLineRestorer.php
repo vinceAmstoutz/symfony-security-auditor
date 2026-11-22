@@ -17,9 +17,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 
 /**
- * Puts back, verbatim, the statement of every line the static pre-scanner
- * flagged: the line itself and, when it leaves a call open, the lines up to
- * the closing parenthesis. The arguments are what carry the vulnerability.
+ * Puts back verbatim every line the static pre-scanner flagged and, when it
+ * leaves a call open, the lines up to the closing parenthesis.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

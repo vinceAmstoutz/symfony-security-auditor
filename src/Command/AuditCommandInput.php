@@ -25,9 +25,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnava
 use function Symfony\Component\String\u;
 
 /**
- * Symfony Console MapInput reflects class properties and requires public mutable fields
- * with property-level defaults; promoted readonly ctor params are invisible to its reflection.
- * Treated as a context carrier per .claude/rules/php-classes.md.
+ * Not readonly: Console's MapInput needs public mutable properties with
+ * defaults. A context carrier per .claude/rules/php-classes.md.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -87,10 +86,8 @@ final class AuditCommandInput
     private bool $failOnIncompleteFromConfiguration = false;
 
     /**
-     * Fills what the command line left unset from the configuration, so a flag
-     * always wins over its `audit.*` key. An empty `audit.output`, such as an
-     * `%env()%` an `.env` file leaves blank, prints the report, as an unset
-     * one does.
+     * Fills each flag the command line left unset from its `audit.*` key. An
+     * empty `audit.output` prints the report, as an unset one does.
      */
     public function applyDefaults(AuditCommandDefaults $auditCommandDefaults): void
     {
@@ -107,8 +104,8 @@ final class AuditCommandInput
     }
 
     /**
-     * What decides whether an incomplete run fails: the flag, or (when the
-     * command line left it unset) the configuration key.
+     * Names what decides whether an incomplete run fails: the flag, or the
+     * configuration key when the command line left the flag unset.
      */
     public function failOnIncompleteSetting(): string
     {
@@ -116,7 +113,7 @@ final class AuditCommandInput
     }
 
     /**
-     * @param ?callable(): (string|false) $cwdResolver defaults to PHP's getcwd; tests inject a stub
+     * @param ?callable(): (string|false) $cwdResolver defaults to getcwd()
      *
      * @throws WorkingDirectoryUnavailableException
      */
@@ -155,11 +152,8 @@ final class AuditCommandInput
     }
 
     /**
-     * `Path::makeRelative()` (used to compute every scanned file's relative
-     * path) never produces a leading `./` in its output, so a `--path ./src`
-     * or bare `--path .` CLI filter could otherwise never match any scanned
-     * real relative path, silently scanning zero files instead of the
-     * intended subdirectory (or, for a bare `.`, the whole project).
+     * Drops the leading `./` segments, which no scanned relative path has. A
+     * bare `.` names the whole project.
      */
     private function stripLeadingCurrentDirSegment(AbstractString $abstractString): AbstractString
     {
@@ -171,10 +165,8 @@ final class AuditCommandInput
     }
 
     /**
-     * `--output` with `--no-output` asks for opposite things and
-     * `--generate-baseline` needs a real audit run while `--dry-run` and
-     * `--show-scanned` exit before the LLM is ever invoked. Combined, one
-     * silently wins over the other with no file written and no diagnostic.
+     * Refuses `--output` with `--no-output` and `--generate-baseline` with
+     * `--dry-run` or `--show-scanned`.
      *
      * @throws ConflictingCommandOptionsException
      */
@@ -198,9 +190,8 @@ final class AuditCommandInput
     }
 
     /**
-     * `--min-score` gates on the normalized score, which only spans 0 to 100: a
-     * value below it gates none. It is honored all the same, as it always was,
-     * so the caller says so instead of refusing it.
+     * Returns a `--min-score` below 0, which is honored and gates no run, else
+     * null.
      */
     public function minScoreBelowRange(): ?int
     {
@@ -208,8 +199,8 @@ final class AuditCommandInput
     }
 
     /**
-     * A value above the normalized score range fails every run and is honored
-     * as such.
+     * Returns a `--min-score` above 100, which is honored and fails every run,
+     * else null.
      */
     public function minScoreAboveRange(): ?int
     {
@@ -217,8 +208,7 @@ final class AuditCommandInput
     }
 
     /**
-     * `--show-scanned` alone lists the files and exits: it writes no report,
-     * so it has no output file to check or create.
+     * Null for `--show-scanned` without `--dry-run`, which writes no report.
      */
     public function reportFile(): ?string
     {

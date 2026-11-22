@@ -16,10 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate;
 use Override;
 
 /**
- * Used whenever refreshing the pricing catalog is not wanted: `privacy.offline_only`
- * is enabled, or the standalone configuration could not be read confidently
- * enough to know either way (self-update must not depend on a fully
- * resolved provider configuration).
+ * Refreshes nothing: used under `privacy.offline_only` or when the standalone
+ * configuration cannot be read.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

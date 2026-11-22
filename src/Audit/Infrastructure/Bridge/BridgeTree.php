@@ -16,12 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\StaleBridgeTreeException;
 
 /**
- * The composer project under the data directory that `init` installs the
- * provider bridges into. The binary registers its autoloader ahead of its own,
- * so the `symfony/ai-platform` it holds replaces the bundled one: a tree built
- * by an older release is read before it is loaded, from the installed-package
- * data Composer writes beside the autoloader and refused when it holds
- * another release.
+ * The Composer project `init` installs the provider bridges into. Its
+ * autoloader is registered ahead of the binary's own, so a tree holding
+ * another `symfony/ai-platform` release than the bundled one is refused
+ * before it is loaded.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -32,7 +30,7 @@ final readonly class BridgeTree
     private const string INSTALLED_PACKAGES_FILE = '%s/vendor/composer/installed.php';
 
     /**
-     * @param ?string $bundledAiPlatformVersion the `symfony/ai-platform` release this binary bundles ({@see BundledAiPlatformVersion}); no tree conflicts with an unknown one
+     * @param ?string $bundledAiPlatformVersion the `symfony/ai-platform` release this binary bundles ({@see BundledAiPlatformVersion}); null accepts every tree
      */
     public function __construct(
         public string $directory,

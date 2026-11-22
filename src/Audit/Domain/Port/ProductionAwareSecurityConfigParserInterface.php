@@ -14,13 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 /**
- * Opt-in extension of {@see SecurityConfigParserInterface} for parsers that
- * know which configuration files the application loads in production. A rule
- * in any other file (a test or development override, a file nothing imports)
- * protects no production route, so its access control and firewalls are
- * not read. Consumers check `instanceof ProductionAwareSecurityConfigParserInterface`
- * and read every configuration file when it is not implemented, so adding
- * this capability never breaks an existing parser.
+ * Optional extension of {@see SecurityConfigParserInterface}, checked with
+ * `instanceof`: tells which configuration files the application loads in
+ * production. The access control and firewalls of any other file are not
+ * read; without it, every configuration file is.
  */
 interface ProductionAwareSecurityConfigParserInterface extends SecurityConfigParserInterface
 {

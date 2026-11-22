@@ -21,9 +21,8 @@ final readonly class LLMResponse
 {
     /**
      * Stop reasons after which the response is not the model's complete
-     * answer: output cut by the token limit, suppressed by a content filter,
-     * a tool loop stopped at its iteration cap, a call that produced no
-     * content at all, or a request the model could not take in.
+     * answer: cut by the token limit, filtered, stopped at the tool-loop cap,
+     * empty or refused as too large.
      */
     private const array DEGRADED_STOP_REASONS = ['length', 'content-filter', 'max_tool_iterations', 'empty_content', self::REQUEST_TOO_LARGE_STOP_REASON];
 
@@ -111,9 +110,8 @@ final readonly class LLMResponse
     }
 
     /**
-     * The same response carrying the model the provider says answered it,
-     * which a gateway or a failover platform may pick on its own. Null when
-     * the provider reports none.
+     * Carries the model the provider says answered, which a gateway or a
+     * failover platform may pick; null when the provider reports none.
      */
     public function withReportedModel(?string $reportedModel): self
     {
@@ -136,9 +134,8 @@ final readonly class LLMResponse
     }
 
     /**
-     * The same response, marked as the answer of a tool-using conversation
-     * that reached its last allowed round: the model may have looked at less
-     * than it wanted to, so an answer that found nothing is no verdict to keep.
+     * Marks the answer of a tool conversation that reached its last allowed
+     * round: if it found nothing, it is no verdict.
      */
     public function withReachedToolCap(): self
     {
@@ -166,9 +163,7 @@ final readonly class LLMResponse
     }
 
     /**
-     * Returns the decoded JSON as an array. Shape varies (list of objects or single object),
-     * so callers narrow with their own `@var` annotation. PHPStan requires a value type here;
-     * `array<array-key, mixed>` is the most truthful expression of "any array".
+     * Returns the decoded JSON: a list of objects or a single object.
      *
      * @return array<array-key, mixed>
      *
@@ -192,9 +187,8 @@ final readonly class LLMResponse
     }
 
     /**
-     * Whether the answer was cut short (see `DEGRADED_STOP_REASONS`), in
-     * which case an empty or partial payload is not the model's verdict and
-     * must never be cached or reported as one.
+     * Whether the answer was cut short (`DEGRADED_STOP_REASONS`): its payload
+     * must never be cached or reported as a verdict.
      */
     public function isDegraded(): bool
     {
@@ -203,10 +197,9 @@ final readonly class LLMResponse
 
     /**
      * Whether the provider refused the request because the prompt alone
-     * exceeds the model's input window. The content carries the refusal. A
-     * batch client answers this per request where a single call throws, so
-     * the caller can split the work; it is degraded too, so no consumer
-     * counts it as a verdict.
+     * exceeds the model's input window; the content carries the refusal. A
+     * batch client answers so per request where a single call throws. Also
+     * degraded.
      */
     public function isRequestTooLarge(): bool
     {

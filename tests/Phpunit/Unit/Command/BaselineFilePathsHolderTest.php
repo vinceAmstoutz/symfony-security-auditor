@@ -97,9 +97,8 @@ final class BaselineFilePathsHolderTest extends TestCase
     }
 
     /**
-     * The paths a walk of the whole baseline names `$file` by, the way the
-     * holder named a file before it indexed the baseline: each path, in the
-     * baseline's order, whose comparable form is one of the file's.
+     * The paths a walk of the whole baseline names `$file` by: each path, in
+     * the baseline's order, whose comparable form is one of the file's.
      *
      * @param list<string> $filePaths
      *

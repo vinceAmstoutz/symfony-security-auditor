@@ -17,11 +17,8 @@ use Closure;
 
 /**
  * Defers moving a verified download over the running binary until the process
- * is about to end. The standalone binary is a PHAR whose classes load lazily,
- * by path, for as long as the process lives; replacing that path mid-run makes
- * every later autoload read the new archive at the old archive's offsets, so
- * PHP aborts with "internal corruption of phar ... actual filesize mismatch"
- * even though the update itself succeeded.
+ * ends: the PHAR loads its classes lazily, so replacing it mid-run corrupts
+ * every later autoload.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

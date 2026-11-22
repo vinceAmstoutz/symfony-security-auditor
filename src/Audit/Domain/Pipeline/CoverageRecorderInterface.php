@@ -16,12 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
- * Append-only coverage tracker. Agents call this to declare which files they
- * examined and what happened. Surfaces silent gaps in the report (a file the
- * attacker never reached, a reviewer error on an otherwise valid finding, …).
+ * Append-only ledger of the files each stage examined and what became of them,
+ * so the report shows silent gaps.
  *
- * Statuses are plain strings to keep the port stable when new outcomes are added.
- * Conventional values:
+ * Statuses are plain strings. Conventional values:
  *   - attacker stage: "analyzed", "cached", "errored"
  *   - reviewer stage: "validated", "rejected", "errored"
  *   - secret_scrubbing stage: "errored" (the scrubber withheld the file's content)
@@ -33,14 +31,9 @@ interface CoverageRecorderInterface
     public function recordCoverage(string $stage, string $filePath, string $status): void;
 
     /**
-     * Records a finding the reviewer has actually reached a verdict for
-     * (validated or rejected), at the moment that verdict is produced,
-     * separately from the reviewer's own return value, which a caller only
-     * receives once every finding in the batch has been processed. If a
-     * later finding in the same call aborts with a budget/provider
-     * exception, that return value never materializes; this side channel
-     * lets the caller recover verdicts already reached before the abort via
-     * {@see drainReviewedFindings()} instead of losing them.
+     * Records a finding as soon as the reviewer reaches a verdict on it, so
+     * {@see drainReviewedFindings()} recovers it when a later finding of the
+     * same call aborts on a budget or provider failure.
      */
     public function recordReviewedFinding(Vulnerability $vulnerability): void;
 
@@ -53,16 +46,10 @@ interface CoverageRecorderInterface
     public function drainReviewedFindings(): array;
 
     /**
-     * Records a raw candidate the attacker has actually found (cache-served or
-     * freshly analyzed), at the moment it's produced, separately from the
-     * attacker's own return value, which a caller only receives once every
-     * chunk/window in the call has been processed. If a later chunk/window in
-     * the same call aborts with a budget/provider exception, that return
-     * value never materializes; this side channel lets the caller recover
-     * candidates already found before the abort via
-     * {@see drainFoundVulnerabilities()} instead of losing them. These are
-     * unreviewed candidates, not confirmed findings: a caller must still run
-     * them through the reviewer before treating them as validated.
+     * Records a candidate as soon as the attacker finds it, so
+     * {@see drainFoundVulnerabilities()} recovers it when a later chunk of the
+     * same call aborts on a budget or provider failure. A candidate is
+     * unreviewed: it still goes through the reviewer.
      */
     public function recordFoundVulnerability(Vulnerability $vulnerability): void;
 

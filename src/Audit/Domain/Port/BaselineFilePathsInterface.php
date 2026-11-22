@@ -14,10 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 /**
- * The paths the run's baseline names a project file by: a baseline written
- * before 1.22 holds a finding under the path the model echoed then
- * (`./src/A.php`, `src\A.php`, `/src/A.php` or an absolute path) and keeps
- * accepting it once the model names the file otherwise.
+ * The paths the run's baseline names a project file by (`./src/A.php`,
+ * `src\A.php`, `/src/A.php` or an absolute path), so an entry keeps accepting
+ * a finding the model names by another spelling.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

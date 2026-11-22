@@ -16,8 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 
 /**
- * Sums the estimated input tokens of a set of prompts for the configured
- * model, used to pre-acquire rate-limit budget before each invocation.
+ * Sums the estimated input tokens of prompts for the configured model.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

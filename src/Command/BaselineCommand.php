@@ -88,11 +88,8 @@ final readonly class BaselineCommand
     }
 
     /**
-     * Finding titles and file paths originate in the audited project and the
-     * LLM's output; the baseline path is echoed back verbatim. Exactly
-     * as the trend presenter does, each value is collapsed to a single line
-     * and stripped of control/ANSI/bidi characters so a crafted value cannot
-     * spoof the terminal.
+     * Collapses untrusted text to one line, stripped of control and bidi
+     * characters.
      */
     private function sanitize(string $value): string
     {
@@ -100,9 +97,7 @@ final readonly class BaselineCommand
     }
 
     /**
-     * A prompt is formatted as console markup, so a `<error>` or `<href=…>`
-     * tag in a finding would restyle or relink what the user reads instead of
-     * showing as text.
+     * Also escapes the console markup a prompt would render.
      */
     private function sanitizedForPrompt(string $value): string
     {

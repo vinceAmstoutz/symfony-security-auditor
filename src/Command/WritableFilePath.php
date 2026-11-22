@@ -17,20 +17,15 @@ use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 
 /**
- * What saving a file at a path needs (checked by the report and baseline
- * writers before an audit spends anything on the file) and the saving itself:
- * `Filesystem::dumpFile()` for a file, a plain write for a character device.
+ * Checks that a file can be saved at a path and saves it: `dumpFile()` for a
+ * file, a plain write for a character device.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class WritableFilePath
 {
     /**
-     * A path ending with a separator names a directory, yet `dirname()` drops
-     * that separator, so every directory check passes and only the write
-     * itself fails, once the audit has run. Both separators count, as they do
-     * for `Symfony\Component\Filesystem\Path`. The bytes are compared as
-     * they are: a path need not be valid UTF-8.
+     * A trailing separator, which `dirname()` drops, names a directory.
      */
     public static function namesADirectory(string $path): bool
     {
@@ -38,13 +33,10 @@ final readonly class WritableFilePath
     }
 
     /**
-     * Once the directories exist (`dumpFile()` would create them anyway),
-     * what remains is what `dumpFile()` needs: a writable directory in every
-     * case (it writes a temporary file beside the target and renames it), plus
-     * a destination that is a writable regular file when it already exists. A
-     * pipe, a socket or a block device is none: the rename would replace it
-     * with a regular file. A character device such as `/dev/null` is written
-     * to directly, so it needs to be writable and its directory does not.
+     * Expects the directories to exist. Needs a writable directory and, for an
+     * existing path, a writable regular file: the rename of `dumpFile()` would
+     * replace a pipe, a socket or a block device. A character device needs
+     * only to be writable.
      */
     public static function canBeWritten(string $path): bool
     {
@@ -61,9 +53,8 @@ final readonly class WritableFilePath
     }
 
     /**
-     * A file is replaced through a temporary file and a rename, which would
-     * turn a character device into a regular file, so a device is appended to
-     * and stays what it is.
+     * Appends to a character device, which the rename of `dumpFile()` would
+     * replace with a regular file.
      *
      * @throws IOException
      */

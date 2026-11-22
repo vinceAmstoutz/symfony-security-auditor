@@ -21,8 +21,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\B
 interface BridgeInstallerInterface
 {
     /**
-     * Installs the bridge of `$provider` together with those of
-     * `$moreProviders`, which a platform may need beside its own.
+     * Installs the bridges a platform needs: its own and those of
+     * `$moreProviders`.
      *
      * @throws BridgeInstallationFailedException
      */

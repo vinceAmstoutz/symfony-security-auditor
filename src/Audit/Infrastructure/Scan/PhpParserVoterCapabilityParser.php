@@ -32,12 +32,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParser
 /**
  * @internal not part of the BC promise, see docs/versioning.md
  *
- * Walks a voter file's AST and approximates its `supports()` vocabulary by
- * collecting every string literal (attribute names) and every `instanceof X`
- * right-hand class name (subject types) inside the method body. The result is
- * heuristic (random string literals inside `supports()` will be reported as
- * attributes), but for the attacker prompt's "Voter Coverage" block it gives
- * the LLM a useful, deterministic summary of who handles what.
+ * Approximates a voter's vocabulary from its AST: every string literal
+ * (attributes) and every `instanceof` class (subjects) its `supports()` and
+ * `voteOnAttribute()` reach. Any string literal there reads as an attribute.
  */
 final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityParserInterface
 {
@@ -95,13 +92,8 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
     }
 
     /**
-     * A voter file may declare helper classes alongside the voter itself
-     * (e.g. a small attribute-constants holder); the voter is whichever class
-     * actually has a `supports()` method, not necessarily the first one. A
-     * voter implementing `VoterInterface` directly (rather than extending the
-     * abstract `Voter` class) has no `supports()` at all: its capability
-     * vocabulary lives inline in `vote()` instead, so that method is tried as
-     * a fallback source for the same string-literal/instanceof heuristics.
+     * The first class with a `supports()` method (a `vote()` method for a
+     * voter implementing `VoterInterface` directly) and that method.
      *
      * @param array<Class_> $classes
      *
@@ -131,12 +123,6 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
     }
 
     /**
-     * The abstract Symfony `Voter` class's canonical style checks only the
-     * subject type in `supports()` and dispatches on the attribute inside
-     * `voteOnAttribute()` instead; that attribute vocabulary would otherwise
-     * be invisible to the string-literal/instanceof heuristics, which only
-     * ever look at whichever method `findVoterClass()` returned.
-     *
      * @param array<string, ClassMethod> $methodsByName
      *
      * @return array<Node>

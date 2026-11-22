@@ -25,14 +25,8 @@ use UnexpectedValueException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 
 /**
- * Installs a `symfony/ai-<slug>-platform` bridge into a writable directory via
- * `composer require`. The provider name is the `symfony/ai` platform *config*
- * key (`openai`, `deepseek`, …); a handful of packages spell that key with
- * hyphens (`symfony/ai-open-ai-platform` for the `openai` platform), so those
- * are mapped to their package slug before the package name is built. An
- * instance-scoped provider (`generic.my_gateway`) names one instance of a
- * platform, not a package of its own, so only the platform part selects the
- * bridge.
+ * Installs `symfony/ai-<slug>-platform` bridges with `composer require`, the
+ * provider being a `symfony/ai` platform config key such as `openai`.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -72,9 +66,9 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     private const string BRIDGE_PACKAGE_PATTERN = '#^symfony/ai-.+-platform$#';
 
     /**
-     * @param Closure(string, ?string, string, string...): Process $processBuilder     the composer-require command builder, given the bridge package, the `symfony/ai-platform` pin, the target directory and any further bridge package to require in the same run (use self::embeddedProcessBuilder() in production); tests inject a stub
-     * @param string                                               $platformPhpVersion the PHP version the bridge tree must resolve for; defaults to the running runtime (`PHP_VERSION`), which for the standalone binary is its own bundled PHP, not the host's
-     * @param ?string                                              $aiPlatformPin      the `symfony/ai-platform` release the bridge tree is held to: the one this binary bundles ({@see BundledAiPlatformVersion}), so a newer release the bridge would otherwise pull in cannot shadow the bundled classes; null writes no pin
+     * @param Closure(string, ?string, string, string...): Process $processBuilder     builds the `composer require` process from the bridge package, the `symfony/ai-platform` pin, the target directory and the further bridge packages; self::embeddedProcessBuilder() in production
+     * @param string                                               $platformPhpVersion the PHP version the bridge tree resolves for: the binary's own, not the host's
+     * @param ?string                                              $aiPlatformPin      the `symfony/ai-platform` release the bridge tree is held to, the bundled one ({@see BundledAiPlatformVersion}); null writes no pin
      */
     public function __construct(
         private Closure $processBuilder,
@@ -84,15 +78,9 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     ) {}
 
     /**
-     * Runs this binary itself as `composer.phar`, on its own PHP, so a host
-     * needs neither PHP nor Composer to install a bridge.
-     *
-     * The pin is named on the command line as well as in the manifest:
-     * composer then moves an already installed `symfony/ai-platform` of
-     * another release to it, where the manifest pin alone would only report
-     * a conflict. `--with-dependencies` lets what those bridges pulled in
-     * move with them (`symfony/ai-open-responses-platform` under the OpenAI
-     * bridge), which composer would otherwise hold at its locked release.
+     * Runs this binary as Composer on its own PHP, so the host needs neither.
+     * An installed `symfony/ai-platform` of another release moves to the pin
+     * with what the bridges pulled in.
      *
      * @return Closure(string, ?string, string, string...): Process
      */
@@ -127,12 +115,9 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     }
 
     /**
-     * Every bridge goes into one `composer require`, so a platform that also
-     * needs another's bridge resolves the tree once rather than twice. So
-     * does every bridge the manifest already requires, a second one fetched
-     * by hand to switch providers included: left out, it stays locked to the
-     * `symfony/ai-platform` release it was resolved with and the pin cannot
-     * move.
+     * Requires every bridge in one `composer require`, those the manifest
+     * already requires included, so none stays locked to another
+     * `symfony/ai-platform` release than the pin.
      *
      * @throws BridgeInstallationFailedException
      */
@@ -158,8 +143,8 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     }
 
     /**
-     * The bridge package a provider selects. Only the platform half names a
-     * bridge: an instance is a connection of that platform, not a package.
+     * Returns the bridge package of the provider's platform, whatever instance
+     * it names.
      */
     public static function packageFor(string $provider): string
     {
@@ -218,11 +203,8 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     }
 
     /**
-     * Decoded as objects, not associative arrays, so an empty JSON object such
-     * as `config.allow-plugins: {}` survives the round-trip: `json_decode(...,
-     * true)` turns `{}` into `[]`, which `json_encode` writes back as `[]`;
-     * Composer then rejects the manifest ("Array value found, but an object is
-     * required"), bricking every later `init` on the tree.
+     * Decodes to objects, so an empty JSON object such as
+     * `config.allow-plugins: {}` is written back as one, as Composer requires.
      *
      * @throws BridgeInstallationFailedException
      */
@@ -242,13 +224,9 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     }
 
     /**
-     * Pins `config.platform.php` so `composer require` resolves the bridge for
-     * the runtime that will load it (the standalone binary bundles its own
-     * PHP; resolved against the host's, the tree aborts in the binary's
-     * `vendor/composer/platform_check.php`) and `symfony/ai-platform` to the
-     * release the binary bundles. Both pins are refreshed on every install, so
-     * a manifest written by an older release is corrected rather than kept
-     * forever; every other key is preserved.
+     * Pins `config.platform.php` to the PHP that loads the tree and
+     * `symfony/ai-platform` to the bundled release on every install, keeping
+     * every other key.
      */
     private function pinnedManifest(stdClass $manifest): string
     {
@@ -269,12 +247,8 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
     }
 
     /**
-     * `Filesystem::exists()` follows a symlink, so a *dangling* one at the
-     * manifest path reads as absent (skipping the "already exists" early
-     * return) and `dumpFile()` then transparently writes through it to
-     * wherever it points. Mirrors the guard already applied to the
-     * filesystem attacker/reviewer/advisory caches, the standalone config
-     * writer and the report/baseline writers.
+     * Refuses a symlinked manifest or target directory, a dangling one
+     * included, which `dumpFile()` would write through.
      *
      * @throws BridgeInstallationFailedException
      */

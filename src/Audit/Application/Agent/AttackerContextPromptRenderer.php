@@ -17,12 +17,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
- * @internal not part of the BC promise, see docs/versioning.md
+ * Renders the preambles the attacker prepends to a chunk's user message: the
+ * pre-scan risk markers, the findings the reviewer confirmed or rejected in
+ * earlier iterations and the unverified candidates of a cheaper first pass.
  *
- * Renders the prompt preambles the attacker prepends to a chunk's user
- * message: deterministic pre-scan risk markers, the patterns already confirmed
- * by the reviewer in earlier iterations, the findings it rejected and the
- * unverified candidates a cheaper first-pass model reported.
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class AttackerContextPromptRenderer
 {
@@ -33,9 +32,7 @@ final readonly class AttackerContextPromptRenderer
     private const int MAX_LISTED_LOCATIONS = 100;
 
     /**
-     * Lists the markers of a file's pattern up to a cap and counts the rest:
-     * a file flagged on every line would otherwise get hints several times its
-     * own size, resent with every iteration.
+     * Lists the markers of a file's pattern up to a cap and counts the rest.
      *
      * @param list<RiskMarker> $markers
      */
@@ -156,9 +153,8 @@ final readonly class AttackerContextPromptRenderer
     }
 
     /**
-     * Each type with the locations of its findings, capped at
-     * {@see self::MAX_LISTED_LOCATIONS} findings since every chunk of a
-     * request carries the list.
+     * Lists each type with the locations of at most
+     * {@see self::MAX_LISTED_LOCATIONS} of its findings.
      *
      * @param list<Vulnerability> $findings
      *
@@ -197,10 +193,9 @@ final readonly class AttackerContextPromptRenderer
     }
 
     /**
-     * A candidate title is a first-pass model's free text about untrusted code:
-     * quoted so the deep pass reads it as data rather than as an instruction of
-     * its own, with embedded double quotes folded so none can close the quote
-     * early and capped so a runaway title cannot crowd the prompt.
+     * Quotes a candidate title, a model's free text about untrusted code, so
+     * the deep pass reads it as data: folds its double quotes so none closes
+     * the quote early and caps its length.
      */
     private function delimitTitle(string $title): string
     {
@@ -214,14 +209,9 @@ final readonly class AttackerContextPromptRenderer
     }
 
     /**
-     * Risk-marker descriptions/patterns (e.g. imported SARIF `message.text`)
-     * and file paths are attacker-influenced free text or come from the
-     * audited (untrusted) codebase; an embedded line break could forge a fake
-     * `##`-prefixed section as unguarded prompt text for the next attacker
-     * call, so every such value is collapsed to a single line before it enters
-     * the prompt. `\R` under `/u` covers every Unicode line break (CR, LF,
-     * CRLF, VT, FF, NEL, LS and PS), where a plain `str_replace()` of CR and
-     * LF would let the other five through.
+     * Collapses an untrusted value (a risk-marker text, a file path) to one
+     * line, every Unicode line break included, so it cannot forge a `##`
+     * section of the prompt.
      */
     private function sanitizeLine(string $value): string
     {

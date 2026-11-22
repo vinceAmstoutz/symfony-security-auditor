@@ -237,11 +237,8 @@ final readonly class FileChunker
     }
 
     /**
-     * A base name that starts with the feature name must not match on the
-     * prefix alone: `UsersController` would match feature `User`, though the
-     * prefix stops mid-word instead of at a CamelCase boundary. Requiring the
-     * remainder to be empty or start with an uppercase letter rejects that
-     * false match while still matching `UserController`, `UserRepository`, ….
+     * Requires the feature name to end at a CamelCase boundary:
+     * `UserController` matches `User`, `UsersController` does not.
      */
     private function baseNameStartsAtFeatureBoundary(string $baseName, string $featureName): bool
     {

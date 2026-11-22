@@ -35,10 +35,8 @@ final readonly class StandalonePlatformConfig
     }
 
     /**
-     * Names the credential the run will authenticate with, so output can say
-     * which key was spent without ever printing it. A run told it needs no
-     * credential carries the sentinel instead of a key and has no identity
-     * worth showing.
+     * Names the credential the run authenticates with without disclosing it;
+     * null when the run needs none.
      */
     public function credentialIdentity(): ?CredentialIdentity
     {

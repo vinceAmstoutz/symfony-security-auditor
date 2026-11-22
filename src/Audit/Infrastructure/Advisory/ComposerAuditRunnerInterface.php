@@ -16,9 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
 
 /**
- * Adapter port for invoking `composer audit --format=json --locked` against an
- * arbitrary project path. Split from the database implementation so we can stub
- * the shell-out in unit tests and swap to other audit sources later.
+ * Runs `composer audit --format=json --locked` against a project path.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -26,9 +24,8 @@ interface ComposerAuditRunnerInterface
 {
     /**
      * @throws AdvisorySourceUnavailableException when composer is missing, the
-     *                                            project has no lock file, or
-     *                                            the process otherwise fails to
-     *                                            emit a usable JSON document
+     *                                            project has no lock file or
+     *                                            the process emits no usable JSON
      */
     public function run(string $projectPath): string;
 }

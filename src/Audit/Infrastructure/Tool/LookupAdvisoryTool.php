@@ -20,9 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 
 /**
- * Bridges the security advisory database to the LLM's tool-calling protocol.
- * The LLM passes a Composer package name and an installed version; the database
- * adapter returns matching CVE entries (or an "no advisories found" message).
+ * Returns the advisories of a Composer package at an installed version.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

@@ -25,11 +25,10 @@ use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
 
 /**
- * A platform that runs a coding agent's own CLI on the user's subscription,
- * used as a plain model: the CLI's built-in tools are turned off, so the
- * audited code it reads cannot make it act on the machine. The CLI takes the
- * prompt as one command-line argument, which Linux caps at 128 KiB, so a
- * longer one is refused as too large and the chunk holding it gets split.
+ * Runs a coding agent's CLI on the user's subscription as a plain model, its
+ * built-in tools off, so the audited code cannot make it act on the machine.
+ * Refuses as too large a prompt over the 128 KiB Linux allows one
+ * command-line argument.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

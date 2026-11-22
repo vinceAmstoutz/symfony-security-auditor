@@ -16,29 +16,21 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
 
 /**
- * Opt-in extension of {@see ProjectFileScannerInterface} for scanners that
- * know which files they matched and still left out because they were over the
- * size limit, could not be read or are symbolic links, which a scan never
- * follows. `IngestionStage` checks `instanceof` and
- * lists each in the report's coverage as `skipped` under the `scan` stage:
- * the report shows the file was left out and nothing gates on it, so the
- * report stays complete as it did when such a file was dropped silently. A
- * file left out because its repaired name or content could read as something
- * else (`SkippedFileReason::leavesTheRunIncomplete()`) is listed as
- * `errored` instead, which leaves the report incomplete. A scanner that does
- * not implement it keeps working and reports nothing. Files
- * excluded on purpose (gitignored, hidden, outside the included paths) are
- * not among them.
+ * Optional extension of {@see ProjectFileScannerInterface}, checked with
+ * `instanceof`: also returns the files the scan matched and left out (over the
+ * size limit, unreadable or symlinked), which the report lists as `skipped`
+ * under the `scan` stage without gating on them. A file whose repaired name or
+ * content could read as something else
+ * (`SkippedFileReason::leavesTheRunIncomplete()`) is listed as `errored`
+ * instead, which leaves the report incomplete. Files excluded on purpose
+ * (gitignored, hidden, outside the included paths) are not among them.
  */
 interface SkippedFileReportingProjectFileScannerInterface extends ProjectFileScannerInterface
 {
     /**
      * Its `files` are exactly what {@see ProjectFileScannerInterface::scan()}
-     * returns for the same project, or what
-     * {@see ScopedProjectFileScannerInterface::scanWithin()} returns when
-     * `$scanPaths` is given: project-relative paths that replace the
-     * configured scan surface, as the `--path` values of a run do when that
-     * surface holds nothing under them.
+     * returns, or {@see ScopedProjectFileScannerInterface::scanWithin()} when
+     * `$scanPaths` is given.
      *
      * @param list<string> $scanPaths none scans the configured paths
      */

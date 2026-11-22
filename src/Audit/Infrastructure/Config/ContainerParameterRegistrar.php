@@ -168,9 +168,9 @@ final readonly class ContainerParameterRegistrar
     }
 
     /**
-     * Empty for the `audited` scope, so the keys of a configuration that never
-     * names a scope stay those of earlier releases, while a `scanned` run,
-     * whose tools may read files an `audited` one may not, keys apart.
+     * Empty for the `audited` scope, so a configuration naming no scope keeps
+     * its cache keys; a `scanned` run, whose tools may read more files, keys
+     * apart.
      */
     private function toolsScopeSalt(AuditExecutionConfiguration $auditExecutionConfiguration): string
     {
@@ -206,11 +206,8 @@ final readonly class ContainerParameterRegistrar
     }
 
     /**
-     * Empty (no `|custom-skills-…` segment) when the project defines no custom
-     * skills, so an unconfigured project's attacker cache keys stay
-     * byte-identical to earlier releases; a change to any custom skill's
-     * bucket, priority, or instructions shifts the hash and re-runs the
-     * attacker.
+     * Empty when the project defines no custom skill, so its attacker cache
+     * keys stay the same; any change to a custom skill re-keys them.
      *
      * @throws JsonException
      */
@@ -220,7 +217,6 @@ final readonly class ContainerParameterRegistrar
             return '';
         }
 
-        // Every CustomAttackerSkill public property (name, fileType, instructions, priority) is captured by json_encode, so changing any one re-hashes the salt and re-runs the affected attacker chunks.
         $encoded = json_encode($bundleConfiguration->audit->customSkills, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
 
         return \sprintf('|custom-skills-%s', substr(hash('sha256', $encoded), 0, 16));

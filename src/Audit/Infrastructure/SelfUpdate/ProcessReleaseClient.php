@@ -20,14 +20,8 @@ use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
 
 /**
- * Fetches release metadata and assets with `curl` through Symfony `Process`
- * (the same subprocess-only convention `ComposerBridgeInstaller` uses), so the
- * binary needs no bundled HTTP client. Metadata lookups (`get()`) run behind
- * the after-command update notice, so they are bounded tightly: 20 seconds and
- * 1 MiB, ample for release JSON and a checksum line; only downloads
- * (`download()`) keep a transfer window of 10 minutes and a 256 MiB body cap,
- * sized for a large binary on a slow link. Every request is pinned to HTTPS
- * with TLS 1.2 or newer, redirects included, so a redirect cannot leave HTTPS.
+ * Fetches release metadata and assets with `curl`, pinned to HTTPS with TLS
+ * 1.2 or newer, redirects included.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -50,7 +44,7 @@ final readonly class ProcessReleaseClient implements ReleaseClientInterface
     private const int PROGRESS_INTERVAL_MICROSECONDS = 200_000;
 
     /**
-     * @param Closure(list<string>): Process $processBuilder the curl command builder (use self::defaultProcessBuilder() in production); tests inject a stub
+     * @param Closure(list<string>): Process $processBuilder the curl command builder; self::defaultProcessBuilder() in production
      */
     public function __construct(
         private Closure $processBuilder,

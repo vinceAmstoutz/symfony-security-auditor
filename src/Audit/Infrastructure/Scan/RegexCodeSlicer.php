@@ -20,14 +20,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 /**
  * @internal not part of the BC promise, see docs/versioning.md
  *
- * Replaces every line of a PHP file the collaborators below don't retain with
- * a `// elided` placeholder, preserving total line count:
- * {@see LineRetentionDeciderInterface} decides retention,
- * {@see ParenContinuationTracker} extends it across an open multi-line
- * signature, {@see HeredocLineTracker} retains a heredoc/nowdoc body
- * verbatim and {@see BlockCommentStripper} feeds both trackers comment-free
- * text. Non-PHP files and files under `minLinesBeforeSlicing` pass through
- * unchanged.
+ * Replaces each line of a PHP file it does not retain with a `// elided`
+ * placeholder, keeping the line count. Leaves a non-PHP file, or one shorter
+ * than `minLinesBeforeSlicing`, unchanged.
  */
 final readonly class RegexCodeSlicer implements CodeSlicerInterface
 {

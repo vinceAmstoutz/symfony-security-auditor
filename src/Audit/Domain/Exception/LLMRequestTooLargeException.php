@@ -16,16 +16,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception;
 use Throwable;
 
 /**
- * The provider refused a request because the prompt alone exceeds what the
- * model can take in: the one `LLMProviderException` that does not repeat on
- * every call, since the same model answers a smaller prompt. The chunk
- * analyzers catch it to split the chunk and retry each half instead of
- * aborting the audit; a single file the model cannot fit is recorded as
- * errored and the run goes on.
+ * The prompt alone exceeds what the model can take in. Unlike other
+ * `LLMProviderException`s it does not abort the audit: the chunk is split and
+ * each half retried. A single file that does not fit is recorded as errored.
  *
- * Not final: `RateLimitRequestTooLargeException` (Infrastructure) extends it
- * for a request whose estimated input exceeds the configured rate-limit
- * window, which no amount of waiting fixes either.
+ * Not final: `RateLimitRequestTooLargeException` extends it for a request
+ * larger than the configured rate-limit window.
  */
 class LLMRequestTooLargeException extends LLMProviderException
 {

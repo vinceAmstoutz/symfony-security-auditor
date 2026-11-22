@@ -16,9 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use Uri\Rfc3986\Uri;
 
 /**
- * The scheme, host and port a platform setting would send a request to. A
- * setting without an authority is no endpoint and the userinfo, path and
- * query of one never leave this class, since they may hold a credential.
+ * The scheme, host and port a platform setting sends requests to; a setting
+ * without an authority is none. Never exposes the userinfo, path or query,
+ * which may hold a credential.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -46,8 +46,7 @@ final readonly class PlatformEndpoint
     }
 
     /**
-     * Whether a request to it never leaves this machine's loopback interface:
-     * `localhost`, an address of `127.0.0.0/8` or `::1`.
+     * True for `localhost`, an address of `127.0.0.0/8` or `::1`.
      */
     public function isLoopback(): bool
     {

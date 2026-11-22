@@ -415,9 +415,7 @@ final class SymfonyAiLLMClientBudgetGuardTest extends TestCase
 
     /**
      * A client whose budget is already spent, over a platform scripted with no
-     * answer at all: a call that reaches it fails the test with the fixture's
-     * own "invoked more times than scripted" error instead of the expected
-     * budget abort and its invocation count says so too.
+     * answer, so a call that reaches the platform fails with its own error.
      *
      * @throws InvalidAuditBudgetException
      * @throws InvalidTokenUsageException

@@ -16,12 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 
 /**
- * The `symfony/ai` platforms whose connection block `init` cannot write, mapped
- * to what they need instead. `init` only ever writes an `api_key` plus an
- * optional `base_url`, so a platform that rejects `api_key` or requires a field
- * `init` never asks for ends up with a block the container refuses to compile.
- * Each entry was confirmed by compiling the block `StandaloneConfigFactory`
- * produces for it against `symfony/ai-bundle`'s own definitions.
+ * The `symfony/ai` platforms whose connection block `init` cannot write, since
+ * they reject `api_key` or require a field it never asks for, mapped to what
+ * they need.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

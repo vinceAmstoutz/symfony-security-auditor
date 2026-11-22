@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 /**
- * Where `init` writes the selected platform reaches it: the settings, each
- * optional, a platform's connection block takes beside its API key.
+ * The optional settings `init` writes into a platform's connection block
+ * beside its API key.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

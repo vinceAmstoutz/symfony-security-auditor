@@ -21,12 +21,10 @@ use SplFileInfo;
 use UnexpectedValueException;
 
 /**
- * The recordings of the last release, under `Fixture/<X.Y.Z>/`: one JSON file
- * per scenario (as `tools/Compat/record.php` wrote them) and
- * `environment.json`, where the recorder notes the PHP and package versions
- * it recorded with, the manifest of the recordings (each scenario with the
- * SHA-256 of its recording), the scenarios it could not record and the seal
- * over all of it.
+ * The recordings of the last release under `Fixture/<X.Y.Z>/`: one JSON file
+ * per scenario and `environment.json`, which holds the PHP and package
+ * versions recorded with, the manifest (each scenario with the SHA-256 of its
+ * recording), the scenarios not recorded and the seal over all of it.
  */
 final readonly class Recordings
 {
@@ -62,9 +60,9 @@ final readonly class Recordings
     }
 
     /**
-     * Each recording under the directory with its SHA-256, by scenario name:
-     * the digest is the value of a `sha256` key, never of a key named after
-     * the scenario, so no scanner reads it as a credential of that name.
+     * Returns each recording under the directory with its SHA-256 under a
+     * `sha256` key, never a key named after the scenario that a secret scanner
+     * would read as a credential.
      *
      * @return list<array{scenario: string, sha256: string}>
      */

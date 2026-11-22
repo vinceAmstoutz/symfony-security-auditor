@@ -14,10 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
- * The configuration files the production application loads: those a parser
- * read, in the order the application loads them (the project's apart from
- * those of each monorepo application the run is narrowed to) and those it
- * could not read, each with the reason.
+ * The configuration files the production application loads that a parser
+ * read, in load order and the project's apart from each monorepo
+ * application's, beside those it could not read.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

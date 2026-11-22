@@ -34,17 +34,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Miss
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 
 /**
- * Dispatches every request in a concurrency window via the platform WITHOUT
- * blocking, then resolves them. When the platform's transport is async (the
- * symfony/ai DeferredResult contract), the resolutions overlap on the wire.
- * Any request that fails to dispatch or resolve falls back to the proven
- * sequential complete() path (full retry) so the batch path is never less
- * correct than the per-call path, except for the failures a retry cannot
- * change: an answer with nothing usable in it comes back as the matching
- * degraded response; a request the model or the rate-limit window cannot
- * take in is answered `request_too_large`, so the caller can act on that one
- * request while its siblings keep their answers. A failure that ends the
- * window cancels the requests still in flight and books their spend.
+ * Dispatches every request of a concurrency window before resolving any. A
+ * request that fails to dispatch or resolve falls back to complete(). An
+ * answer with nothing usable in it comes back as the matching degraded
+ * response instead; a request the model or the rate-limit window cannot take
+ * in is answered `request_too_large` while its siblings keep their answers. A
+ * failure that ends the window cancels the requests in flight and books their
+ * spend.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -85,8 +81,8 @@ final readonly class BatchWindowResolver
     }
 
     /**
-     * A request larger than the whole rate-limit window is answered on the
-     * spot instead of taking the window down with it.
+     * Answers a request larger than the whole rate-limit window on the spot,
+     * leaving the others running.
      *
      * @param list<LLMRequest> $window
      *
@@ -131,12 +127,9 @@ final readonly class BatchWindowResolver
     }
 
     /**
-     * Every request of the window was already dispatched (and billed by the
-     * provider), so every response is resolved and its spend recorded before
-     * the budget verdict is given: a window that blows the budget then aborts
-     * with the whole window's spend on the books rather than the first
-     * response's alone. Any other failure ends the window: the requests it
-     * leaves in flight are cancelled and booked.
+     * Checks the budget only once every billed response is resolved and
+     * booked. Any other failure ends the window, cancelling and booking the
+     * requests left in flight.
      *
      * @param list<LLMRequest>              $window
      * @param array<int, DispatchedRequest> $dispatched
@@ -173,9 +166,8 @@ final readonly class BatchWindowResolver
     }
 
     /**
-     * The request whose resolution failed is cancelled but not booked: its
-     * fallback call already recorded what it spent. A request answered before
-     * dispatch took no rate-limit reservation, so there is nothing to release.
+     * Cancels the failed request without booking it, since its fallback call
+     * booked its spend. Skips a request answered before dispatch.
      *
      * @param array<int, DispatchedRequest> $unconsumed
      *
@@ -241,9 +233,8 @@ final readonly class BatchWindowResolver
     }
 
     /**
-     * A retry cannot change an answer with nothing usable in it, or a request
-     * the model cannot take in, so those are answered as they are; any other
-     * failure falls back to a fresh complete() call.
+     * Answers a degraded answer or a request the model cannot take in as it
+     * is; any other failure falls back to complete().
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
@@ -266,9 +257,8 @@ final readonly class BatchWindowResolver
     }
 
     /**
-     * The fresh call that stands in for a request whose dispatch or
-     * resolution failed. That request was an attempt too, so a retry that
-     * runs out counts it, as the concurrent tool-using window does.
+     * Replaces a request whose dispatch or resolution failed; a retry that
+     * runs out counts that failed request as one more attempt.
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException

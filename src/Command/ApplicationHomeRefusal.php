@@ -17,10 +17,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredCredentialVariable;
 
 /**
- * The credential commands keep the configuration, the variable name and the
- * stored key under the directory a relative `SYMFONY_SECURITY_AUDITOR_HOME`
- * refuses, so they give that refusal first instead of reading it as no
- * directory at all.
+ * Prints the refusal of a relative `SYMFONY_SECURITY_AUDITOR_HOME`, which the
+ * credential commands give before reading anything under it.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

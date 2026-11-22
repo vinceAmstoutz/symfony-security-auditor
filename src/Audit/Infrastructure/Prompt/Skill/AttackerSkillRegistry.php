@@ -20,8 +20,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectProfile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerSkillPromptRendererInterface;
 
 /**
- * Collects every {@see AttackerSkillInterface} strategy and emits the blocks
- * for a chunk, ordered by each skill's {@see AttackerSkillInterface::priority()}.
+ * Emits the skill blocks of a chunk, ordered by
+ * {@see AttackerSkillInterface::priority()}.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -57,8 +57,7 @@ final readonly class AttackerSkillRegistry implements AttackerSkillPromptRendere
     }
 
     /**
-     * The blocks for a chunk, keeping only the hunts whose `{requires …}`
-     * tag the audited project satisfies.
+     * Keeps only the hunts whose `{requires …}` tag the project satisfies.
      *
      * @param list<ProjectFileType> $presentTypes
      */
@@ -75,8 +74,8 @@ final readonly class AttackerSkillRegistry implements AttackerSkillPromptRendere
     }
 
     /**
-     * The `{requires …}` tag of every hunt the audited project's prompts
-     * leave out, in skill order.
+     * The `{requires …}` tag of every hunt the project's prompts leave out, in
+     * skill order.
      *
      * @return list<string>
      */

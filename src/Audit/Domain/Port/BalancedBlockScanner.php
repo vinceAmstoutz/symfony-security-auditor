@@ -52,9 +52,8 @@ final readonly class BalancedBlockScanner
     }
 
     /**
-     * True when `$content` starts with an opener and `scanBalancedBlockFrom`
-     * consumes the entire string, meaning the original top-level `json_decode`
-     * call already saw exactly this payload.
+     * True when `$content` is one balanced block from its first character to
+     * its last.
      */
     public static function contentIsSingleBalancedBlock(string $content): bool
     {
@@ -72,11 +71,9 @@ final readonly class BalancedBlockScanner
     }
 
     /**
-     * Delegates to {@see self::advanceStringLiteralState()} only when the
-     * content's quotes are genuinely paired. Otherwise every character is
-     * reported as not consumed, so `openerPositions` tries every `[`/`{`
-     * position directly instead of relying on a toggle a stray unpaired quote
-     * would desync (see {@see self::hasBalancedQuotes()}).
+     * Tracks string literals only when the content's quotes pair up
+     * ({@see self::hasBalancedQuotes()}); otherwise reports every character as
+     * not consumed.
      *
      * @param array{inString: bool, escape: bool} $state
      *
@@ -92,17 +89,8 @@ final readonly class BalancedBlockScanner
     }
 
     /**
-     * An unescaped double-quote toggles "inside a string" on and off as
-     * `openerPositions` scans for genuine `[`/`{` openers,
-     * meant to skip a bracket embedded in a quoted prose phrase (see
-     * `test_it_skips_a_leading_quoted_string_with_escaped_bracket_before_the_real_array`).
-     * That toggle only makes sense when every quote in the content is
-     * genuinely paired; a single unpaired literal quote before the real
-     * JSON (e.g. a measurement like `5"`) would otherwise flip the running
-     * state permanently, hiding every opener after it, including the real
-     * one. Running the same state machine across the whole content and
-     * checking whether it ends still "inside a string" detects that case,
-     * so the scan can fall back to trying every opener directly instead.
+     * Whether the content's unescaped quotes pair up. One stray quote (`5"`)
+     * would otherwise hide every opener after it.
      */
     private static function hasBalancedQuotes(string $content): bool
     {
@@ -125,11 +113,8 @@ final readonly class BalancedBlockScanner
     }
 
     /**
-     * Advances the string-literal scanning state for a single character.
-     *
-     * `consumed` is true when the character belongs to string-literal handling
-     * (an escape, a quote, or any character inside a string) and the caller must
-     * skip its own structural handling for it.
+     * `consumed` is true for an escape, a quote or a character inside a string,
+     * which the caller does not read as structure.
      *
      * @return array{inString: bool, escape: bool, consumed: bool}
      */

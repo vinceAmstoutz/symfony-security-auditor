@@ -21,20 +21,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception
 use function Symfony\Component\String\b;
 
 /**
- * Runs the decorated `composer audit` outside the audited project. Composer
- * reads the `composer.json` of the directory it runs in and the project's
- * `repositories` decide where it fetches advisories from: a repository under
- * audit could point it at a feed of its own that reports nothing, or at an
- * internal address of the audit host. The decorated runner is therefore given
- * a private temporary directory holding a copy of the project's `composer.lock`
- * (the only file `audit --locked` reads of the project) and an empty
- * `composer.json`, removed once the audit is done. The user's own Composer
- * configuration (`COMPOSER_HOME`) still applies.
+ * Runs the decorated `composer audit` in a private temporary directory holding
+ * a copy of the project's `composer.lock` and an empty `composer.json`, so the
+ * audited project's `repositories` cannot choose the advisory feed. The user's
+ * `COMPOSER_HOME` still applies.
  *
- * A lockfile that is missing, a symlink that does not lead to a regular file
- * inside the project (`LockfileSymlinkResolver`) or larger than
- * `MAX_LOCKFILE_BYTES` is refused before it is read: the project is untrusted
- * and a `composer.lock` symlinked to `/dev/zero` must not be copied.
+ * Refuses a missing lockfile, one larger than `MAX_LOCKFILE_BYTES` and a
+ * symlink that does not lead to a regular file inside the project.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

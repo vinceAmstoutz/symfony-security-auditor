@@ -37,11 +37,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonT
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 
 /**
- * Drives one autonomous tool-using conversation sequentially: invokes the
- * platform with retry, executes requested tools against the registry, feeds
- * results back and returns the model's final textual response. A last round
- * that still asks to read gets one closing request ({@see FinalRound}); one
- * that reads again ends as an empty `max_tool_iterations` response.
+ * Runs one tool conversation until the model answers in text. A last round
+ * that still asks to read gets one closing request; one that reads again ends
+ * as an empty `max_tool_iterations` response.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -116,9 +114,9 @@ final readonly class SequentialToolLoop
     }
 
     /**
-     * Returns the platform's deferred answer, or the response that ends the
-     * conversation instead: the model answered with no content, or the
-     * conversation outgrew the model after tool results were appended.
+     * Returns the platform's answer, or the response that ends the
+     * conversation when the model answered nothing or the tool results
+     * outgrew its input limit.
      *
      * @throws MissingAiPlatformException
      * @throws TransientLLMFailureException
@@ -195,8 +193,8 @@ final readonly class SequentialToolLoop
     }
 
     /**
-     * The conversation after the round's tool calls ran, or the response that
-     * ends it when they were the last round's recording calls.
+     * Returns the conversation after the round's tool calls ran, or the
+     * response that ends it when they were the last round's recording calls.
      *
      * @throws InvalidTokenUsageException
      */
@@ -256,9 +254,8 @@ final readonly class SequentialToolLoop
     }
 
     /**
-     * The initial prompt fit, so it is the tool results appended since that
-     * outgrew the model: splitting the chunk would not change what the model
-     * asks to read. The conversation ends here with what it recorded.
+     * Ends the conversation with what it recorded once the tool results
+     * outgrew the model, which splitting the chunk would not change.
      */
     private function outgrownConversationResponseAndLog(
         LLMRequestTooLargeException $llmRequestTooLargeException,

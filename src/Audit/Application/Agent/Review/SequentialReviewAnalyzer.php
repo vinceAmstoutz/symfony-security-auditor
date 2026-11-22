@@ -25,10 +25,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilder
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 /**
- * Reviews findings one at a time via the JSON response path, optionally with
- * the investigation tool registry. Cache hits short-circuit the LLM. A finding
- * the model cannot review with its whole file in the prompt is recorded as
- * errored and the review goes on with the next one.
+ * Reviews findings one at a time through the JSON answer, optionally with the
+ * investigation tools, serving cache hits without calling the LLM. Records a
+ * finding the model cannot take in with its whole file as errored and goes on
+ * with the next one.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

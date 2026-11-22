@@ -16,17 +16,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 use Symfony\AI\Platform\PlatformOptions;
 
 /**
- * Builds the per-invocation platform options: temperature, plus the
- * Anthropic-dialect output token cap and provider JSON mode that other
- * providers reject. The cap goes to a Claude model only, as symfony/ai's
- * canonical `max_output_tokens` on a platform whose bridge translates it and
- * as `max_tokens` elsewhere: on another model it would also count the
- * reasoning tokens and cut a thinking model's answer short. The JSON mode goes only to a platform that can honour it: the
- * Anthropic and Bedrock bridges turn any `response_format` into a JSON schema
- * for Anthropic's structured outputs, empty for a JSON-object mode, which
- * Anthropic has no equivalent of; Bedrock's Mantle route refuses it
- * outright; a gateway relaying a Claude model through an OpenAI-compatible API
- * passes it on.
+ * Builds the platform options of a call: the temperature and, for a Claude
+ * model only, the output cap and the provider JSON mode. The cap goes as
+ * `max_output_tokens` where the bridge translates it, as `max_tokens`
+ * elsewhere; on another model it would also count the reasoning tokens. The
+ * JSON mode never goes to the Anthropic or Bedrock platform, whose bridges
+ * turn it into an empty JSON schema or refuse it.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

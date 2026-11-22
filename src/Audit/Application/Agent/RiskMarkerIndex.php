@@ -17,11 +17,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 
 /**
- * @internal not part of the BC promise, see docs/versioning.md
+ * Indexes pre-scan risk markers by file path.
  *
- * Indexes pre-scan risk markers by file path and answers the two questions the
- * attacker agent asks of them: which markers belong to a given chunk and which
- * files carry at least one marker (used by lean mode to skip inert files).
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class RiskMarkerIndex
 {
