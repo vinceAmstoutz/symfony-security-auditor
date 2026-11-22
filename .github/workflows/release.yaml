@@ -86,18 +86,14 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
 
-      - name: Skip the build when a pull request only changes require-dev
+      - name: Skip the build when a pull request changes no binary code
         id: plan
         env:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           build=true
-          if [ "$EVENT_NAME" = pull_request ]; then
-            changed="$(git diff --name-only HEAD^1 HEAD -- .github/workflows/release.yaml bin box.json composer.json src/Audit/Infrastructure/Bridge src/Audit/Infrastructure/SelfUpdate src/Standalone)"
-            if [ "$changed" = composer.json ] \
-              && [ "$(git show HEAD^1:composer.json | jq -S 'del(."require-dev")')" = "$(git show HEAD:composer.json | jq -S 'del(."require-dev")')" ]; then
-              build=false
-            fi
+          if [ "$EVENT_NAME" = pull_request ] && ! build="$(sh .github/scripts/plan-binary-build.sh HEAD^1 HEAD)"; then
+            build=true
           fi
           echo "build=$build" >> "$GITHUB_OUTPUT"
 
