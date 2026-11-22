@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Runner\Workspace;
  * The standalone binary: its user configuration and the configuration files
  * of the folder it runs in and of the audited project, the flags over them,
  * the guards on what a checkout may set, `init` (fresh and over an existing
- * file), the credential commands, its cache, and its help.
+ * file), the credential commands, its cache and its help.
  */
 final readonly class StandaloneScenarios
 {

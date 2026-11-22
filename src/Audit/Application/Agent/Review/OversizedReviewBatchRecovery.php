@@ -27,10 +27,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
  * several findings is split in two and each half goes back through the
  * analyzer's own batch path (so a half still too large is split again); a
  * single finding the model cannot fit with its file is recorded as errored and
- * the review goes on — the batch counterpart of the attacker's
- * `OversizedChunkRecovery`.
+ * the review goes on (the batch counterpart of the attacker's
+ * `OversizedChunkRecovery`).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class OversizedReviewBatchRecovery
 {

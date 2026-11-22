@@ -18,7 +18,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
  * key of their own (`audit.min_score`, `audit.fail_on_incomplete`,
  * `audit.format`, `audit.output`). A flag always wins over them.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class AuditCommandDefaults
 {

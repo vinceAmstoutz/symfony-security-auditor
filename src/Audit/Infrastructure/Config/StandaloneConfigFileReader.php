@@ -22,10 +22,10 @@ use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 
 /**
- * Reads one standalone configuration file — the user's or the project's —
+ * Reads one standalone configuration file (the user's or the project's)
  * into the array the loader layers and guards. A missing file reads as empty.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class StandaloneConfigFileReader
 {
@@ -106,7 +106,7 @@ final readonly class StandaloneConfigFileReader
     }
 
     /**
-     * Walks the values lazily, nested ones included, and stops at the limit,
+     * Walks the values lazily (nested ones included) and stops at the limit,
      * so counting an expanding tree costs no more than the limit itself.
      *
      * @param array<array-key, mixed> $config

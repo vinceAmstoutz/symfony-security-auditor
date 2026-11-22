@@ -926,7 +926,7 @@ final class ProjectFileScannerTest extends TestCase
     public function test_it_keeps_explicit_file_at_exact_max_size_boundary(): void
     {
         mkdir($this->tmpDir.'/public', 0o777, true);
-        // 2 KB exactly — `str_repeat('a', 2 * 1024)` is 2048 bytes on disk.
+        // 2 KB exactly: `str_repeat('a', 2 * 1024)` is 2048 bytes on disk.
         file_put_contents($this->tmpDir.'/public/index.php', str_repeat('a', 2 * 1024));
 
         $projectFileScanner = new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2);

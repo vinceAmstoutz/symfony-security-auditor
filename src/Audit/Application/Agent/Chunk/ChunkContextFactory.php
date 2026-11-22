@@ -27,11 +27,11 @@ use WeakMap;
 
 /**
  * Assembles the per-chunk system/user prompts (risk markers + cross-iteration
- * preambles), slices each file to its security-relevant lines, and derives
+ * preambles), slices each file to its security-relevant lines and derives
  * cacheability from the cache key {@see ChunkContextKeyDeriver} computes.
  * Shared by the sequential and concurrent chunk analyzers.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ChunkContextFactory
 {
@@ -152,7 +152,7 @@ final readonly class ChunkContextFactory
     /**
      * Only the candidates on the chunk's own files are rendered: the deep pass
      * analyzes exactly the files the first pass flagged, so none is lost, the
-     * prompt carries only what the chunk needs, and the cache key stays the
+     * prompt carries only what the chunk needs and the cache key stays the
      * chunk's own instead of changing with every candidate elsewhere.
      *
      * @param list<ProjectFile> $chunk
@@ -203,8 +203,8 @@ final readonly class ChunkContextFactory
      * down to security-relevant lines. The slicer preserves the original line
      * count by replacing elided lines with a `// elided` placeholder, so the
      * line-numbering protocol in the prompt stays accurate against the source.
-     * Any line the static pre-scanner already flagged as a risk marker, and the
-     * rest of the call it leaves open, is restored verbatim afterward by
+     * Any line the static pre-scanner already flagged as a risk marker and the
+     * rest of the call it leaves open are restored verbatim afterward by
      * {@see RiskMarkerLineRestorer}, since the slicer's own keyword list is
      * independently maintained and can miss patterns the pre-scanner catches.
      *

@@ -15,8 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception;
 
 /**
  * A prompt carrying a single file was refused although that file is only a
- * small share of it, so it is the prompt's fixed part — the system prompt and
- * the project mapping — that leaves no room, whether against the model's
+ * small share of it, so it is the prompt's fixed part (the system prompt and
+ * the project mapping) that leaves no room, whether against the model's
  * context window or the configured input-token rate limit. No split can help
  * and every chunk would end the same way, so the audit stops with the reason
  * instead of recording file after file as errored.

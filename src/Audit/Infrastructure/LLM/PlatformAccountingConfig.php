@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageR
 /**
  * The optional token-usage and budget bookkeeping sinks.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PlatformAccountingConfig
 {

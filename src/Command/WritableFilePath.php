@@ -17,18 +17,18 @@ use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 
 /**
- * What saving a file at a path needs, checked by the report and baseline
- * writers before an audit spends anything on the file, and the saving itself:
+ * What saving a file at a path needs (checked by the report and baseline
+ * writers before an audit spends anything on the file) and the saving itself:
  * `Filesystem::dumpFile()` for a file, a plain write for a character device.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class WritableFilePath
 {
     /**
      * A path ending with a separator names a directory, yet `dirname()` drops
      * that separator, so every directory check passes and only the write
-     * itself fails — once the audit has run. Both separators count, as they do
+     * itself fails, once the audit has run. Both separators count, as they do
      * for `Symfony\Component\Filesystem\Path`. The bytes are compared as
      * they are: a path need not be valid UTF-8.
      */
@@ -38,7 +38,7 @@ final readonly class WritableFilePath
     }
 
     /**
-     * Once the directories exist — `dumpFile()` would create them anyway —
+     * Once the directories exist (`dumpFile()` would create them anyway),
      * what remains is what `dumpFile()` needs: a writable directory in every
      * case (it writes a temporary file beside the target and renames it), plus
      * a destination that is a writable regular file when it already exists. A

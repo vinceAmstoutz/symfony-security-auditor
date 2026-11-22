@@ -24,10 +24,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderI
 /**
  * Turns a batch review outcome into the reviewed findings plus their reviewer
  * coverage entries: matches verdicts to findings by id (a finding with no
- * verdict is recorded as errored, never as rejected), and degrades a whole
+ * verdict is recorded as errored, never as rejected) and degrades a whole
  * failed batch to errored.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class BatchVerdictApplier
 {
@@ -109,7 +109,7 @@ final readonly class BatchVerdictApplier
 
     /**
      * A batch of one may come back as a bare review object instead of a
-     * one-element array — treat it as a single-entry list rather than
+     * one-element array: treat it as a single-entry list rather than
      * iterating its scalar values.
      *
      * @param array<int|string, mixed> $rawData
@@ -219,7 +219,7 @@ final readonly class BatchVerdictApplier
     /**
      * Marks every finding in a batch the reviewer never reached because a
      * budget/provider abort unwound the batch loop before a verdict for it
-     * was produced — no logging, no persisted verdict, unlike
+     * was produced: no logging, no persisted verdict, unlike
      * `markBatchErrored()`, whose findings did get a (failed) verdict.
      *
      * @param list<Vulnerability> $batch

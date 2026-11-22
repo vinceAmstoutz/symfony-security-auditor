@@ -21,7 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialI
  * in full: a user who put `file:` in front of the variable that holds the key
  * itself would otherwise read their key back in an error message.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class UnreadableCredentialFileException extends RuntimeException
 {

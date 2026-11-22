@@ -17,7 +17,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Runner\Workspace;
 
 /**
  * Every option of `audit:run` given alone, the nine formats on stdout and
- * written to a file, each exit code, and the gate values around their
+ * written to a file, each exit code and the gate values around their
  * bounds, on the bundle's console.
  */
 final readonly class OptionScenarios

@@ -22,7 +22,7 @@ use function Symfony\Component\String\b;
 
 /**
  * Runs the decorated `composer audit` outside the audited project. Composer
- * reads the `composer.json` of the directory it runs in, and the project's
+ * reads the `composer.json` of the directory it runs in and the project's
  * `repositories` decide where it fetches advisories from: a repository under
  * audit could point it at a feed of its own that reports nothing, or at an
  * internal address of the audit host. The decorated runner is therefore given
@@ -33,10 +33,10 @@ use function Symfony\Component\String\b;
  *
  * A lockfile that is missing, a symlink that does not lead to a regular file
  * inside the project (`LockfileSymlinkResolver`) or larger than
- * `MAX_LOCKFILE_BYTES` is refused before it is read: the project is untrusted,
+ * `MAX_LOCKFILE_BYTES` is refused before it is read: the project is untrusted
  * and a `composer.lock` symlinked to `/dev/zero` must not be copied.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class IsolatedComposerAuditRunner implements ComposerAuditRunnerInterface
 {

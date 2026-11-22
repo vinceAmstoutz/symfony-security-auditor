@@ -19,7 +19,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
  * skipped as a whole, with the reason, because the run did not ask for it and
  * must not fail on it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class AuditedProjectConfig
 {

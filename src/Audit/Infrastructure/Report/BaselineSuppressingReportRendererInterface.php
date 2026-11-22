@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
  * Opt-in extension of {@see ReportRendererInterface} for formats that render
  * baselined findings instead of dropping them, marking each as suppressed.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface BaselineSuppressingReportRendererInterface
 {

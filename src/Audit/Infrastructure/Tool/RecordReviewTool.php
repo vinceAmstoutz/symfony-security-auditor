@@ -29,7 +29,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
  * (missing id, prose, wrapper objects) is structurally impossible and never
  * costs a discarded response.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class RecordReviewTool implements RecordingToolInterface
 {

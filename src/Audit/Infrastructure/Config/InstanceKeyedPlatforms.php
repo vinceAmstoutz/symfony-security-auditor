@@ -22,7 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
  * naming the platform alone describes no service and compiles to nothing the
  * container accepts.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class InstanceKeyedPlatforms
 {

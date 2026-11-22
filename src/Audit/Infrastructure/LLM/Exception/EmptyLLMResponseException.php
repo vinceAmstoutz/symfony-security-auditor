@@ -19,11 +19,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\ProviderMessageR
 
 /**
  * The model answered with nothing usable. `$stopReason` names the outcome the
- * way `LLMResponse` does when a provider reports it as a response instead —
- * `empty_content`, `length` or `content-filter` — so the caller can hand back
+ * way `LLMResponse` does when a provider reports it as a response instead
+ * (`empty_content`, `length` or `content-filter`), so the caller can hand back
  * the same degraded response either way.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class EmptyLLMResponseException extends RuntimeException
 {

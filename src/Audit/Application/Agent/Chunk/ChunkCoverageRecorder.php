@@ -22,7 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\InconclusiveAnaly
 /**
  * Records attacker coverage for every file in a chunk under a single status.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ChunkCoverageRecorder
 {
@@ -38,7 +38,7 @@ final readonly class ChunkCoverageRecorder
 
     /**
      * Records every file in a chunk as errored and, when the recorder keeps
-     * them, why — so the progress output can name the cause.
+     * them, why, so the progress output can name the cause.
      *
      * @param list<ProjectFile> $chunk
      */

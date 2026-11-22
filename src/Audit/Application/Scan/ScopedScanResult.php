@@ -17,10 +17,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileScan;
 
 /**
- * What {@see ScopedScan} found for a run: the scan of the files it audits, and
+ * What {@see ScopedScan} found for a run: the scan of the files it audits and
  * the wider set of files the Symfony mapping is read from.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ScopedScanResult
 {

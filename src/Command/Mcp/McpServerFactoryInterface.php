@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp;
 
 use Mcp\Server\Server;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 interface McpServerFactoryInterface
 {
     public function create(): Server;

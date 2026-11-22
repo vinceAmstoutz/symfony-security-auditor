@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate;
 use Closure;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 interface ReleaseClientInterface
 {
     /**

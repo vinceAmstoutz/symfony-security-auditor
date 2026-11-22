@@ -24,7 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
  * Case-sensitive substring search across the project files scanned by the
  * ingestion stage. Returns up to MAX_MATCHES matches as path:line lines.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class GrepTool implements ToolInterface
 {
@@ -136,7 +136,7 @@ final readonly class GrepTool implements ToolInterface
 
     /**
      * Matches on bytes: a file that is not valid UTF-8 (a Latin-1 comment, an
-     * embedded blob) must not fail the whole search, and its matched line is
+     * embedded blob) must not fail the whole search and its matched line is
      * scrubbed so the tool result stays valid JSON for the provider.
      *
      * @return iterable<string>
@@ -154,9 +154,9 @@ final readonly class GrepTool implements ToolInterface
     }
 
     /**
-     * A single matched line's length is otherwise unbounded — audited-project
+     * A single matched line's length is otherwise unbounded: audited-project
      * content fully controls it (e.g. a long inline base64/SVG blob or config
-     * value), and unlike {@see MAX_MATCHES}, capping the match count alone
+     * value). Unlike {@see MAX_MATCHES}, capping the match count alone
      * does nothing to bound a single oversized line sent to the LLM.
      */
     private function truncateLine(string $line): string

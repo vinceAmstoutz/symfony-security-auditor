@@ -41,7 +41,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
  * mode parses the model's array response, as does a structured turn whose
  * client never offered the tool. Cache hits short-circuit the LLM.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SequentialChunkAnalyzer
 {
@@ -121,8 +121,8 @@ final readonly class SequentialChunkAnalyzer
     }
 
     /**
-     * Marks every chunk from `$fromIndex` onward — the ones the loop never
-     * reached because an earlier chunk aborted the run — under the same
+     * Marks every chunk from `$fromIndex` onward (the ones the loop never
+     * reached because an earlier chunk aborted the run) under the same
      * status, mirroring `ConcurrentChunkAnalyzer::failRemainingWindows()`.
      *
      * @param list<list<ProjectFile>> $chunks
@@ -265,7 +265,7 @@ final readonly class SequentialChunkAnalyzer
     /**
      * Recovers findings the LLM already recorded via `record_vulnerability`
      * tool calls in an earlier round of this chunk's own conversation before
-     * a later round aborted it — otherwise they vanish with the exception
+     * a later round aborted it. Otherwise they vanish with the exception
      * even though `drainFoundVulnerabilities()` exists precisely to let a
      * caller recover candidates found before a mid-run abort.
      */
@@ -276,7 +276,7 @@ final readonly class SequentialChunkAnalyzer
 
     /**
      * A chunk split in two reaches this once per half, as each half is
-     * analyzed — not once for the merged chunk — so the findings of a first
+     * analyzed (not once for the merged chunk), so the findings of a first
      * half are already in the recorder's buffer when an abort ends the second.
      */
     private function recordedFindings(VulnerabilityHydrationResult $vulnerabilityHydrationResult, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult

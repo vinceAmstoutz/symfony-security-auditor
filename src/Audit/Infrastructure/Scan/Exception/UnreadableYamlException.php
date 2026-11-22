@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Excepti
 use RuntimeException;
 use Throwable;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class UnreadableYamlException extends RuntimeException
 {
     public static function tooLarge(int $bytes, int $limit): self

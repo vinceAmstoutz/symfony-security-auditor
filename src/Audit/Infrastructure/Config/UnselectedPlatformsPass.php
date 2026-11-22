@@ -25,7 +25,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
  * The composition root names that interface here, so this class touches no
  * `symfony/ai` type itself.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class UnselectedPlatformsPass implements CompilerPassInterface
 {

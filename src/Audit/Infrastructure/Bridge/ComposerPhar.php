@@ -23,7 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\B
  * or Composer on the host. PHP cannot run a PHAR held inside another, so it
  * is copied out to the bridge tree and checked against its SHA-256 there.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ComposerPhar
 {

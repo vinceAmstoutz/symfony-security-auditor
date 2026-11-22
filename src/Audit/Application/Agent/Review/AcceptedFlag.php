@@ -20,7 +20,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
  * an empty string, a number other than 0 or 1) reads as null: not a verdict.
  * PHP's `(bool)` cast would read every one of those as an acceptance.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class AcceptedFlag
 {

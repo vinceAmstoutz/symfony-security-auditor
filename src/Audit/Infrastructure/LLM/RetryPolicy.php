@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 use Closure;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class RetryPolicy
 {
     public const int DEFAULT_MAX_ATTEMPTS = 3;
@@ -35,15 +35,15 @@ final readonly class RetryPolicy
     public const int DEFAULT_RATE_LIMIT_DELAY_MS = 60_000;
 
     /**
-     * Upper bound applied to any rate-limit delay — exponential backoff or
-     * server-provided `Retry-After` — so a misbehaving provider cannot wedge
+     * Upper bound applied to any rate-limit delay (exponential backoff or
+     * server-provided `Retry-After`), so a misbehaving provider cannot wedge
      * the audit for hours.
      */
     public const int DEFAULT_RATE_LIMIT_MAX_DELAY_MS = 300_000;
 
     /**
      * Upper bound applied to a transient-failure retry delay, mirroring
-     * {@see DEFAULT_RATE_LIMIT_MAX_DELAY_MS} — without it, a high
+     * {@see DEFAULT_RATE_LIMIT_MAX_DELAY_MS}: without it, a high
      * `max_attempts` combined with the default `backoff_multiplier` grows the
      * delay exponentially without limit (e.g. attempt 19 computes to roughly
      * a day), wedging the audit exactly as the rate-limit ceiling above was
@@ -121,9 +121,9 @@ final readonly class RetryPolicy
 
     /**
      * Returns the unclamped, unrounded delay so callers can clamp against
-     * their own ceiling in float space before rounding — clamping after an
+     * their own ceiling in float space before rounding. Clamping after an
      * `(int)` cast is too late: the exponential term can exceed `PHP_INT_MAX`
-     * long before any realistic ceiling, and casting an out-of-range float to
+     * long before any realistic ceiling; casting an out-of-range float to
      * int is undefined (observed as a nonsensical negative value), which
      * `min()` would then wrongly treat as "smaller than the ceiling".
      */

@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 interface DiffPresenterInterface
 {
     public function present(SymfonyStyle $symfonyStyle, ReportDiff $reportDiff, DiffOutputFormat $diffOutputFormat): void;

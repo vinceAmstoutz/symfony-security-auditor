@@ -21,12 +21,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 use function Symfony\Component\String\b;
 
 /**
- * Renders an audit report as GitHub Actions workflow-command annotations — one
- * `::error`/`::warning`/`::notice` line per validated finding — so findings
+ * Renders an audit report as GitHub Actions workflow-command annotations (one
+ * `::error`/`::warning`/`::notice` line per validated finding), so findings
  * appear inline on the PR's "Files changed" view without a separate SARIF
  * upload step.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class GithubAnnotationsReportRenderer implements ReportRendererInterface
 {

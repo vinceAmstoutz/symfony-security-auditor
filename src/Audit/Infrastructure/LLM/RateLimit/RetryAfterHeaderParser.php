@@ -25,7 +25,7 @@ use Throwable;
  * scan over the chained messages when no typed exception is present, covering
  * custom providers that surface the header through a plain `RuntimeException`.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class RetryAfterHeaderParser
 {

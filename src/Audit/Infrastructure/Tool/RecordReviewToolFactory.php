@@ -18,7 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordReviewToo
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewCollector;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class RecordReviewToolFactory implements RecordReviewToolFactoryInterface
 {
     #[Override]

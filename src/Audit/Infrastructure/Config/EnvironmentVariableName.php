@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
  * The shape a name must have for a `%env(NAME)%` placeholder, a shell export
  * and a credential-store entry to all refer to the same variable.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class EnvironmentVariableName
 {

@@ -19,7 +19,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
  * it can close the HTML comment that hides it. The list stops before it
  * would push the comment past what GitHub accepts.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class GithubReviewSuggestions
 {

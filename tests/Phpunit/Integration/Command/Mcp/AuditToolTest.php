@@ -129,7 +129,7 @@ final class AuditToolTest extends TestCase
     /**
      * The MCP tool's own JSON schema documents `path` as "Absolute path to
      * the Symfony project directory to audit" but nothing enforced that
-     * contract — unlike `AuditCommandInput::resolvedProjectPath()`, which
+     * contract, unlike `AuditCommandInput::resolvedProjectPath()`, which
      * resolves a relative CLI argument against a known working directory.
      * An MCP tool call has no equivalent "current directory" concept to fall
      * back to, so a relative `path` is rejected rather than silently

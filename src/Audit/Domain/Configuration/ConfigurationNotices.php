@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
  * Derives the pre-flight notices `audit:run` prints for configuration
  * combinations that silently disable a cost saver.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ConfigurationNotices
 {

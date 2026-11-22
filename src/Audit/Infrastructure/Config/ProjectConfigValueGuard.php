@@ -16,20 +16,20 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 
 /**
- * A project value is echoed back — a model name in the pricing warning, a
- * rejected value in a validation error — and handed to the container, so a
+ * A project value is echoed back (a model name in the pricing warning, a
+ * rejected value in a validation error) and handed to the container, so a
  * value that is not plain text (an escape sequence, a line a CI runner would
- * read as a workflow command, a spoofed line direction) is refused, and so is
+ * read as a workflow command, a spoofed line direction) is refused and so is
  * a value or key the container would resolve (`%env(VAR)%`), which would read
  * the user's environment into a setting the repository chose. A double colon
  * is refused too, since the console wraps a long message wherever it likes
- * and a runner reads a line that starts with one as a workflow command, and a
+ * and a runner reads a line that starts with one as a workflow command. A
  * model name must be a model id alone: request options after `?` and path
  * segments reach the provider as written, so `tool_choice` or `server_tools`
  * would silence or widen the audit on the user's key. No setting a project
  * file may set needs any of them.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ProjectConfigValueGuard
 {
@@ -84,7 +84,7 @@ final readonly class ProjectConfigValueGuard
     }
 
     /**
-     * A list node handed a map keeps its keys, and the container resolves
+     * A list node handed a map keeps its keys and the container resolves
      * keys as it does values; `symfony/config` quotes an unknown key back.
      *
      * @param list<array-key> $parentPath

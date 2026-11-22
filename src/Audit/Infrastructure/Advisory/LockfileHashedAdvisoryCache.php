@@ -31,22 +31,22 @@ use function Symfony\Component\String\u;
  * across audit runs, keyed by a SHA-256 hash of the project's `composer.lock`.
  *
  * Hit: the cached JSON is returned without ever spawning composer, provided
- * the entry is younger than `TTL_SECONDS` — the lockfile hash alone cannot
+ * the entry is younger than `TTL_SECONDS`: the lockfile hash alone cannot
  * detect newly-disclosed advisories against an unchanged dependency set.
  * Miss / stale / no lockfile: delegates to the inner runner, caches the
- * result on success (only when a lockfile exists), and either way returns
+ * result on success (only when a lockfile exists) and either way returns
  * the raw JSON.
  *
- * Cache I/O failures degrade gracefully — they are logged and swallowed so the
+ * Cache I/O failures degrade gracefully: they are logged and swallowed so the
  * audit never aborts because of a stale or unreadable advisory cache entry.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerInterface
 {
     /**
      * Advisory feeds gain new CVEs over time for an unchanged dependency set,
-     * so even a lockfile-hash hit must expire — 24 hours balances staying
+     * so even a lockfile-hash hit must expire. 24 hours balances staying
      * useful within a single working day against missing newly-disclosed
      * advisories for longer than necessary.
      */
@@ -138,9 +138,9 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
     }
 
     /**
-     * `filemtime()` only fails for a path that does not exist, and every
+     * `filemtime()` only fails for a path that does not exist and every
      * caller has already confirmed existence via `Filesystem::exists()`
-     * immediately before calling this — asserted rather than branched on,
+     * immediately before calling this: asserted rather than branched on,
      * since the only way to fail it is a TOCTOU race no test can force.
      */
     private function isExpired(string $path): bool
@@ -171,8 +171,8 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
 
     /**
      * `Filesystem::dumpFile()` transparently writes through a symlink at its
-     * destination, and `Filesystem::mkdir()` treats a symlinked directory as
-     * already existing — a cache path derived entirely from the project's own
+     * destination and `Filesystem::mkdir()` treats a symlinked directory as
+     * already existing: a cache path derived entirely from the project's own
      * `composer.lock` content lets a malicious contributor pre-plant a symlink
      * at the exact path this cache will write to, turning a routine audit run
      * into an arbitrary-file overwrite.

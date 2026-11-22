@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
  * Sends one short request to the configured provider, so `doctor
  * --check-connection` can tell whether the key, model and endpoint work.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface ConnectionCheckInterface
 {

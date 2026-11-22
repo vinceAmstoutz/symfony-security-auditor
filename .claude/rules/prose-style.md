@@ -20,10 +20,10 @@ A hyphen stays fine where it is not punctuation: compound words (`cost-aware`), 
 
 ## Enforcement
 
-CI fails a pull request whose Markdown breaks this rule: the Lint job runs `.github/scripts/check-prose.sh` on every tracked `.md` file, skipping code blocks, inline code and the released sections of `CHANGELOG.md`. Run it before pushing, or `bin/castor lint:docs`:
+CI fails a pull request whose Markdown, PHP comments or PHP docblocks break this rule: the Lint job runs `.github/scripts/check-prose.sh` on every tracked `.md` and `.php` file. It skips code blocks, inline code, PHP code and strings, the released sections of `CHANGELOG.md`, fixture directories (`Fixture/`, `Fixtures/`) and the PHP of `examples/`, whose text is test data. Run it before pushing, or `bin/castor lint:docs`:
 
 ```bash
-git ls-files -z '*.md' | xargs -0 sh .github/scripts/check-prose.sh
+sh .github/scripts/check-prose.sh
 ```
 
-Code comments, commit messages, pull request text and printed strings follow the rule too, but no check enforces it there yet. Rewrite such a sentence when you edit it. Changing a string the tool prints is a behavior change: give it a CHANGELOG entry and accept the difference in the compatibility checks.
+Commit messages, pull request text and printed strings follow the rule too, but no check enforces it there yet. Rewrite such a sentence when you edit it. Changing a string the tool prints is a behavior change: give it a CHANGELOG entry and accept the difference in the compatibility checks.

@@ -18,7 +18,7 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 interface AuditPresenterInterface
 {
     public function header(SymfonyStyle $symfonyStyle, string $projectPath): void;
@@ -38,13 +38,13 @@ interface AuditPresenterInterface
 
     /**
      * Says that a `--min-score` below the 0 the normalized score starts at is
-     * honored as given, and gates no run.
+     * honored as given and gates no run.
      */
     public function minScoreBelowRange(SymfonyStyle $symfonyStyle, int $minScore): void;
 
     /**
      * Says that a `--min-score` above the 100 the normalized score ends at is
-     * honored as given, and fails every run.
+     * honored as given and fails every run.
      */
     public function minScoreAboveRange(SymfonyStyle $symfonyStyle, int $minScore): void;
 
@@ -66,7 +66,7 @@ interface AuditPresenterInterface
     public function scannedFiles(SymfonyStyle $symfonyStyle, array $projectFiles): void;
 
     /**
-     * Says that a scan listed no file, and under which project and `--path`
+     * Says that a scan listed no file and under which project and `--path`
      * values it looked, so a wrong folder or path shows at a glance.
      *
      * @param list<string> $scanPaths
@@ -83,9 +83,9 @@ interface AuditPresenterInterface
     public function result(SymfonyStyle $symfonyStyle, AuditReport $auditReport, int $exitCode, string $failOnIncompleteSetting): void;
 
     /**
-     * Says so when the report could not analyze every file — and nothing
-     * otherwise. `result()` prints it itself; a run that shows no result — its
-     * report went to stdout, or it generated a baseline — calls it directly.
+     * Says so when the report could not analyze every file and says nothing
+     * otherwise. `result()` prints it itself; a run that shows no result (its
+     * report went to stdout, or it generated a baseline) calls it directly.
      *
      * @param string $failOnIncompleteSetting the flag or configuration key that failed an incomplete run, named when it did
      */
@@ -94,7 +94,7 @@ interface AuditPresenterInterface
     public function baselineGenerated(SymfonyStyle $symfonyStyle, string $path, int $fingerprintCount): void;
 
     /**
-     * Says that a run with no verdict left the baseline at `$path` as it was,
+     * Says that a run with no verdict left the baseline at `$path` as it was
      * and why the run has none.
      */
     public function baselineKept(SymfonyStyle $symfonyStyle, string $path, AuditReport $auditReport): void;

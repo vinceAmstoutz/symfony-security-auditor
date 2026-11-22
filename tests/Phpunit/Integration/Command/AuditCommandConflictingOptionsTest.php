@@ -54,7 +54,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\Fixed
 /**
  * `--generate-baseline` needs real findings from a real audit run, but
  * `--dry-run`/`--show-scanned` both exit before the LLM (and therefore the
- * pipeline `FixedFindingPipeline` stands in for here) is ever invoked —
+ * pipeline `FixedFindingPipeline` stands in for here) is ever invoked. This
  * verifies the combination is rejected instead of the baseline file silently
  * never being written.
  */

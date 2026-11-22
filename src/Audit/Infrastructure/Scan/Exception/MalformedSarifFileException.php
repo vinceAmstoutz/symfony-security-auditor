@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Excepti
 use RuntimeException;
 use Throwable;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class MalformedSarifFileException extends RuntimeException
 {
     public static function fromJsonException(string $path, Throwable $throwable): self

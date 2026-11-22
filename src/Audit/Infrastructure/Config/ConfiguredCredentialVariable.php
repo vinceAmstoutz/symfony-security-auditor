@@ -22,7 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
  * instead of asking the user to repeat it. A configuration that is missing,
  * unreadable or not yet written simply has no answer.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ConfiguredCredentialVariable
 {
@@ -32,8 +32,8 @@ final readonly class ConfiguredCredentialVariable
     ) {}
 
     /**
-     * Why the directory the configuration lives under cannot be used — a
-     * relative `SYMFONY_SECURITY_AUDITOR_HOME` — or null when it can.
+     * Why the directory the configuration lives under cannot be used (a
+     * relative `SYMFONY_SECURITY_AUDITOR_HOME`), or null when it can.
      */
     public function applicationHomeRefusal(): ?string
     {
@@ -46,8 +46,8 @@ final readonly class ConfiguredCredentialVariable
     }
 
     /**
-     * The placeholder the configuration reads the key through — the key of the
-     * platform `provider:` selects when several are configured — or null for
+     * The placeholder the configuration reads the key through (the key of the
+     * platform `provider:` selects when several are configured), or null for
      * a literal key, a platform needing none, or no configuration at all.
      */
     public function placeholder(): ?EnvPlaceholder

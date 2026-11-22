@@ -21,7 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadable
  * Tracks how finding counts evolve across a chronological series of JSON
  * audit reports.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface ReportTrendAnalyzerInterface
 {

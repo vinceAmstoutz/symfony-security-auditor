@@ -30,14 +30,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilder
 
 /**
  * Reviews findings one at a time, collecting each verdict through a
- * schema-enforced `record_review` tool call — or reading it from the answer, as
+ * schema-enforced `record_review` tool call, or reading it from the answer, as
  * the JSON path does, when the client never offered the tool. Cache hits
  * short-circuit the LLM.
  *
  * A finding the model cannot review with its whole file in the prompt is
  * recorded as errored and the review goes on with the next one.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class StructuredReviewAnalyzer
 {

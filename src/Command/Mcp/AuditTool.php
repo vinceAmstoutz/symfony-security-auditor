@@ -41,7 +41,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ScanPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 
-/** @internal not part of the BC promise — the MCP tool *name* (`audit`) is public, but the PHP class itself is for internal use only. */
+/** @internal not part of the BC promise: the MCP tool *name* (`audit`) is public, but the PHP class itself is for internal use only. */
 final readonly class AuditTool
 {
     private const string FAILURE_WITH_PARTIAL_REPORT = "%s\n\nPartial report of the run that stopped early:\n%s";
@@ -62,8 +62,8 @@ final readonly class AuditTool
     /**
      * `mcp/sdk` answers a tool that throws anything but its own
      * `ToolCallException` with a bare "Error while executing tool", so every
-     * failure — a relative path, an exhausted budget, a refused credential, a
-     * run with no verdict — is rethrown as one, and its reason reaches the
+     * failure (a relative path, an exhausted budget, a refused credential, a
+     * run with no verdict) is rethrown as one and its reason reaches the
      * client that asked. A run a budget cap or a provider failure stopped
      * keeps the findings it had validated: its reason is followed by the
      * partial report, as `audit:run` still writes it.
@@ -111,9 +111,9 @@ final readonly class AuditTool
     /**
      * Runs the audit as `audit:run` does without options: the configured
      * baseline's reasons reach the reviewer and the findings it accepts skip
-     * the reviewer and leave the report, the muted finding types leave it too,
-     * and a run with no verdict returns no report. A budgeted run on a model
-     * with no published price still runs, as it always did, and the log says
+     * the reviewer and leave the report, the muted finding types leave it too.
+     * A run with no verdict returns no report. A budgeted run on a model
+     * with no published price still runs (as it always did) and the log says
      * the cap cannot be enforced; `audit:run` refuses it under
      * `--no-interaction`.
      *

@@ -288,8 +288,8 @@ final class AttackerSkillRegistryTest extends TestCase
     /**
      * Symfony Messenger's real default serializer (when `serializer` is
      * omitted, the overwhelmingly common case) is native PHP
-     * `serialize()`/`unserialize()` via `messenger.transport.native_php_serializer`
-     * — `messenger.transport.symfony_serializer` is an explicit, safer
+     * `serialize()`/`unserialize()` via `messenger.transport.native_php_serializer`.
+     * `messenger.transport.symfony_serializer` is an explicit, safer
      * opt-in, never the default. Confirmed against
      * `vendor/symfony/framework-bundle/DependencyInjection/FrameworkExtension.php`'s
      * `default_serializer` config node, whose default value is literally
@@ -313,8 +313,8 @@ final class AttackerSkillRegistryTest extends TestCase
 
     /**
      * `Email::subject()` RFC-2047-encodes an embedded newline into the
-     * header body, and `Email::from()`/`addBcc()` either strip control
-     * characters or throw `InvalidArgumentException` for them — verified
+     * header body and `Email::from()`/`addBcc()` either strip control
+     * characters or throw `InvalidArgumentException` for them, verified
      * directly against a real `symfony/mime` `Email` instance. Unconditionally
      * flagging these calls as header injection is a broad false positive for
      * one of the most common real-world Mailer patterns (a dynamic subject
@@ -330,7 +330,7 @@ final class AttackerSkillRegistryTest extends TestCase
     /**
      * EasyAdminBundle's real field/action permission method is `setPermission()`
      * (`Field::new('x')->setPermission('ROLE_ADMIN')`,
-     * `$actions->setPermission(Action::DELETE, 'ROLE_SUPER_ADMIN')`) — confirmed
+     * `$actions->setPermission(Action::DELETE, 'ROLE_SUPER_ADMIN')`), confirmed
      * against the bundle's published security documentation.
      */
     public function test_easyadmin_skill_references_the_real_permission_method(): void

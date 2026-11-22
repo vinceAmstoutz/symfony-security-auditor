@@ -16,9 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 /**
  * The outcome of planning a baseline merge: the existing entries to keep
  * (raw payloads preserved), the report findings not yet covered by any
- * entry, and how many stale entries a prune dropped.
+ * entry and how many stale entries a prune dropped.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class BaselineMergePlan
 {

@@ -20,8 +20,8 @@ use Throwable;
 use UnitEnum;
 
 /**
- * What a Domain object answers through its public accessors — every public,
- * non-static method that takes no argument and does not change the object —
+ * What a Domain object answers through its public accessors (every public,
+ * non-static method that takes no argument and does not change the object),
  * nested a few levels deep. A method that throws is kept as the exception's
  * class and message.
  */

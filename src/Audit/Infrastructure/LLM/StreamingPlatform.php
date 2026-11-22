@@ -20,11 +20,11 @@ use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
 
 /**
- * Asks the platform for a streamed answer, so the connection keeps receiving
- * bytes while the model generates, and hands it back read whole, as a
+ * Asks the platform for a streamed answer (so the connection keeps receiving
+ * bytes while the model generates) and hands it back read whole, as a
  * buffered call would.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class StreamingPlatform implements PlatformInterface
 {
@@ -32,7 +32,7 @@ final readonly class StreamingPlatform implements PlatformInterface
      * The platforms whose bridge cannot be trusted with a streamed answer in
      * symfony/ai 0.15, which keep buffered calls: Vertex AI and Venice add up
      * running usage totals, Cohere and MiniMax report no usage in a stream
-     * (MiniMax no tool calls either), and Bedrock's native routes do not
+     * (MiniMax no tool calls either) and Bedrock's native routes do not
      * stream. A platform the run cannot name keeps buffered calls too.
      */
     private const array BUFFERED_PLATFORMS = ['vertexai', 'venice', 'cohere', 'minimax', 'bedrock'];

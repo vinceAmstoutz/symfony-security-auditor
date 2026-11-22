@@ -26,7 +26,7 @@ use function Symfony\Component\String\b;
  * (`composer.lock -> /dev/zero`, see `LockfileSymlinkResolver`) or larger than
  * `MAX_LOCKFILE_BYTES` is refused before it is read.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class LockfileHasher
 {

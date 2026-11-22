@@ -20,10 +20,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 /**
  * What every chunk of one attacker pass is analyzed against: the request, the
  * indexed risk markers and the investigation tools. Lets a chunk carved out
- * mid-pass — the half of a chunk the model could not fit — be analyzed exactly
+ * mid-pass (the half of a chunk the model could not fit) be analyzed exactly
  * like the chunks the pass started with.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ChunkAnalysisScope
 {

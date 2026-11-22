@@ -194,7 +194,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      * The scan lists the files git tracks although a `.gitignore` pattern
      * matches them only when `scan.include_tracked_ignored` asks for it under
      * `scan.respect_gitignore`; otherwise no such service exists, the scanner
-     * is handed none, and no git process runs.
+     * is handed none and no git process runs.
      */
     private function registerTrackedIgnoredFiles(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
     {
@@ -408,7 +408,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     /**
      * With `scan.import_sarif` configured, the effective pre-scanner is the
      * SARIF importer decorating whichever scanner `audit.static_prescan`
-     * selected — imports work even with the regex pre-scan disabled.
+     * selected: imports work even with the regex pre-scan disabled.
      */
     private function registerStaticPreScanner(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration): void
     {
@@ -473,7 +473,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
 
     /**
      * The cheap attacker must never share cache entries with the primary
-     * attacker: both would otherwise read and write the same keys, and a
+     * attacker: both would otherwise read and write the same keys. A
      * cheap-model "no findings" result cached during an escalation run would
      * later be served to the full-price attacker as its own analysis.
      */

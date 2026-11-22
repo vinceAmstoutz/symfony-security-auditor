@@ -16,11 +16,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate;
 /**
  * The only shape of release tag the updater trusts: `X.Y.Z`, optionally a
  * SemVer pre-release (`X.Y.Z-rc.1`) and optionally a leading `v`. A tag is
- * pasted into download URLs and printed to the terminal, so anything else —
- * a path, a query, a URL, a control character — is refused outright rather
+ * pasted into download URLs and printed to the terminal, so anything else
+ * (a path, a query, a URL, a control character) is refused outright rather
  * than escaped.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ReleaseTag
 {

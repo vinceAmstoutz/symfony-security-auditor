@@ -15,11 +15,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory;
 
 /**
  * Mutable runtime carrier (same pattern as `ProgressReporterHolder`) bridging
- * a container-time default — `kernel.project_dir` — and the project path the
+ * a container-time default (`kernel.project_dir`) and the project path the
  * audit command actually targets, which is only known once its `project-path`
  * argument is resolved.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class AuditedProjectPathHolder
 {

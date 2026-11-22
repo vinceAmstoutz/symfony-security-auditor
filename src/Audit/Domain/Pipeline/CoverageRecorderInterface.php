@@ -26,7 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
  *   - reviewer stage: "validated", "rejected", "errored"
  *   - secret_scrubbing stage: "errored" (the scrubber withheld the file's content)
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface CoverageRecorderInterface
 {
@@ -34,7 +34,7 @@ interface CoverageRecorderInterface
 
     /**
      * Records a finding the reviewer has actually reached a verdict for
-     * (validated or rejected), at the moment that verdict is produced —
+     * (validated or rejected), at the moment that verdict is produced,
      * separately from the reviewer's own return value, which a caller only
      * receives once every finding in the batch has been processed. If a
      * later finding in the same call aborts with a budget/provider
@@ -46,7 +46,7 @@ interface CoverageRecorderInterface
 
     /**
      * Returns every finding recorded via {@see recordReviewedFinding()} since
-     * the last drain, and clears the buffer.
+     * the last drain and clears the buffer.
      *
      * @return list<Vulnerability>
      */
@@ -54,21 +54,21 @@ interface CoverageRecorderInterface
 
     /**
      * Records a raw candidate the attacker has actually found (cache-served or
-     * freshly analyzed), at the moment it's produced — separately from the
+     * freshly analyzed), at the moment it's produced, separately from the
      * attacker's own return value, which a caller only receives once every
      * chunk/window in the call has been processed. If a later chunk/window in
      * the same call aborts with a budget/provider exception, that return
      * value never materializes; this side channel lets the caller recover
      * candidates already found before the abort via
      * {@see drainFoundVulnerabilities()} instead of losing them. These are
-     * unreviewed candidates, not confirmed findings — a caller must still run
+     * unreviewed candidates, not confirmed findings: a caller must still run
      * them through the reviewer before treating them as validated.
      */
     public function recordFoundVulnerability(Vulnerability $vulnerability): void;
 
     /**
      * Returns every candidate recorded via {@see recordFoundVulnerability()}
-     * since the last drain, and clears the buffer.
+     * since the last drain and clears the buffer.
      *
      * @return list<Vulnerability>
      */

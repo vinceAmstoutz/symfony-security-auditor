@@ -24,7 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\Unr
  * import never reaches outside the project and nothing is read from the
  * disk; each import looks among the files of the one folder it names.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class YamlImportResolver
 {

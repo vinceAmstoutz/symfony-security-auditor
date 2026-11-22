@@ -26,7 +26,7 @@ use function Symfony\Component\String\u;
  * sit in the prompt exactly like a built-in skill, but tagged as custom so the
  * LLM (and a human reading the prompt) can tell project rules from shipped ones.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ConfiguredAttackerSkill implements AttackerSkillInterface
 {

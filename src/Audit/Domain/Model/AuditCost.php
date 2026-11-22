@@ -21,7 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCost
  * `primaryModel` is the model used by the attacker (the dominant cost
  * contributor). When the audit ran with a split attacker/reviewer
  * configuration, the optional per-role breakdown lives in `byRole()` and is
- * also surfaced in `toArray()` under `by_role` — useful for dry-run reports
+ * also surfaced in `toArray()` under `by_role`, useful for dry-run reports
  * that want to show "$X for the attacker, $Y for the reviewer" instead of
  * a single bundled total.
  */
@@ -99,7 +99,7 @@ final readonly class AuditCost
     }
 
     /**
-     * `false` when tokens were actually spent but they priced out to zero —
+     * `false` when tokens were actually spent but they priced out to zero:
      * the model has no published rate in the pricing catalog, or is a free
      * local/self-hosted model. Zero tokens (nothing tracked yet) is not
      * treated as a pricing gap.
@@ -107,8 +107,8 @@ final readonly class AuditCost
      * The aggregate total cannot answer this for a split configuration: a
      * priced cloud attacker paired with an unpriced local reviewer still sums
      * to something nonzero. So each breakdown is checked on its own terms
-     * where one exists — the per-model map for a real run, which records the model
-     * of every call, and `byRole()` for the `--dry-run` estimate, which
+     * where one exists: the per-model map for a real run (which records the model
+     * of every call) and `byRole()` for the `--dry-run` estimate, which
      * projects per role. The aggregate is the last resort, correct on its own
      * terms because a single-model run has nothing to disaggregate.
      */
@@ -196,7 +196,7 @@ final readonly class AuditCost
 
     /**
      * `by_role` is cast to `object` so `json_encode()` always renders it as a
-     * JSON object (`{}`), never an array (`[]`) — PHP's array type can't
+     * JSON object (`{}`), never an array (`[]`): PHP's array type can't
      * distinguish "empty map" from "empty list", so an unqualified empty
      * array here would silently flip the field's JSON type between the
      * populated (dry-run) and unpopulated (real-run) cases, breaking any

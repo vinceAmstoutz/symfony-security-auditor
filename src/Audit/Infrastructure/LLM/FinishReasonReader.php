@@ -23,7 +23,7 @@ use function Symfony\Component\String\u;
  * Reads why the provider stopped an answer, warning when the answer it reads
  * may have lost findings.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class FinishReasonReader
 {

@@ -19,7 +19,7 @@ use Override;
  * Reads the models to offer from the catalog the run would price from: the
  * ten newest a platform's own listing prices and lists as calling tools.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ModelsDevPricedModelList implements PricedModelListInterface
 {

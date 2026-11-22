@@ -18,12 +18,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileEx
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 interface BaselineMergerInterface
 {
     /**
      * Plans a merge of a JSON report's findings into a baseline file: which
-     * existing entries stay, which findings are new, and — with `$prune` —
+     * existing entries stay, which findings are new and (with `$prune`)
      * how many stale entries go. Coverage is count-aware: each entry accepts
      * one occurrence, so a finding duplicated beyond its accepted count is
      * new again.

@@ -23,10 +23,10 @@ use function Symfony\Component\String\u;
 
 /**
  * Renders the stakeholder-facing view of a report: risk level, what it means
- * for the business, and the severity / type / hotspot distributions — without
+ * for the business and the severity / type / hotspot distributions, without
  * the per-finding technical detail the `console` format carries.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ExecutiveSummaryReportRenderer implements ReportRendererInterface
 {

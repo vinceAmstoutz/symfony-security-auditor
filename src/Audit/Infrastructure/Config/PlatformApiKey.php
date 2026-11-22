@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
  * Every symfony/ai platform that authenticates spells its credential
  * `api_key`, whichever provider it is, so one lookup serves them all.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PlatformApiKey
 {

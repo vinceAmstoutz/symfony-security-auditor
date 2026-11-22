@@ -70,7 +70,7 @@ enum ProjectFileType: string
      * A `#[AsLiveComponent]`/`#[ApiResource]` class classifies as its own
      * dedicated type (to keep its specialized attacker-skill treatment), but
      * may still declare `#[Route]`/`#[IsGranted]`-guarded actions when it also
-     * extends `AbstractController` — the documented pattern for reusing
+     * extends `AbstractController`, the documented pattern for reusing
      * `denyAccessUnlessGranted()`/`addFlash()`. Those actions still need to
      * reach the access-control/form-binding map, which is exactly what
      * {@see SurfaceArchetype::HTTP_ENTRYPOINT} designates.

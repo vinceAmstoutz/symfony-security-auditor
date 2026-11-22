@@ -19,10 +19,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PlatformCa
 
 /**
  * The providers `init` lists to pick from: the platforms the pricing catalog
- * prices that a bare name configures, so a pick always prices the run, and
+ * prices that a bare name configures (so a pick always prices the run) and
  * the coding-agent CLIs that run on the user's subscription.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class InitProviderChoices
 {

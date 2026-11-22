@@ -33,7 +33,7 @@ use PHPUnit\TextUI\Configuration\Configuration;
  * it registers the detector's own measurement (the `Test\PreparationStarted`
  * and `Test\Finished` subscribers, which honour per-test
  * `#[Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration]` overrides)
- * to collect tests that exceed the threshold, reads that collector, and fails
+ * to collect tests that exceed the threshold, reads that collector and fails
  * the run when it is non-empty. Both halves derive from the single
  * `maximum-duration` declared on the
  * `Ergebnis\PHPUnit\SlowTestDetector\Extension` bootstrap, so they never drift

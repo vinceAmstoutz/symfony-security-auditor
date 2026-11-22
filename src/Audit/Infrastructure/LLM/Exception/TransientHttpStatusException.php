@@ -18,15 +18,15 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\ProviderMessageRedactor;
 
 /**
- * A request the provider failed with an HTTP status that clears on its own —
- * a request timeout, a request that came too early, a rate limit or a server
- * error — read from the raw answer of a conversion that failed, whatever the
+ * A request the provider failed with an HTTP status that clears on its own
+ * (a request timeout, a request that came too early, a rate limit or a server
+ * error), read from the raw answer of a conversion that failed, whatever the
  * bridge made of the body that came with it. Nothing was served, so it is
  * retried with the usual back-off and booked as nothing. It keeps the
- * bridge's message, and the failure as it reads without the status
+ * bridge's message and the failure as it reads without the status
  * (`$statusFreeFailure`), which decides once the retries are spent.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class TransientHttpStatusException extends RuntimeException
 {

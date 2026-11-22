@@ -17,7 +17,7 @@ use Throwable;
 
 /**
  * The provider refused a request because the prompt alone exceeds what the
- * model can take in — the one `LLMProviderException` that does not repeat on
+ * model can take in: the one `LLMProviderException` that does not repeat on
  * every call, since the same model answers a smaller prompt. The chunk
  * analyzers catch it to split the chunk and retry each half instead of
  * aborting the audit; a single file the model cannot fit is recorded as
@@ -25,7 +25,7 @@ use Throwable;
  *
  * Not final: `RateLimitRequestTooLargeException` (Infrastructure) extends it
  * for a request whose estimated input exceeds the configured rate-limit
- * window — which no amount of waiting fixes either.
+ * window, which no amount of waiting fixes either.
  */
 class LLMRequestTooLargeException extends LLMProviderException
 {

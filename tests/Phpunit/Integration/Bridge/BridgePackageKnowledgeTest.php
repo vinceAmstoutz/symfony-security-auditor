@@ -66,7 +66,7 @@ final class BridgePackageKnowledgeTest extends TestCase
      * The bundle names each bridge with the platform key hyphenated, so
      * `symfony/ai-open-ai-platform` belongs to `openai`. Keying the declared
      * packages that way pairs each platform with its own package, rather than
-     * only asking whether the requested name exists somewhere in the list — a
+     * only asking whether the requested name exists somewhere in the list: a
      * slug pointing at another platform's real bridge would pass that.
      *
      * @return array<string, string>

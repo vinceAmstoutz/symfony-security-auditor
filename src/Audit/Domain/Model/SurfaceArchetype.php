@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
- * The framework-neutral shape of a scanned file — what it *does* in an
+ * The framework-neutral shape of a scanned file: what it *does* in an
  * application, stripped of the vocabulary of any one framework.
  *
  * {@see ProjectFileType} stays the precise, framework-specific taxonomy that
@@ -26,7 +26,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 enum SurfaceArchetype: string
 {
     /**
-     * A route-guarded action surface — deliberately narrow. A file whose
+     * A route-guarded action surface, deliberately narrow. A file whose
      * requests arrive through a transport rather than a route (a webhook
      * consumer, a queue worker) is an {@see self::ASYNC_HANDLER}, because this
      * archetype is what decides which files reach the access-control and
@@ -34,7 +34,7 @@ enum SurfaceArchetype: string
      */
     case HTTP_ENTRYPOINT = 'http_entrypoint';
 
-    /** States who may do what — the decision, not the identity. */
+    /** States who may do what: the decision, not the identity. */
     case AUTHORIZATION_RULE = 'authorization_rule';
 
     /** Establishes or looks up an identity. */
@@ -49,10 +49,10 @@ enum SurfaceArchetype: string
     /** Declares which request fields may be written to what. */
     case INPUT_BINDING = 'input_binding';
 
-    /** Carries out one business operation for its caller — a use case, interactor or command/query handler. */
+    /** Carries out one business operation for its caller: a use case, interactor or command/query handler. */
     case APPLICATION_SERVICE = 'application_service';
 
-    /** Consumes work that arrived out of band — a message, event or schedule. */
+    /** Consumes work that arrived out of band: a message, event or schedule. */
     case ASYNC_HANDLER = 'async_handler';
 
     /** Reacts to a framework lifecycle event. */

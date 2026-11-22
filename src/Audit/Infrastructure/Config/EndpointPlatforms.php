@@ -18,13 +18,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
 /**
  * The `symfony/ai` platforms whose connection node declares an `endpoint`, as
  * listed by `symfony/ai-bundle`'s `config/platform/*.php`. They are the ones
- * `--endpoint` applies to, and they are distinct from the platforms naming the
+ * `--endpoint` applies to; they are distinct from the platforms naming the
  * same thing `base_url`: a platform declares one spelling or the other, never
  * both. The others fall back to a default endpoint and only need one to reach
  * somewhere else; `ollama` has none, so a configuration without it sends the
  * request against no base URI at all.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class EndpointPlatforms
 {

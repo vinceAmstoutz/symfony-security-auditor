@@ -27,7 +27,7 @@ use Symfony\Component\Filesystem\Filesystem;
  * such as the system temp directory would let another local user configure
  * it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class CliAgentPlatformFactory
 {

@@ -78,7 +78,7 @@ final class TokenBucketRateLimiterTest extends TestCase
 
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 10);
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 10);
-        // 2 requests used. Advance partway then acquire again — should sleep until 12:01:00.
+        // 2 requests used. Advance partway then acquire again: should sleep until 12:01:00.
         $mockClock->modify('+30 seconds');
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 10);
 
@@ -108,7 +108,7 @@ final class TokenBucketRateLimiterTest extends TestCase
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 60);
 
         $mockClock->modify('+10 seconds');
-        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 60); // total would be 120 > 100 — sleeps to next minute (50s remain).
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 60); // total would be 120 > 100: sleeps to next minute (50s remain).
 
         self::assertSame([50_000], $sleeper->sleepsMs);
     }
@@ -161,7 +161,7 @@ final class TokenBucketRateLimiterTest extends TestCase
             sleeper: $sleeper,
         );
 
-        // Estimate 60 then learn actual was 30 — frees 30 tokens, next 70 should fit.
+        // Estimate 60 then learn actual was 30: frees 30 tokens, next 70 should fit.
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 60);
         $tokenBucketRateLimiter->record(inputTokens: 30, outputTokens: 0);
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 70);
@@ -349,7 +349,7 @@ final class TokenBucketRateLimiterTest extends TestCase
 
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
         $tokenBucketRateLimiter->record(inputTokens: 0, outputTokens: 80);
-        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0); // 80 < 100 — fits.
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0); // 80 < 100: fits.
 
         self::assertSame([], $sleeper->sleepsMs);
     }
@@ -460,7 +460,7 @@ final class TokenBucketRateLimiterTest extends TestCase
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
 
         // The pause sleep alone (65s) lands the clock in a fresh window, so the
-        // re-evaluated window reset frees the exhausted RPM slot — no second sleep.
+        // re-evaluated window reset frees the exhausted RPM slot: no second sleep.
         self::assertSame([65_000], $sleeper->sleepsMs);
     }
 
@@ -616,7 +616,7 @@ final class TokenBucketRateLimiterTest extends TestCase
             sleeper: $sleeper,
         );
 
-        // Recording zero output must leave outputTokensUsed at 0 — the next
+        // Recording zero output must leave outputTokensUsed at 0: the next
         // acquire must succeed under OTPM=1 without sleeping.
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
         $tokenBucketRateLimiter->record(inputTokens: 0, outputTokens: 0);
@@ -800,7 +800,7 @@ final class TokenBucketRateLimiterTest extends TestCase
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 40);
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 50);
         // Reconciling in dispatch order must credit each record() against
-        // its own estimate (40, then 50) — not the last-seen estimate for
+        // its own estimate (40, then 50), not the last-seen estimate for
         // both, which would overcharge the bucket by the first estimate.
         $tokenBucketRateLimiter->record(inputTokens: 20, outputTokens: 0);
         $tokenBucketRateLimiter->record(inputTokens: 30, outputTokens: 0);
@@ -944,7 +944,7 @@ final class TokenBucketRateLimiterTest extends TestCase
             sleeper: $sleeper,
         );
 
-        // Exact 1ms (1000µs) delta must produce exactly 1ms — verifies the
+        // Exact 1ms (1000µs) delta must produce exactly 1ms: verifies the
         // ceil-equivalent integer math doesn't over-add a millisecond.
         $tokenBucketRateLimiter->pauseUntil(new DateTimeImmutable('2026-01-01T12:00:00.001000+00:00'));
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
@@ -972,7 +972,7 @@ final class TokenBucketRateLimiterTest extends TestCase
             sleeper: $sleeper,
         );
 
-        // 1.001ms (1001µs) delta must round up to exactly 2ms — proves the
+        // 1.001ms (1001µs) delta must round up to exactly 2ms: proves the
         // ceil-equivalent +999 offset captures the leftover microsecond.
         $tokenBucketRateLimiter->pauseUntil(new DateTimeImmutable('2026-01-01T12:00:00.001001+00:00'));
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);

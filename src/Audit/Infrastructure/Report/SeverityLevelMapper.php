@@ -20,7 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
  * renderers: CRITICAL/HIGH map to `error` and MEDIUM to `warning` in both
  * formats; only the low tier's label differs (SARIF `note`, GitHub `notice`).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SeverityLevelMapper
 {

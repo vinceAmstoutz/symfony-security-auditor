@@ -28,7 +28,7 @@ use PHPStan\Rules\RuleErrorBuilder;
  * `sprintf('%s/%s', $dir, $name)` and scatters the format across operators.
  *
  * Only flagged when the chain mixes at least one string literal with at least
- * one non-literal operand — pure `$a.$b` and literal-only concatenations are
+ * one non-literal operand: pure `$a.$b` and literal-only concatenations are
  * left alone, as sprintf would not improve them.
  *
  * @implements Rule<Concat>

@@ -46,7 +46,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnava
     aliases: [self::ALIAS],
     help: AuditCommandHelp::HELP,
 )]
-/** @internal not part of the BC promise — the command *name* (`audit:run`), its `audit` alias, and the CLI surface are public, but the PHP class itself is for internal use only. */
+/** @internal not part of the BC promise: the command *name* (`audit:run`), its `audit` alias and the CLI surface are public, but the PHP class itself is for internal use only. */
 final readonly class AuditCommand
 {
     public const string NAME = 'audit:run';
@@ -313,10 +313,10 @@ final readonly class AuditCommand
 
     /**
      * Baseline fingerprints threaded into the pipeline so accepted findings
-     * skip the reviewer. Empty while (re)generating a baseline — every
+     * skip the reviewer. Empty while (re)generating a baseline: every
      * finding must then be collected, not suppressed. Also empty for SARIF
      * output: a pipeline-skipped finding never reaches the report, so it
-     * could not be rendered as a suppressed result — SARIF trades the
+     * could not be rendered as a suppressed result. SARIF trades the
      * review-skip saving for suppressed results GitHub/GitLab can display.
      * The baseline is read whatever the format, so a malformed entry stops
      * the run before the first model call instead of after the whole audit.
@@ -336,8 +336,8 @@ final readonly class AuditCommand
 
     /**
      * The report is written whatever becomes of the baseline: the audit has
-     * already run and paid for it. A run with no verdict writes no baseline —
-     * its empty result would replace every accepted finding and its reason —
+     * already run and paid for it. A run with no verdict writes no baseline
+     * (its empty result would replace every accepted finding and its reason)
      * and fails.
      *
      * @throws UnsupportedOutputFormatException
@@ -411,7 +411,7 @@ final readonly class AuditCommand
      * A budget abort gets its own dedicated exit code (partial report still
      * emitted, but the run stopped on purpose); every other abort cause
      * shares the generic failure code. A partial report that cannot be saved
-     * is kept on the console by the writer, and the abort still says why it
+     * is kept on the console by the writer and the abort still says why it
      * stopped and keeps its code.
      *
      * @throws UnsupportedOutputFormatException

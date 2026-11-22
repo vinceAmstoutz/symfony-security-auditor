@@ -19,12 +19,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
  * Implementations are responsible for *displaying* progress (CLI write,
  * log line, SSE event, …); the pipeline and orchestrator never inspect
  * the destination, they just emit events. The default implementation
- * (`NullProgressReporter`) discards everything — wire a real reporter
+ * (`NullProgressReporter`) discards everything. Wire a real reporter
  * (e.g. `LoggerProgressReporter`) to surface progress to users.
  *
  * Events are keyed by a short snake_case identifier; the (optional)
  * context array carries event-specific payload (audit id, stage name,
- * iteration number, …). Implementations MUST NOT throw — a reporter
+ * iteration number, …). Implementations MUST NOT throw: a reporter
  * failure must never abort the audit.
  */
 interface ProgressReporterInterface

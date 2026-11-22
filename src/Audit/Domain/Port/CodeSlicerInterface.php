@@ -22,7 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
  * attacker prompt's `line_start` / `line_end` protocol remains accurate.
  *
  * Implementations MUST be pure (no I/O, no clock) and idempotent. They MUST
- * NEVER renumber retained lines — the LLM relies on absolute line numbers to
+ * NEVER renumber retained lines: the LLM relies on absolute line numbers to
  * report findings against the original source.
  */
 interface CodeSlicerInterface

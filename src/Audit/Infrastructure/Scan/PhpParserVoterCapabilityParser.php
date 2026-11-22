@@ -30,13 +30,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  *
  * Walks a voter file's AST and approximates its `supports()` vocabulary by
  * collecting every string literal (attribute names) and every `instanceof X`
  * right-hand class name (subject types) inside the method body. The result is
- * heuristic — random string literals inside `supports()` will be reported as
- * attributes — but for the attacker prompt's "Voter Coverage" block it gives
+ * heuristic (random string literals inside `supports()` will be reported as
+ * attributes), but for the attacker prompt's "Voter Coverage" block it gives
  * the LLM a useful, deterministic summary of who handles what.
  */
 final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityParserInterface
@@ -99,7 +99,7 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
      * (e.g. a small attribute-constants holder); the voter is whichever class
      * actually has a `supports()` method, not necessarily the first one. A
      * voter implementing `VoterInterface` directly (rather than extending the
-     * abstract `Voter` class) has no `supports()` at all — its capability
+     * abstract `Voter` class) has no `supports()` at all: its capability
      * vocabulary lives inline in `vote()` instead, so that method is tried as
      * a fallback source for the same string-literal/instanceof heuristics.
      *
@@ -133,7 +133,7 @@ final readonly class PhpParserVoterCapabilityParser implements VoterCapabilityPa
     /**
      * The abstract Symfony `Voter` class's canonical style checks only the
      * subject type in `supports()` and dispatches on the attribute inside
-     * `voteOnAttribute()` instead — that attribute vocabulary would otherwise
+     * `voteOnAttribute()` instead; that attribute vocabulary would otherwise
      * be invisible to the string-literal/instanceof heuristics, which only
      * ever look at whichever method `findVoterClass()` returned.
      *

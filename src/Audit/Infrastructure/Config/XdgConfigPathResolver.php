@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class XdgConfigPathResolver
 {
@@ -40,7 +40,7 @@ final readonly class XdgConfigPathResolver
      * `SYMFONY_SECURITY_AUDITOR_HOME` is a tool-specific home that outranks the
      * XDG variables and `$HOME`, so a container whose base image hijacks
      * `XDG_CONFIG_HOME` to a root-owned directory (e.g. Caddy/FrankenPHP's
-     * `/config`) can still redirect the config, cache, and bridge dirs to a
+     * `/config`) can still redirect the config, cache and bridge dirs to a
      * writable location. XDG variables win over the OS home; on Windows the
      * base directories fall back to the native `%APPDATA%` (config) and
      * `%LOCALAPPDATA%` (cache/data) locations, with `%USERPROFILE%` as the
@@ -96,7 +96,7 @@ final readonly class XdgConfigPathResolver
     /**
      * The XDG Base Directory Specification requires every one of these
      * variables to hold an absolute path and says implementations "may
-     * consider" a relative value invalid — this treats it as unset (falling
+     * consider" a relative value invalid. This treats it as unset (falling
      * back to `$home`) rather than resolving paths relative to whatever the
      * process's current working directory happens to be, e.g. an audited
      * project directory the standalone binary is invoked from.
@@ -113,7 +113,7 @@ final readonly class XdgConfigPathResolver
 
     /**
      * Why the `SYMFONY_SECURITY_AUDITOR_HOME` override cannot be used, or null
-     * when it can or is not set — for a caller that would otherwise read the
+     * when it can or is not set, for a caller that would otherwise read the
      * refusal as no directory at all.
      */
     public function applicationHomeRefusal(): ?string
@@ -168,7 +168,7 @@ final readonly class XdgConfigPathResolver
     /**
      * `Symfony\Component\Filesystem\Path::isAbsolute()` only recognizes a
      * Windows drive-letter path (`C:\...`/`C:/...`) as absolute when the
-     * *current* runtime's `DIRECTORY_SEPARATOR` is itself `\` — but
+     * *current* runtime's `DIRECTORY_SEPARATOR` is itself `\`, but
      * {@see self::fromEnvironment()} deliberately builds a Windows-shaped
      * instance from a `Windows` `$osFamily` argument regardless of the OS
      * actually running the process (see the Windows-environment test suite),

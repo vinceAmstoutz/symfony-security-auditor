@@ -20,7 +20,7 @@ use Symfony\Component\Filesystem\Path;
  * may run from any folder, so a relative one is read from the folder that
  * holds the config file instead of the working directory.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ProjectConfigPathAnchor
 {

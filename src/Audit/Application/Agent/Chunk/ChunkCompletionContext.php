@@ -20,7 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
  * The context of an `attacker.chunk.completed` progress event: how the chunk
  * ended and, for one that errored, why.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ChunkCompletionContext
 {

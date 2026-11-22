@@ -24,7 +24,7 @@ final class CharacterRatioCounterTest extends TestCase
     }
 
     /**
-     * BPE tokenizers operate on UTF-8 bytes, not characters — a
+     * BPE tokenizers operate on UTF-8 bytes, not characters: a
      * multi-byte-per-character script (CJK, emoji) needs far more than one
      * token per character, but `charsPerToken` ratios are calibrated
      * assuming the byte-length-per-character of the target language stays

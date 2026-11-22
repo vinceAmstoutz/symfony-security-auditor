@@ -21,7 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
  * and the parallel collections (collection sessions, vulnerabilities,
  * contexts) keyed so each pending index resolves to its finding.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ConcurrentReviewBatch
 {
@@ -42,7 +42,7 @@ final readonly class ConcurrentReviewBatch
     ) {}
 
     /**
-     * `null` when caching is bypassed for this run — the caller passes it
+     * `null` when caching is bypassed for this run: the caller passes it
      * straight through to `ReviewOutcomeRecorder::recoverDrainedVerdict()`,
      * which caches a recovered verdict only when given a non-null context.
      */

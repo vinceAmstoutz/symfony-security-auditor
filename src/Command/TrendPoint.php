@@ -15,12 +15,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 /**
  * One report's place in a trend: its total finding count plus how many
- * findings appeared and disappeared since the report before it — and how many
+ * findings appeared and disappeared since the report before it, as well as how many
  * disappeared from files this report could not fully analyze, which says
  * nothing about them. The first report of a trend has no predecessor, so its
  * `newCount`, `fixedCount` and `unverifiedCount` are null.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class TrendPoint
 {

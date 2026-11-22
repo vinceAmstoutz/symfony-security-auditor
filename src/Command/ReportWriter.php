@@ -26,7 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedExce
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class ReportWriter implements ReportWriterInterface
 {
     /** @var array<string, ReportRendererInterface> */
@@ -109,7 +109,7 @@ final readonly class ReportWriter implements ReportWriterInterface
     }
 
     /**
-     * A report reaches the console when no `--output` was given, and also
+     * A report reaches the console when no `--output` was given and also
      * when its file cannot be written: the audit already ran and paid for
      * it, so it goes to the console instead of vanishing with the exception.
      */
@@ -121,11 +121,11 @@ final readonly class ReportWriter implements ReportWriterInterface
 
     /**
      * `Filesystem::dumpFile()` transparently writes through a pre-existing
-     * symlink at its destination — a predictable, documented `--output` path
+     * symlink at its destination: a predictable, documented `--output` path
      * (e.g. `report.sarif`, `gl-sast-report.sarif`) committed as a symlink by
      * a malicious PR would let the audit overwrite an arbitrary file the CI
      * runner can reach. Mirrors the guard already applied to the filesystem
-     * attacker/reviewer/advisory caches and the standalone config writer, and
+     * attacker/reviewer/advisory caches and the standalone config writer; it
      * walks the audited project below its root as well.
      *
      * @throws UnsafeReportWriteException

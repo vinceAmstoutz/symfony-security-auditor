@@ -17,9 +17,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * Asks `init` which provider to configure: first how the model is reached,
- * then the providers that serve it that way — or a provider typed directly.
+ * then the providers that serve it that way, or a provider typed directly.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class InitProviderQuestion
 {

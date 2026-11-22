@@ -26,10 +26,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use function Symfony\Component\String\u;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  *
- * Generates a suggested fix — a minimal unified-diff patch against the
- * vulnerable file — for every accepted finding at or above the configured
+ * Generates a suggested fix (a minimal unified-diff patch against the
+ * vulnerable file) for every accepted finding at or above the configured
  * severity floor (default HIGH). The attacker's `remediation` prose is
  * preserved; the patch is attached via `Vulnerability::withSuggestedFix()`.
  */
@@ -198,7 +198,7 @@ final readonly class FixSynthesizer implements FixSynthesizerInterface
     /**
      * LLM-echoed finding text is interpolated into this prompt's own
      * ```-delimited code-fence and `###`-prefixed section headers; an
-     * unescaped run of backticks would let the finding forge a fake fence,
+     * unescaped run of backticks would let the finding forge a fake fence
      * and an unescaped `#` would let it forge a fake section header as
      * unguarded top-level prompt text.
      */

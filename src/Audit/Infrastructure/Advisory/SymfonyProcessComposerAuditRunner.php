@@ -29,13 +29,13 @@ use function Symfony\Component\String\u;
  * as fatal when stdout is empty (the JSON is the contract).
  *
  * `--no-scripts` and `--no-plugins` are mandatory, not tidiness: composer runs
- * inside the audited project, which is untrusted, and would otherwise dispatch
+ * inside the audited project, which is untrusted and would otherwise dispatch
  * that project's `pre-command-run` script and activate the plugins in its
  * `vendor/`. Either is arbitrary command execution on the audit host. Neither
  * flag changes what `audit --locked` reports, since the advisory check reads
  * `composer.lock`.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditRunnerInterface
 {

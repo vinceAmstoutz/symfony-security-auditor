@@ -21,7 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
  * the configuration names, so a machine the user has set up once no longer
  * needs the key exported into every shell.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface CredentialStoreInterface
 {

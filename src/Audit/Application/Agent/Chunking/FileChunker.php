@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 
 use function Symfony\Component\String\u;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class FileChunker
 {
     private const int DEFAULT_CHUNK_SIZE = 10;

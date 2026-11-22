@@ -24,7 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
  * `AuditReport` collected up to the abort point so the command layer can
  * still render whatever findings were validated before the provider failed.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class AuditAbortedByProviderException extends RuntimeException implements AuditAbortedExceptionInterface
 {

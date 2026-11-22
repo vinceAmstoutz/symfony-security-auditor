@@ -74,8 +74,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingC
  * failure instead of a stop reason: the output-limit cut-off, the content
  * filter. Every call path answers those with the degraded response a stop
  * reason would have produced, without retrying the same prompt, while a
- * malformed tool call — a sampling glitch — is retried. The JSON batch window
- * answers a request the model or the rate-limit window cannot fit on its own,
+ * malformed tool call (a sampling glitch) is retried. The JSON batch window
+ * answers a request the model or the rate-limit window cannot fit on its own
  * and a failure that ends it cancels the requests still in flight.
  */
 final class SymfonyAiLLMClientDegradedOutcomeTest extends TestCase

@@ -22,13 +22,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTex
 
 /**
  * Append-only, line-oriented reporter for non-interactive output (CI logs,
- * pipes, redirected files). Emits one clean line per meaningful event — no
- * carriage returns, no cursor control, no progress bar — so the audit narrates
+ * pipes, redirected files). Emits one clean line per meaningful event (no
+ * carriage returns, no cursor control, no progress bar) so the audit narrates
  * itself in environments where an animated ProgressBar would be noise. Streams
  * findings as the attacker records them, which also keeps the log alive on long
  * runs. The decorated counterpart is `ConsoleProgressReporter`.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PlainProgressReporter implements ProgressReporterInterface
 {

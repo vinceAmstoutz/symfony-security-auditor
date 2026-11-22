@@ -21,7 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFileReason;
  * characters {@see Utf8Normalizer} repairs them into could read two different
  * names as one once repaired, so the scan leaves it out.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class AmbiguousContent
 {

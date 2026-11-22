@@ -33,12 +33,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Excepti
  * embedded credentials (e.g. `postgres://user:pass@host`), credentials in a URL query
  * (`?token=…`), `Authorization` headers of any scheme, the literal arguments of a call
  * that takes a credential (`setCredentials()`, `ldap_bind()`, `new Credentials()`),
- * OpenAI-style `sk-`/`sk-proj-` keys, Slack and Discord webhook URLs, and GitLab, Hugging Face,
+ * OpenAI-style `sk-`/`sk-proj-` keys, Slack and Discord webhook URLs, plus GitLab, Hugging Face,
  * npm, SendGrid and PyPI tokens. Each match is replaced
  * with `***REDACTED:<label>***` so downstream prompt builders can still emit a coherent
  * file context without exposing the secret to the LLM.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInterface
 {
@@ -112,7 +112,7 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
      * an array opening on a variable, a string or a spread (`[$a, $b]`), a
      * negation of any of them, a parenthesised variable or instance
      * (`($a || $b)`, `(new Foo())`), a call nested in a call
-     * (`unserialize(serialize(`), or a call — static or a lower-case function —
+     * (`unserialize(serialize(`), or a call (static or a lower-case function)
      * that ends the statement (`uniqid();`, `mt_rand(1000,`), closes an
      * argument list or an array (`getenv('X')]`) or opens on a string, a
      * variable or another call (`hash_hmac('sha256',`). `$2y$13$…`,
@@ -126,7 +126,7 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
 
     /**
      * A Symfony secrets vault writes its decryption key, a 64-byte sodium key
-     * pair, as `return "…";`, each byte `rawurlencode()` escapes spelled `\xHH`,
+     * pair, as `return "…";`, each byte `rawurlencode()` escapes spelled `\xHH`
      * and recent releases put a `// SYMFONY_DECRYPTION_SECRET=` copy right above: a
      * literal returned under that copy is the key whatever its length.
      */
@@ -190,14 +190,14 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
      * unterminated, backslash-heavy value elsewhere in the file exhaust
      * `pcre.backtrack_limit` and silently skip redaction file-wide. A quoted
      * value runs to `(?!\2)[^\n]` rather than excluding both quote characters,
-     * so a value quoted with one type may hold the other — "don't" inside
-     * double quotes — without the closing-quote backreference stopping there.
+     * so a value quoted with one type may hold the other ("don't" inside
+     * double quotes) without the closing-quote backreference stopping there.
      * A repeated group costs the engine a stack frame per repetition, so the
      * segments of a key are bounded (`{0,8}`, `{1,4}`) and the further words
      * of an unquoted value are one character run: a single line repeating
      * `_a` would otherwise exhaust the JIT stack and withhold the whole file.
      * A private key with no end marker after it ends the search, since no
-     * later key can have one either, and a URL scheme is at most 32
+     * later key can have one either. A URL scheme is at most 32
      * characters, so neither rescans the rest of the file from every header
      * or word boundary.
      *
@@ -342,9 +342,9 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     }
 
     /**
-     * A pattern the PCRE engine refuses to evaluate — a file crafted to exhaust
-     * `pcre.backtrack_limit`, a `/u` custom pattern meeting invalid UTF-8 — leaves
-     * the content only part-scanned, and nothing downstream can tell that apart
+     * A pattern the PCRE engine refuses to evaluate (a file crafted to exhaust
+     * `pcre.backtrack_limit`, a `/u` custom pattern meeting invalid UTF-8) leaves
+     * the content only part-scanned and nothing downstream can tell that apart
      * from a clean scan. Enabling secret scrubbing is a promise that no credential
      * reaches the LLM, so the content is withheld rather than sent unverified.
      */
@@ -368,12 +368,12 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     }
 
     /**
-     * A credential-named key is also a common variable, column or array key,
+     * A credential-named key is also a common variable, column or array key
      * and the code around it is what the audit reads: a request parameter
      * flowing into `$pass`, or a `pass` column concatenated into a query, is a
-     * finding redaction would hide. A value shaped like PHP code — a variable
+     * finding redaction would hide. A value shaped like PHP code (a variable
      * access, a class constant, a call, or a quoted fragment joined to a
-     * variable or a call — is left as written; any other value is redacted,
+     * variable or a call) is left as written; any other value is redacted,
      * a literal holding `(`, `::` or a `$` included. A literal written in
      * exactly one of those shapes is read as code: that is the trade-off for
      * letting the audit see the code.
@@ -393,7 +393,7 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     /**
      * A shell or dotenv assignment is rewritten to `NAME=***REDACTED***`. A PHP
      * constant declaration is no such assignment: it keeps its spacing, its
-     * quotes and its terminator, and a value that is no string literal is code.
+     * quotes and its terminator. A value that is no string literal is code.
      *
      * @param array<int|string, array{0: string, 1: int}> $match
      */
@@ -436,7 +436,7 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
 
     /**
      * Only text is ever redacted, never code: a placeholder written over a constant, a call or a
-     * parameter default would leave a file PHP can no longer parse, and none of those is a literal
+     * parameter default would leave a file PHP can no longer parse and none of those is a literal
      * secret. A value reaching past the text it starts in is cut where that text ends.
      *
      * @param array<int|string, array{0: string, 1: int}> $match
@@ -590,7 +590,7 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     /**
      * Replaces a multi-line match (the PEM key block) with a single placeholder
      * line followed by enough blank lines to keep the file's total line count
-     * unchanged — otherwise every subsequent line number the attacker/reviewer
+     * unchanged; otherwise every subsequent line number the attacker/reviewer
      * reports would be off by the number of lines the key spanned.
      *
      * @param array<int|string, string> $match
@@ -616,7 +616,7 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     /**
      * Detects Symfony parameter references (`%env(FOO)%`, `%kernel.secret%`) and shell-style
      * env expansions (`$FOO`, `${FOO}`). These are configuration indirections, not committed
-     * secrets — redacting them produces a false positive when an LLM sees the placeholder
+     * secrets: redacting them produces a false positive when an LLM sees the placeholder
      * marker and reports an "inline credential" vulnerability for code that follows the
      * recommended Symfony secrets pattern.
      */

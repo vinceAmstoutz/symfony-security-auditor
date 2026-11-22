@@ -18,11 +18,11 @@ use function Symfony\Component\String\u;
 /**
  * A unified-diff patch as a model writes it: the `--- a/` and `+++ b/` header
  * of each file, then its `@@` hunks, with any prose or code fence around them
- * left out, and any byte that is not UTF-8 replaced. A patch that does not read as one — a hunk shorter or longer than
- * its header says, a file it creates or deletes, a header with no hunk — is
+ * left out and any byte that is not UTF-8 replaced. A patch that does not read as one (a hunk shorter or longer than
+ * its header says, a file it creates or deletes, a header with no hunk) is
  * none, as applying any part of it could leave the file half fixed.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class UnifiedDiff
 {
@@ -167,7 +167,7 @@ final readonly class UnifiedDiff
     }
 
     /**
-     * @return array{list<string>, list<string>} the line as the file has it before the patch, and after
+     * @return array{list<string>, list<string>} the line as the file has it before the patch and after
      */
     private static function sidesOf(string $marker, string $text): array
     {

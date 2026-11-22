@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimi
 
 use InvalidArgumentException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class InvalidRateLimiterConfigurationException extends InvalidArgumentException
 {
     public static function forNoEnabledDimension(): self

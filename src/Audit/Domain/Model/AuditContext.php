@@ -128,7 +128,7 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
 
     /**
      * Spends one baseline credit for `$fingerprint`, shared across every
-     * caller and every attacker/reviewer iteration of this run — the budget
+     * caller and every attacker/reviewer iteration of this run. The budget
      * is seeded once from `$acceptedFingerprints` (`array_count_values()`
      * semantics: an accepted fingerprint repeated N times grants N credits)
      * and decrements monotonically, so the same accepted occurrence can never
@@ -183,7 +183,7 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
      * The findings whose baseline credit was spent, each under its own
      * fingerprint beside the baseline fingerprint it spent.
      *
-     * @internal not part of the BC promise — see docs/versioning.md
+     * @internal not part of the BC promise, see docs/versioning.md
      *
      * @return list<SuppressedFinding>
      */
@@ -262,7 +262,7 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
 
     /**
      * The files `MappingStage` builds `SymfonyMapping`/`AccessControlMap`
-     * from — the full scan scope, unlike {@see self::projectFiles()}, which
+     * from: the full scan scope, unlike {@see self::projectFiles()}, which
      * a `--since` diff-mode run narrows to only the changed files. Falls
      * back to {@see self::projectFiles()} when `IngestionStage` never calls
      * {@see self::setMappingFiles()} (a full, non-diff run, or a test that
@@ -277,7 +277,7 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
 
     /**
      * How many files the scan found in the run's scope, before a `--since`
-     * diff narrowed them — what the report calls the files discovered. Falls
+     * diff narrowed them: what the report calls the files discovered. Falls
      * back to the count of {@see self::mappingFiles()} when `IngestionStage`
      * never calls {@see self::setFilesDiscovered()}, since a `--path`-less
      * run maps exactly the files its scan found.
@@ -293,7 +293,7 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     }
 
     /**
-     * The mapping under framework-neutral names — what pipeline stages should
+     * The mapping under framework-neutral names: what pipeline stages should
      * read, so core orchestration never names a Symfony concept.
      */
     public function securityMap(): ?ApplicationSecurityMap
@@ -438,7 +438,7 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     }
 
     /**
-     * Whether the reviewer rejected this finding — reached that verdict, as
+     * Whether the reviewer rejected this finding: reached that verdict, as
      * opposed to a review that failed and reached none.
      */
     public function wasRejectedByReviewer(Vulnerability $vulnerability): bool

@@ -27,7 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
  * window, so the check is silent when offline and never blocks a run more than
  * once a day.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ThrottledUpdateAvailabilityNotifier implements UpdateAvailabilityNotifierInterface
 {

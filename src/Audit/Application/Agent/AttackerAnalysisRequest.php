@@ -18,7 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  *
  * Immutable input bundle for a single attacker analysis pass. Collapses what
  * were five positional parameters into one value object so callers (the
@@ -41,11 +41,11 @@ final readonly class AttackerAnalysisRequest
      *                                               reviewer budget)
      * @param list<Vulnerability> $candidateFindings findings a cheaper first-pass model reported on
      *                                               these files, injected so the LLM confirms,
-     *                                               refines or discards each one — unlike
+     *                                               refines or discards each one. Unlike
      *                                               previousFindings they are unvalidated and
      *                                               must be re-reported when confirmed
      * @param ?list<ProjectFile>  $toolFiles         the files the investigation tools may open when they
-     *                                               are not the files to analyze — every scanned file on a
+     *                                               are not the files to analyze: every scanned file on a
      *                                               run narrowed by `--since`, `--path` or the escalation
      *                                               deep pass, with `audit.tools_scope: scanned`; null
      *                                               means `files`, those of the deep pass included

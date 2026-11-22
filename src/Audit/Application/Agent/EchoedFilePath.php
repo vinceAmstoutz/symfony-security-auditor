@@ -16,13 +16,13 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 use function Symfony\Component\String\b;
 
 /**
- * `Vulnerability::filePath()` is free text echoed back by the LLM — the
+ * `Vulnerability::filePath()` is free text echoed back by the LLM (the
  * `record_vulnerability` schema only constrains it to a non-blank string, with
- * no cross-check against the chunk's real file list — so a model quirk like a
+ * no cross-check against the chunk's real file list), so a model quirk like a
  * leading `./` must not keep a finding from matching its `ProjectFile`
  * ({@see KnownFiles::name()}).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class EchoedFilePath
 {

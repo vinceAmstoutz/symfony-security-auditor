@@ -378,8 +378,8 @@ final class FilesystemAttackerCacheTest extends TestCase
     /**
      * A cache path is derived entirely from a project file's own path/content
      * (attacker-visible), so a malicious contributor can pre-plant a symlink
-     * at the exact path this cache will ever read from — with no `store()`
-     * ever called — turning a routine cached-run into an arbitrary-file read
+     * at the exact path this cache will ever read from (with no `store()`
+     * ever called), turning a routine cached-run into an arbitrary-file read
      * whose content is trusted as a real, previously-computed finding.
      *
      * @throws InvalidProjectFileException

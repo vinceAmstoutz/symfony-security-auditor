@@ -19,12 +19,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
 
 /**
  * The audited repository may tune the run through the config files it ships,
- * so the audit header says which ones were layered in, lowest priority first,
+ * so the audit header says which ones were layered in (lowest priority first)
  * and which one was left out and why: a stricter `fail_on` or another model
  * coming from the checkout rather than from the user's own file would
  * otherwise be silent.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ProjectConfigNotices
 {

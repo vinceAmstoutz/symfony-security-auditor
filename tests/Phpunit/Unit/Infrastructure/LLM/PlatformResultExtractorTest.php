@@ -247,7 +247,7 @@ final class PlatformResultExtractorTest extends TestCase
      * `$tokenUsageRecorder` is optional and defaults to `null`
      * ({@see PlatformAccountingConfig}),
      * so this guard must reject the value itself rather than relying on the
-     * recorder's own validation — every caller depends on it running before
+     * recorder's own validation: every caller depends on it running before
      * the value ever reaches `RateLimiterInterface::record()`, whose
      * mutable window counters have no lower bound of their own.
      *

@@ -19,7 +19,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
  * finding against every entry. Of the entries sharing a fingerprint, only the
  * first one is kept: a finding spends a fingerprint's credit, not one entry.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class HoldingEntries
 {

@@ -20,7 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
  * prefixed with its 1-based number (`NNN | code`) so the model can populate
  * `line_start` / `line_end` without counting.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class NumberedFileContextRenderer
 {
@@ -42,7 +42,7 @@ final readonly class NumberedFileContextRenderer
 
     /**
      * A scanned file's path comes from the audited project's filesystem, not
-     * from us — a POSIX filename may contain `"` or a newline, either of
+     * from us: a POSIX filename may contain `"` or a newline, either of
      * which would otherwise let a crafted filename close this attribute
      * early and forge additional `<file>` blocks in the attacker/reviewer
      * prompt.

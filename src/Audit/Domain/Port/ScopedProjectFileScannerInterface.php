@@ -27,8 +27,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 interface ScopedProjectFileScannerInterface extends ProjectFileScannerInterface
 {
     /**
-     * Scans exactly `$scanPaths` — project-relative directories and files,
-     * never empty — in place of the configured ones, under every other rule
+     * Scans exactly `$scanPaths` (project-relative directories and files,
+     * never empty) in place of the configured ones, under every other rule
      * the scanner applies (file types, size limit, ignored files, symlinks,
      * containment in the project).
      *

@@ -70,7 +70,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingC
  * answer into a result: a tool call the output token limit cut off mid-way
  * through its arguments, a tool call whose arguments the model garbled, an
  * answer the bridge reports as an error. The cut-off is a degraded `length`
- * answer, never retried — every attempt would hit the same cap — and every
+ * answer, never retried (every attempt would hit the same cap). Every
  * attempt that was billed is booked against the budget, the report's token
  * totals and the rate-limit window, at the usage the provider reported when
  * its raw answer carries one.

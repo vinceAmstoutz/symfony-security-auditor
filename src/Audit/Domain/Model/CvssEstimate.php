@@ -17,11 +17,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
  * A heuristic CVSS v4.0 base-metric estimate for a finding.
  *
  * This is an ESTIMATE, not a hand-scored vector: the base score is the
- * representative value of the reviewer-assigned severity's CVSS band, and the
+ * representative value of the reviewer-assigned severity's CVSS band and the
  * exploitability/impact metrics are derived from the vulnerability type's
  * category and that severity. It gives dashboards and Code Scanning a
  * machine-comparable number and a standards-shaped vector without claiming
- * analyst-grade precision — a human triager should refine it before it drives
+ * analyst-grade precision: a human triager should refine it before it drives
  * an SLA.
  */
 final readonly class CvssEstimate
@@ -73,7 +73,7 @@ final readonly class CvssEstimate
 
     /**
      * Representative base score for the severity's CVSS v4.0 qualitative band
-     * (Critical 9.0–10.0, High 7.0–8.9, Medium 4.0–6.9, Low 0.1–3.9, None 0.0).
+     * (Critical 9.0-10.0, High 7.0-8.9, Medium 4.0-6.9, Low 0.1-3.9, None 0.0).
      */
     private static function baseScoreFor(VulnerabilitySeverity $vulnerabilitySeverity): float
     {
@@ -101,8 +101,8 @@ final readonly class CvssEstimate
     }
 
     /**
-     * Access-control, logic, and Symfony-specific flaws typically require an
-     * authenticated session to reach (PR:L); injection, data-exposure, and
+     * Access-control, logic and Symfony-specific flaws typically require an
+     * authenticated session to reach (PR:L); injection, data-exposure and
      * cryptographic weaknesses are commonly reachable unauthenticated (PR:N).
      */
     private static function privilegesRequired(VulnerabilityType $vulnerabilityType): string

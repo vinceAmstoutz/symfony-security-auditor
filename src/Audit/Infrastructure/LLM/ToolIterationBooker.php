@@ -23,10 +23,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 
 /**
  * Books the usage one answered round of a tool-using conversation reported:
- * on the rate-limit window first, then against the budget — checking it right
+ * on the rate-limit window first, then against the budget, checking it right
  * after, since that round may have spent it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ToolIterationBooker
 {

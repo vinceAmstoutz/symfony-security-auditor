@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
  * Reads, from where a project's files sit and what they are, the
  * architecture styles it is laid out in.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ProjectLayoutDetector
 {

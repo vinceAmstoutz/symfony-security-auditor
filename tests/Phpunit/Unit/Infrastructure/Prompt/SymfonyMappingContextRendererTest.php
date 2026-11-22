@@ -270,10 +270,10 @@ final class SymfonyMappingContextRendererTest extends TestCase
 
     /**
      * A voter's `supports()` string-literal attribute is a PHP source value
-     * collected by an AST parser — attacker-controlled, not ours. `sanitizeLine()`
+     * collected by an AST parser: attacker-controlled, not ours. `sanitizeLine()`
      * stripped `\n` but left a bare `\r` untouched, unlike the sibling
      * `NumberedFileContextRenderer::sanitizePathAttribute()` and
-     * `AttackerPromptBuilder::sanitizePathLine()`, which strip both — a bare
+     * `AttackerPromptBuilder::sanitizePathLine()`, which strip both: a bare
      * `\r` can still forge a fake `##`-prefixed section in the rendered
      * attacker/reviewer prompt.
      */

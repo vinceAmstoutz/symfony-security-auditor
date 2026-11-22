@@ -20,7 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 
 use function Symfony\Component\String\u;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class ConsoleReportRenderer implements ReportRendererInterface
 {
     public function __construct(
@@ -155,7 +155,7 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
     /**
      * `title`/`filePath` render on a single template line, unlike
      * `description`/`attackVector`/`proof`/`remediation`, which are
-     * legitimately multi-line and rendered inside their own indented block —
+     * legitimately multi-line and rendered inside their own indented block:
      * an embedded newline here would let a crafted finding forge a fake
      * `[ID] SEVERITY` finding block as unguarded top-level output.
      */

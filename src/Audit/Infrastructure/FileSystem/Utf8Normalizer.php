@@ -16,9 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 /**
  * Writes each byte that is not part of a valid UTF-8 sequence as the Latin-1
  * character of that byte, so two names or identifiers that differ only in
- * such bytes stay different, and a Latin-1 `$café` still parses.
+ * such bytes stay different and a Latin-1 `$café` still parses.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class Utf8Normalizer
 {

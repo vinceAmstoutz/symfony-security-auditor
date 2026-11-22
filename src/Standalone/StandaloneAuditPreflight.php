@@ -21,12 +21,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPreflightInterface;
 
 /**
  * Boots the audit command through the exact same factories `audit` uses at
- * startup — configuration load, container build and compile, command
- * instantiation — so its verdict matches what an actual audit run would hit.
+ * startup (configuration load, container build and compile, command
+ * instantiation), so its verdict matches what an actual audit run would hit.
  * Every failure is reported as a reason string rather than thrown: the caller
- * is a diagnostic, and whatever aborts the boot is precisely its finding.
+ * is a diagnostic and whatever aborts the boot is precisely its finding.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class StandaloneAuditPreflight implements AuditPreflightInterface
 {

@@ -40,7 +40,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
  * the LLM. A batch the model cannot take in whole is split rather than
  * aborting the review.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class BatchReviewAnalyzer
 {
@@ -316,8 +316,8 @@ final readonly class BatchReviewAnalyzer
     }
 
     /**
-     * The verdicts the model recorded through `record_review`, or — when the
-     * client never offered the tool — the ones its answer carries, read as the
+     * The verdicts the model recorded through `record_review`, or (when the
+     * client never offered the tool) the ones its answer carries, read as the
      * JSON path reads them.
      *
      * @param list<Vulnerability>   $batch
@@ -340,8 +340,8 @@ final readonly class BatchReviewAnalyzer
     }
 
     /**
-     * A batch response cut short — by the output token limit, a content
-     * filter, the tool-loop cap or a call that produced no content — never
+     * A batch response cut short (by the output token limit, a content
+     * filter, the tool-loop cap or a call that produced no content) never
      * considered the members it does not name: they are recorded as errored
      * (never as implicitly rejected and cached), while the verdicts it did
      * reach are applied as usual.
@@ -367,7 +367,7 @@ final readonly class BatchReviewAnalyzer
      * A batch member absent from `$rawData` because the conversation was cut
      * off before it was ever considered must not be routed through
      * {@see BatchVerdictApplier::applyBatchReview()}, which warns about a
-     * verdict the model left out — it is marked errored quietly instead, like
+     * verdict the model left out. It is marked errored quietly instead, like
      * a fully-empty drain. `mergeBatchIntoReviewed()` maps this method's return
      * value back to the caller's findings purely by position, so the result
      * is reassembled in `$batch`'s original order rather than concatenating
@@ -414,11 +414,11 @@ final readonly class BatchReviewAnalyzer
     /**
      * Recovers any verdicts the LLM already recorded via `record_review` tool
      * calls in an earlier round of this batch's conversation before a later
-     * round aborted it — otherwise they vanish with the exception even
+     * round aborted it. Otherwise they vanish with the exception even
      * though they were genuinely reached. A batch member with no matching
      * verdict is marked not-reached rather than routed through
      * {@see BatchVerdictApplier::applyBatchReview()}, which would otherwise
-     * warn about its absence as a verdict the model left out — right when the
+     * warn about its absence as a verdict the model left out: right when the
      * model finished the batch, wrong when the conversation was cut off
      * before it was ever considered. Falls back to
      * the existing not-reached handling for the whole batch only when

@@ -15,12 +15,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 /**
  * An instance name reaches the container as the tail of
- * `ai.platform.<platform>.<instance>`, and `ContainerBuilder::setDefinition()`
+ * `ai.platform.<platform>.<instance>` and `ContainerBuilder::setDefinition()`
  * refuses an id holding a NUL, a carriage return, a newline or a quote, or
  * ending in a backslash. Such a name survives YAML untouched, so it is only
  * caught here, before `init` writes a config the next run cannot build.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PlatformServiceId
 {

@@ -15,14 +15,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
 /**
  * What a record call says about the finding it names: the file, type and line
- * its id is derived from, and its title. A field the call leaves out or gives
- * as another kind of value is not stated, and never stands in for one the
+ * its id is derived from and its title. A field the call leaves out or gives
+ * as another kind of value is not stated and never stands in for one the
  * other call states: a call the recording tool refused for lacking a field is
  * repeated only by a call that names its file and either its title or the
  * type and line both calls state, so another finding of its file is never
  * taken for it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class FindingSignature
 {

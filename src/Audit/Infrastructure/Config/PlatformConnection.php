@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
  * Where `init` writes the selected platform reaches it: the settings, each
  * optional, a platform's connection block takes beside its API key.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PlatformConnection
 {

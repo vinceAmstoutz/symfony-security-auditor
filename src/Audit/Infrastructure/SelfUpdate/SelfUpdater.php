@@ -26,19 +26,19 @@ use function Symfony\Component\String\u;
 
 /**
  * The GitHub release tag is compared and reported with any leading `v`/`V`
- * stripped — `version_compare()` ranks a raw `v1.2.3` *below* every plain
+ * stripped (`version_compare()` ranks a raw `v1.2.3` *below* every plain
  * `1.2.3`, which would silently disable update detection if a release were
- * ever tagged with the prefix — while asset URLs keep the tag verbatim, since
+ * ever tagged with the prefix), while asset URLs keep the tag verbatim, since
  * that is the path the release publishes under. A tag outside `ReleaseTag`'s
  * grammar is refused before any URL is built from it.
  *
  * The snapshot channel reads the version from the title of the `snapshot`
- * pre-release, which the Snapshot workflow sets once every asset is attached,
+ * pre-release (which the Snapshot workflow sets once every asset is attached)
  * and installs whenever it differs from the running one. A snapshot binary on
  * the stable channel likewise takes the latest release, older or not, so
  * leaving the snapshot channel takes a plain `self-update`.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SelfUpdater implements SelfUpdaterInterface
 {
@@ -95,7 +95,7 @@ final readonly class SelfUpdater implements SelfUpdaterInterface
     }
 
     /**
-     * A `--check` probe answers a question without touching the machine, and
+     * A `--check` probe answers a question without touching the machine and
      * the background update notifier runs on that path, so it must not reach
      * for the network on a user's behalf.
      */

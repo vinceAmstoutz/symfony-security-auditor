@@ -179,8 +179,8 @@ final class PlatformShapeKnowledgeTest extends TestCase
     }
 
     /**
-     * A platform whose connection block names another platform's service —
-     * `cache` the one it caches, `failover` the ones it falls back through —
+     * A platform whose connection block names another platform's service
+     * (`cache` the one it caches, `failover` the ones it falls back through)
      * wraps platforms rather than reaching a provider.
      */
     public function test_every_platform_wrapping_another_is_named(): void
@@ -355,7 +355,7 @@ final class PlatformShapeKnowledgeTest extends TestCase
 
     /**
      * A node left optional in its own declaration can still be demanded by
-     * the platform's `->validate()` closure — `vertexai` insists on `api_key`
+     * the platform's `->validate()` closure: `vertexai` insists on `api_key`
      * unless a project-scoped endpoint is configured instead, which `init`
      * never writes.
      */

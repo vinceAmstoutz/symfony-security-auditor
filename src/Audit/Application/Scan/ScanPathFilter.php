@@ -25,10 +25,10 @@ use function Symfony\Component\String\u;
  * `ProjectFileScannerInterface` contract.
  *
  * Path comparison is byte-exact on a normalized form (forward slashes, no
- * trailing separator) — a path of `apps/api` matches `apps/api/src/X.php`
+ * trailing separator): a path of `apps/api` matches `apps/api/src/X.php`
  * but not `apps/api-shared/X.php`.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ScanPathFilter
 {
@@ -59,7 +59,7 @@ final readonly class ScanPathFilter
 
     /**
      * Whether a file at `$relativePath` lies under any of the scan paths, by
-     * the same rule {@see apply()} keeps files by — so a report's recorded
+     * the same rule {@see apply()} keeps files by, so a report's recorded
      * scope reads back exactly as its scan applied it.
      *
      * @param list<string> $scanPaths empty list covers every file
@@ -73,9 +73,9 @@ final readonly class ScanPathFilter
 
     /**
      * The scan paths in the one form the filter compares and a scanner scans:
-     * trimmed, with forward slashes, and with their `.`, `..` and empty
-     * segments resolved, so `src/../src`, `./src//` and `src` are one path —
-     * the scanner resolves them through the filesystem, and a spelling the
+     * trimmed, with forward slashes and with their `.`, `..` and empty
+     * segments resolved, so `src/../src`, `./src//` and `src` are one path:
+     * the scanner resolves them through the filesystem and a spelling the
      * filter read literally would scan a directory while its skipped files
      * went unrecorded. The project root itself and blank entries name no path
      * to narrow to and are dropped.

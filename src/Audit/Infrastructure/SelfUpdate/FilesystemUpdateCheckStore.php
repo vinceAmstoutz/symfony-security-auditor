@@ -29,7 +29,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPa
  * but never thrown, so the update notice is only ever a best-effort convenience
  * and can never abort a command.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class FilesystemUpdateCheckStore implements UpdateCheckStoreInterface
 {

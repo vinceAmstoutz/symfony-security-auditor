@@ -31,7 +31,7 @@ use Symfony\AI\Platform\Result\DeferredResult;
  * prompt as one command-line argument, which Linux caps at 128 KiB, so a
  * longer one is refused as too large and the chunk holding it gets split.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class CliAgentPlatform implements PlatformInterface
 {

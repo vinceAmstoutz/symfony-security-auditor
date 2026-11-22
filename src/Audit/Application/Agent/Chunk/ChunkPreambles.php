@@ -16,9 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 /**
  * The context a chunk's user message is prefixed with: the risk markers of its
  * files, the findings rejected and the ones confirmed in earlier iterations,
- * and the candidates a first-pass model reported on its files.
+ * plus the candidates a first-pass model reported on its files.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ChunkPreambles
 {

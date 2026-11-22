@@ -21,7 +21,7 @@ use Symfony\Component\Filesystem\Filesystem;
 
 /**
  * Keeps the exact bytes of the files a recorded release wrote while preparing
- * a scenario, the workspace path written as `{workspace}`, and writes them
+ * a scenario (the workspace path written as `{workspace}`) and writes them
  * back before a replay.
  */
 final readonly class ArtifactStore

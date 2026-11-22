@@ -61,7 +61,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingC
 
 /**
  * A prompt the model cannot take in is refused before anything is generated:
- * a single call surfaces it under its own type, without retrying, and a batch
+ * a single call surfaces it under its own type (without retrying) and a batch
  * answers it per request as a `request_too_large` response, so the chunk
  * analyzers can split the chunk while the other requests of the window keep
  * their answers. A conversation that only outgrows the model once tool results

@@ -17,7 +17,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 
 /**
  * Supplies the maintainer-authored false-positive feedback for the current
- * run — accepted baseline findings annotated with a `reason` — so the
+ * run (accepted baseline findings annotated with a `reason`), so the
  * reviewer prompt can treat them as negative examples and the reviewer cache
  * can key verdicts on the feedback they were produced under.
  */

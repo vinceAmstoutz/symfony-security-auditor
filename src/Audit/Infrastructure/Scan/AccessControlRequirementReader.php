@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class AccessControlRequirementReader
 {
     /**
@@ -23,7 +23,7 @@ final readonly class AccessControlRequirementReader
 
     /**
      * Distinguishes an entry that declares a requirement key but with an
-     * empty value (`roles: []` — a deliberate public rule) from one that
+     * empty value (`roles: []`, a deliberate public rule) from one that
      * declares no requirement key at all (a degenerate entry with nothing to
      * record).
      *

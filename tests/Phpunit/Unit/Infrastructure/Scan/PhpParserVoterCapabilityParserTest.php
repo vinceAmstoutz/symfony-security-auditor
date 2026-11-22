@@ -253,7 +253,7 @@ final class PhpParserVoterCapabilityParserTest extends TestCase
     /**
      * The abstract Symfony `Voter` class's canonical style checks only the
      * subject type in `supports()` and dispatches on the attribute inside
-     * `voteOnAttribute()` — this attribute vocabulary must not be invisible
+     * `voteOnAttribute()`: this attribute vocabulary must not be invisible
      * to the "Voter Coverage" prompt block just because it lives in a
      * different method than `supports()`.
      *

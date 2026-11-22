@@ -33,7 +33,7 @@ use WeakMap;
  * request's mapping, so its fingerprint is computed once per mapping instance
  * and remembered in a `WeakMap` that lets go of it with the mapping.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ChunkContextKeyDeriver
 {
@@ -52,7 +52,7 @@ final readonly class ChunkContextKeyDeriver
 
     /**
      * Hashing each input individually before joining fixes each to 64 hex
-     * characters, which can never contain the raw-text join's own separator —
+     * characters, which can never contain the raw-text join's own separator,
      * so a rejected/previous preamble embedding a null byte (both are
      * rendered from LLM-echoed `Vulnerability::filePath()` values, which are
      * never null-byte-sanitized) can't shift content across the join
@@ -60,14 +60,14 @@ final readonly class ChunkContextKeyDeriver
      * `FilesystemAttackerCache::keyForChunk()`'s per-file hash-then-join.
      *
      * The marker preamble is included so a chunk cache entry is invalidated
-     * whenever the risk markers it was built from change — e.g. a custom
+     * whenever the risk markers it was built from change, e.g. a custom
      * `StaticPreScannerInterface` implementation (a documented extension
      * point) starts flagging a file differently on an unchanged content hash.
      * The mapping fingerprint serves the same purpose for the access-control
      * data {@see self::mappingFingerprint()} folds in. The candidate preamble
      * only exists in an escalation deep pass, so it joins the key only when it
-     * is there: every other chunk keeps the key earlier releases derived, and
-     * their cache entries still hit.
+     * is there: every other chunk keeps the key earlier releases derived.
+     * Their cache entries still hit.
      */
     public function derive(string $markerPreamble, string $rejectedPreamble, string $previousPreamble, string $candidatePreamble, SymfonyMapping $symfonyMapping): string
     {
@@ -86,7 +86,7 @@ final readonly class ChunkContextKeyDeriver
      * `AttackerPromptBuilder::buildUserMessage()` renders the firewall,
      * route-access-control, voter-coverage and form-binding sections straight
      * from the mapping, but the chunk cache is keyed only by file content and
-     * this class's context key — so, unfingerprinted, a `security.yaml` edit
+     * this class's context key. So, unfingerprinted, a `security.yaml` edit
      * or a voter added elsewhere in the project would replay a verdict
      * computed under the old mapping for a file whose own content never
      * changed. Each list is sorted before hashing since project scanning

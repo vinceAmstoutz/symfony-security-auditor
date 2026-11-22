@@ -16,11 +16,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 
 /**
- * What the cost a human report shows rests on: the rates it was priced at,
+ * What the cost a human report shows rests on: the rates it was priced at
  * and, when calls were cut before their answer ended, that it is a minimum,
  * since a provider may bill such a call beyond the usage it reported.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class CostRateLabel
 {

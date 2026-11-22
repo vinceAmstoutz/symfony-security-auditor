@@ -23,12 +23,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsupportedEnvPlaceholderException;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class StandalonePlatformConfigResolver
 {
     /**
-     * Stands in for a credential a run has been told it will not need — a
+     * Stands in for a credential a run has been told it will not need: a
      * `--dry-run`, which estimates cost from the scanned files and never
      * reaches the provider, or a platform `provider:` does not select. It is
      * deliberately not a plausible key: were a code path ever to send it, the
@@ -86,9 +86,9 @@ final readonly class StandalonePlatformConfigResolver
 
     /**
      * The run connects through the block `provider:` selects and no other,
-     * so every other platform, and every other instance of the selected one,
+     * so every other platform (and every other instance of the selected one)
      * is resolved the way a dry run resolves it: a key the run never sends
-     * cannot stop it, nor send the user to store the wrong one — the
+     * cannot stop it, nor send the user to store the wrong one; the
      * credential commands and the audit header describe the selected block
      * alone ({@see PlatformApiKey::valueForProvider()}). A provider naming an
      * instance its platform's block does not hold selects nothing; the
@@ -122,8 +122,8 @@ final readonly class StandalonePlatformConfigResolver
 
     /**
      * Only a platform's `api_key` is a credential: it alone may come out of
-     * the store, and it alone is spoken of as the API key when it is missing.
-     * Every other placeholder — a `base_url`, an `endpoint` — is a plain
+     * the store and it alone is spoken of as the API key when it is missing.
+     * Every other placeholder (a `base_url`, an `endpoint`) is a plain
      * setting the environment has to supply.
      *
      * @param array<array-key, mixed> $config

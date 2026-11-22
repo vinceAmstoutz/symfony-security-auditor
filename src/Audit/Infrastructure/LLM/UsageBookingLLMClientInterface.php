@@ -16,10 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 
 /**
- * A client that books the usage of its answers itself — the bundled client,
- * or one the bundle wrapped to book it — so it is never wrapped again, even
+ * A client that books the usage of its answers itself (the bundled client,
+ * or one the bundle wrapped to book it), so it is never wrapped again, even
  * when one client id is wired to the other.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface UsageBookingLLMClientInterface extends LLMClientInterface {}

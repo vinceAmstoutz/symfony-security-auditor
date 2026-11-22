@@ -26,7 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilder
 /**
  * Resolves every single-finding review in concurrency windows via the
  * batch-capable client, then applies each verdict. Findings are dispatched one
- * `maxConcurrent`-sized window at a time — never as a single oversized batch —
+ * `maxConcurrent`-sized window at a time (never as a single oversized batch),
  * so a budget/provider failure in a later window cannot discard an earlier
  * window's already-applied verdicts; the failing window and every window not
  * yet dispatched are marked `aborted`/`errored` before the exception
@@ -34,7 +34,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilder
  * verdict exactly as the sequential path does. Cached verdicts are served
  * first; only the misses are dispatched.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ConcurrentReviewAnalyzer
 {
@@ -195,7 +195,7 @@ final readonly class ConcurrentReviewAnalyzer
 
     /**
      * Marks every finding in the window that just failed, plus every window
-     * not yet attempted, as failed — without touching windows that already
+     * not yet attempted, as failed, without touching windows that already
      * finalized successfully.
      *
      * @param list<list<PendingReview>> $pendingWindows

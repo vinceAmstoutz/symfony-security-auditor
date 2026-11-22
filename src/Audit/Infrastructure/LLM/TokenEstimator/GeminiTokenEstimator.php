@@ -17,7 +17,7 @@ use Override;
 
 use function Symfony\Component\String\u;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class GeminiTokenEstimator implements ProviderTokenEstimatorInterface
 {
     public const float CHARS_PER_TOKEN = 3.8;

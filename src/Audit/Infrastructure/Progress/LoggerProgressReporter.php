@@ -27,7 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInter
  * Logger failures are swallowed so a misbehaving logger cannot abort the
  * audit (contract guarantee from the ProgressReporterInterface).
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class LoggerProgressReporter implements ProgressReporterInterface
 {

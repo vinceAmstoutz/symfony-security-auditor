@@ -27,7 +27,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\InstalledPackagesRead
  * lockfile installs and the architecture its files are laid out in, which
  * decide the hunting instructions the attacker is given.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ProjectProfileStage implements StageInterface
 {

@@ -22,7 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInter
  * produced, so reporters can stream findings live as the attacker discovers
  * them. Shared by the sequential and concurrent chunk analyzers.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ChunkFindingProgress
 {

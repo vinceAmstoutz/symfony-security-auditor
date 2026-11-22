@@ -17,7 +17,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
  * What an audit knows of the audited project as a whole: the packages its
  * lockfile installs and the architecture its files are laid out in.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ProjectProfile
 {

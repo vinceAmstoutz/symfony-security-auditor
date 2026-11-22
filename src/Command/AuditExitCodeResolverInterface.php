@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 interface AuditExitCodeResolverInterface
 {
     /**

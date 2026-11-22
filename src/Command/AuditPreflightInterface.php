@@ -18,7 +18,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
  * startup, without running it, so a preflight can report why an audit would
  * fail to boot before one is attempted.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface AuditPreflightInterface
 {

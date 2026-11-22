@@ -20,10 +20,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\S
  * provider bridges into. The binary registers its autoloader ahead of its own,
  * so the `symfony/ai-platform` it holds replaces the bundled one: a tree built
  * by an older release is read before it is loaded, from the installed-package
- * data Composer writes beside the autoloader, and refused when it holds
+ * data Composer writes beside the autoloader and refused when it holds
  * another release.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class BridgeTree
 {

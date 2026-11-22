@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Revie
 
 use Override;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class ReviewerPromptSections implements ReviewerPromptSectionsInterface
 {
     private const string SEVERITY_RUBRIC = <<<'RUBRIC'

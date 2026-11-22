@@ -20,7 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Runner\Workspace;
 
 /**
  * One recorded behaviour: a workspace (the audited project, a home, config
- * files), the commands run in it, and what is captured afterwards.
+ * files), the commands run in it and what is captured afterwards.
  *
  * The `prepare` commands run only when recording: the release being recorded
  * produces the `artifacts` (its reports, baselines, caches, configuration

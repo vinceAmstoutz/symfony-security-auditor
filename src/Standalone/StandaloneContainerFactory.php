@@ -49,7 +49,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformPro
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class StandaloneContainerFactory
 {
@@ -161,7 +161,7 @@ final readonly class StandaloneContainerFactory
     /**
      * The product banner is already on screen by the time a command runs, so
      * the audit header carries the credential the run will spend instead of
-     * repeating it — named by its masked preview, never printed.
+     * repeating it (named by its masked preview, never printed).
      */
     private function registerSubscriptionPricing(ContainerBuilder $containerBuilder, ?string $cliAgent): void
     {

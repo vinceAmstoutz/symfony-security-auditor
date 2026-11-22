@@ -26,38 +26,38 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Utf8Nor
 use function Symfony\Component\String\u;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  *
  * Resolves the set of changed files via four git invocations:
  *
  *   1. `git diff --relative --name-only --diff-filter=ACMRT <ref>...HEAD`
- *      — committed changes that diverge from the ref's merge base. The triple
+ *      lists committed changes that diverge from the ref's merge base. The triple
  *      dot semantics handle topic branches diverged from the ref correctly:
  *      only changes ON the branch are returned, not changes the ref accrued
- *      since branch point. Pure tree-to-tree comparison — never touches the
+ *      since branch point. Pure tree-to-tree comparison: never touches the
  *      working tree, so it cannot invoke a `.gitattributes` content filter.
  *
  *   2. `git diff-index --relative --name-only --diff-filter=ACMRT --cached HEAD`
- *      — staged changes against HEAD (including files already `git add`ed):
+ *      lists staged changes against HEAD (including files already `git add`ed):
  *      index vs tree, both already-hashed objects, so no working-tree content
  *      filter runs either.
  *
  *   3. `git diff-files --relative --name-only --diff-filter=ACMRT`
- *      — unstaged edits to already-tracked files: working tree vs index.
- *      Deliberately the plumbing form rather than `git diff HEAD` — the
+ *      lists unstaged edits to already-tracked files: working tree vs index.
+ *      Deliberately the plumbing form rather than `git diff HEAD`: the
  *      porcelain form normalizes a working-tree file through its
- *      `.gitattributes` `filter=<name>` `clean` command before comparing it,
- *      and both the attribute assignment and the `filter.<name>.clean`
+ *      `.gitattributes` `filter=<name>` `clean` command before comparing it.
+ *      Both the attribute assignment and the `filter.<name>.clean`
  *      command live in the audited (untrusted) repo's own `.gitattributes`/
  *      `.git/config`, making it as exploitable as the `core.fsmonitor` hook
  *      neutralized below. `diff-files` reports the same "did this tracked
- *      file change" answer from the stat data alone, and re-hashes a file —
- *      through that filter — only when its stat matches a racily clean index
+ *      file change" answer from the stat data alone and re-hashes a file
+ *      (through that filter) only when its stat matches a racily clean index
  *      entry: the stat check forced below makes a checkout shipped with its
  *      own `.git` directory never match.
  *
  *   4. `git ls-files --others --exclude-standard`
- *      — new files never staged at all, minus what a `.gitignore` leaves out.
+ *      lists new files never staged at all, minus what a `.gitignore` leaves out.
  *      Plumbing again, so no content filter runs: it lists the working tree's
  *      directory entries and reads no file content.
  *
@@ -69,11 +69,11 @@ use function Symfony\Component\String\u;
  * a regular file holds code the scan never read.
  *
  * `--relative` rewrites paths relative to `$projectPath` instead of the git
- * root, and excludes changes outside it — required so the result lines up
+ * root and excludes changes outside it, required so the result lines up
  * with `ProjectFile::relativePath()` when the audited project is a
  * subdirectory of a larger repository (a monorepo layout).
  *
- * All four lists are merged, deduplicated, and returned in deterministic
+ * All four lists are merged, deduplicated and returned in deterministic
  * order.
  */
 final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesResolverInterface
@@ -140,7 +140,7 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
 
     /**
      * False when git found no repository at all; a failure for any other
-     * reason — a repository owned by another user, one it cannot read —
+     * reason (a repository owned by another user, one it cannot read)
      * carries git's own message.
      *
      * @throws GitChangedFilesUnavailableException
@@ -186,9 +186,9 @@ final readonly class ProcessGitChangedFilesResolver implements GitChangedFilesRe
     }
 
     /**
-     * `-z` NUL-terminates each path instead of newline-terminating it, and disables
+     * `-z` NUL-terminates each path instead of newline-terminating it and disables
      * git's C-style quoting of non-ASCII bytes AND of literal quotes/backslashes/
-     * control characters alike — `core.quotepath=off` alone only covers the former.
+     * control characters alike; `core.quotepath=off` alone only covers the former.
      * `core.fsmonitor=` neutralizes the audited (untrusted) repo's own local config:
      * otherwise a hostile `core.fsmonitor` hook set in its `.git/config` runs as an
      * arbitrary command on this working-tree comparison. `core.checkStat=default`

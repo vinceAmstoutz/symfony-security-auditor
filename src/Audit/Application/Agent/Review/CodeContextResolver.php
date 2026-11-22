@@ -19,10 +19,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 /**
  * Resolves the source content backing a finding's file path, or an empty
  * string when the file is not part of the scanned set. The path is the one the
- * attacker echoed, so a leading `./` is dropped before the lookup — otherwise
+ * attacker echoed, so a leading `./` is dropped before the lookup. Otherwise
  * the reviewer would judge the finding without its file.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class CodeContextResolver
 {

@@ -39,11 +39,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Tran
 /**
  * Drives one autonomous tool-using conversation sequentially: invokes the
  * platform with retry, executes requested tools against the registry, feeds
- * results back, and returns the model's final textual response. A last round
+ * results back and returns the model's final textual response. A last round
  * that still asks to read gets one closing request ({@see FinalRound}); one
  * that reads again ends as an empty `max_tool_iterations` response.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SequentialToolLoop
 {
@@ -257,7 +257,7 @@ final readonly class SequentialToolLoop
 
     /**
      * The initial prompt fit, so it is the tool results appended since that
-     * outgrew the model — splitting the chunk would not change what the model
+     * outgrew the model: splitting the chunk would not change what the model
      * asks to read. The conversation ends here with what it recorded.
      */
     private function outgrownConversationResponseAndLog(

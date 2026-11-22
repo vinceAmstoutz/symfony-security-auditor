@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 
-/** @internal not part of the BC promise — the command *name* (`mcp:serve`) is public, but the PHP class itself is for internal use only. */
+/** @internal not part of the BC promise: the command *name* (`mcp:serve`) is public, but the PHP class itself is for internal use only. */
 #[AsCommand(name: self::NAME, description: self::DESCRIPTION)]
 final readonly class McpServeCommand
 {
@@ -30,7 +30,7 @@ final readonly class McpServeCommand
     ) {}
 
     /**
-     * STDOUT is the JSON-RPC channel the client parses, and the CLI SAPI
+     * STDOUT is the JSON-RPC channel the client parses and the CLI SAPI
      * displays notices and warnings there by default: one stray notice would
      * corrupt the protocol stream, so PHP's error display goes to STDERR while
      * the server runs.

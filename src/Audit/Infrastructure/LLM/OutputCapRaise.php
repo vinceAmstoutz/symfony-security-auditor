@@ -20,7 +20,7 @@ use Symfony\AI\Platform\PlatformOptions;
  * call off: the same request with twice the cap. Null for a request that
  * offered no tool or sent no cap, which a higher cap cannot help.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class OutputCapRaise
 {

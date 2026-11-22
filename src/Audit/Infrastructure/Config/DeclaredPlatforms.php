@@ -21,7 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
  * stops the container outright (`Unrecognized option "meta" under
  * "ai.platform"`), so `init` writes nothing for it and installs no bridge.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class DeclaredPlatforms
 {
@@ -41,8 +41,8 @@ final readonly class DeclaredPlatforms
     }
 
     /**
-     * Every platform `init` takes on — the ones wrapping others it refuses
-     * outright — spelled the way a provider naming it must be, so a reader
+     * Every platform `init` takes on (the ones wrapping others it refuses
+     * outright) spelled the way a provider naming it must be, so a reader
      * picking one is not refused again for leaving out the instance.
      *
      * @return list<string>

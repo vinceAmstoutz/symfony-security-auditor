@@ -17,11 +17,11 @@ use function Symfony\Component\String\b;
 
 /**
  * Names a credential in output without disclosing it: a masked preview that
- * matches what a provider console shows next to the key, and a truncated
+ * matches what a provider console shows next to the key and a truncated
  * SHA-256 fingerprint that identifies it exactly and cannot be turned back into
  * the key, though whoever already holds a candidate key can confirm it.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class CredentialIdentity
 {
@@ -71,7 +71,7 @@ final readonly class CredentialIdentity
 
     /**
      * A credential carrying anything outside printable ASCII is a paste
-     * accident rather than a provider key, and slicing its bytes would emit
+     * accident rather than a provider key; slicing its bytes would emit
      * a half-codepoint into the console.
      */
     private static function isPreviewable(string $credential): bool

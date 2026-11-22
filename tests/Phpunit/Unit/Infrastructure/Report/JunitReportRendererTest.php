@@ -239,8 +239,8 @@ final class JunitReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
-     * A Unicode bidirectional override is valid XML text — the illegal-XML-char
-     * filter never touches it — so it reaches any JUnit-consuming CI viewer
+     * A Unicode bidirectional override is valid XML text (the illegal-XML-char
+     * filter never touches it), so it reaches any JUnit-consuming CI viewer
      * unchanged, enabling a Trojan-Source-style visual reorder of the
      * displayed finding title/description/remediation.
      *

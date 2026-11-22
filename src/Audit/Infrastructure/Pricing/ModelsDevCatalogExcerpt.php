@@ -18,7 +18,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing;
  * cost, family, dates and tool support. A loaded catalog keeps only that, a
  * fraction of the memory the whole decoded file takes.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ModelsDevCatalogExcerpt
 {

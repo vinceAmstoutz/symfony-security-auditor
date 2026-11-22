@@ -20,7 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\S
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnsafeStandaloneConfigWriteException;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWriterInterface
 {
@@ -53,8 +53,8 @@ final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWrite
 
     /**
      * `Filesystem::dumpFile()` transparently writes through a pre-existing
-     * symlink at its destination, and `Filesystem::mkdir()` treats a
-     * symlinked directory as already existing — mirrors the same guard
+     * symlink at its destination and `Filesystem::mkdir()` treats a
+     * symlinked directory as already existing. Mirrors the same guard
      * already applied to the filesystem attacker/reviewer caches and the
      * advisory cache.
      *

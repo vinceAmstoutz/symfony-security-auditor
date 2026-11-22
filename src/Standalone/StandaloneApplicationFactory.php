@@ -102,7 +102,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableAuditC
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableMcpServeCommandException;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class StandaloneApplicationFactory
 {
@@ -212,9 +212,9 @@ final readonly class StandaloneApplicationFactory
 
     /**
      * `$PWD` keeps the spelling the shell shows (symlinks unresolved), but it
-     * is a shell export: absent on Windows and under cron, and stale under a
-     * launcher that inherited it from another directory — an MCP client, a
-     * `Process`, a task runner. It is trusted only while it names the process
+     * is a shell export: absent on Windows and under cron, stale under a
+     * launcher that inherited it from another directory (an MCP client, a
+     * `Process`, a task runner). It is trusted only while it names the process
      * working directory, which is always available and wins otherwise.
      *
      * @param array<string, string> $environment
@@ -333,7 +333,7 @@ final readonly class StandaloneApplicationFactory
 
     /**
      * `self-update` must keep working before "init" has ever run, so this
-     * never routes through `StandaloneConfigLoader::load()` — it would throw
+     * never routes through `StandaloneConfigLoader::load()`: it would throw
      * `MissingPlatformException` on a fresh install. A config file that is
      * present but broken (an unresolvable home directory, malformed YAML)
      * fails closed to skipping the refresh, same as `privacy.offline_only`
@@ -459,10 +459,10 @@ final readonly class StandaloneApplicationFactory
     }
 
     /**
-     * Where the project being audited would keep its own configuration file —
-     * the folder the command line names, the working directory when it names
+     * Where the project being audited would keep its own configuration file
+     * (the folder the command line names, the working directory when it names
      * none, or the Composer project either lies in when it is not a project
-     * itself, as the audit command reads it — or null when the working
+     * itself, as the audit command reads it), or null when the working
      * directory it is relative to cannot be told, which the audit command then
      * reports itself. The loader layers that file over the working directory's
      * when it exists and is another file.

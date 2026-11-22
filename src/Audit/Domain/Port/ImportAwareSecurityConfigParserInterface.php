@@ -25,7 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
  * and otherwise asks {@see ProductionAwareSecurityConfigParserInterface::isLoadedInProduction()}
  * and {@see LoadOrderAwareSecurityConfigParserInterface::loadRank()} file by file.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 interface ImportAwareSecurityConfigParserInterface extends LoadOrderAwareSecurityConfigParserInterface
 {

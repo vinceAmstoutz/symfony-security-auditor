@@ -167,7 +167,7 @@ The harness lives in [`tools/Eval/`](tools/Eval/), outside the shipped bundle an
 
 Run `bin/castor lint` to check everything, or `bin/castor lint:fix` to fix what it can first. It runs, in order: Prettier, markdownlint, Composer Normalize, PHP CS Fixer, Rector, PHPStan max, Deptrac, Swiss Knife, the `tests/Shell/` tests, the changelog and prose checks, PHPUnit and Infection. Prettier and markdownlint run in Docker: no local Node is needed.
 
-- Write Markdown with one line per paragraph and list item, never hard-wrapped (`bin/castor lint:fix` rejoins one). Follow the [prose rule](.claude/rules/prose-style.md): no em dash, no comma before "and". `bin/castor lint:docs` checks Markdown alone.
+- Write Markdown with one line per paragraph and list item, never hard-wrapped (`bin/castor lint:fix` rejoins one). Follow the [prose rule](.claude/rules/prose-style.md) in Markdown, comments and docblocks: no em dash, no comma before "and". `bin/castor lint:docs` checks Markdown and comments alone.
 - Never silence a gate (`@phpstan-ignore*`, baseline files, Rector skips, `@infection-ignore-all`, `ignoreSourceCodeByRegex`, `@codeCoverageIgnore`, `markTestSkipped` to dodge a failure): fix the code. A genuine false positive needs a justification in the PR description and a linked tracking issue ([CLAUDE.md → Never Silence Quality Gates](CLAUDE.md#5-never-silence-quality-gates)).
 
 ## Writing Tests

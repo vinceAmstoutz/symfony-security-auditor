@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\E
 
 use RuntimeException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class UnsupportedSelfUpdatePlatformException extends RuntimeException
 {
     public static function forPlatform(string $osFamily, string $machine): self

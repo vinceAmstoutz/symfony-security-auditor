@@ -47,7 +47,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\HiddenInputUnavailabl
 use function Symfony\Component\String\b;
 use function Symfony\Component\String\u;
 
-/** @internal not part of the BC promise — the command *name* (`init`) is public, but the PHP class itself is for internal use only. */
+/** @internal not part of the BC promise: the command *name* (`init`) is public, but the PHP class itself is for internal use only. */
 #[AsCommand(name: self::NAME, description: self::DESCRIPTION, help: InitCommandHelp::HELP)]
 final readonly class InitCommand
 {
@@ -145,7 +145,7 @@ final readonly class InitCommand
 
     /**
      * Asking here is what makes a guided install end with a working setup:
-     * the configuration alone only names a variable, and a user who has to go
+     * the configuration alone only names a variable and a user who has to go
      * and export it separately is a user whose first audit fails.
      */
     private function offerToStoreCredential(SymfonyStyle $symfonyStyle, string $envVar): void

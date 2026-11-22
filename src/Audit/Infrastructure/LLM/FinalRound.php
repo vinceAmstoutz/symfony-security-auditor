@@ -22,8 +22,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 /**
  * The last round a tool-using conversation is allowed. The tool result that
- * precedes it carries a notice saying so — a tool result, not a message of its
- * own, because a provider may refuse a user turn right after one — and a last
+ * precedes it carries a notice saying so (a tool result, not a message of its
+ * own, because a provider may refuse a user turn right after one) and a last
  * round that records its answer (a recording tool took the call in, rather than
  * refusing it) ends the conversation instead of asking for one more round to
  * say it is done. A last round that asks to read instead gets one closing
@@ -33,7 +33,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
  * than the model wanted to look at; one that only ever recorded lost nothing
  * to the limit.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class FinalRound
 {

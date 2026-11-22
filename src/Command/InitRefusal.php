@@ -41,14 +41,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatfo
  * and in the order the options are written, so a run passing two that do not
  * apply is told about the connection field before the credential.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class InitRefusal
 {
     private const string PICK_A_NAME = 'Pick a plain name such as "%s.my_gateway".';
 
     /**
-     * Checked on the raw bytes, before `ProviderKeyNormalizer` — its `u()` call
+     * Checked on the raw bytes, before `ProviderKeyNormalizer`: its `u()` call
      * throws on non-UTF-8 input, which must refuse rather than crash.
      */
     public static function forProviderText(string $provider): ?string
@@ -246,7 +246,7 @@ final readonly class InitRefusal
 
     /**
      * Named before the platform is consulted: whichever of the two the user
-     * drops, the answer is the same, and silently honouring one while ignoring
+     * drops, the answer is the same. Silently honouring one while ignoring
      * the other is how a run ends up with a credential nobody asked for.
      */
     private static function forContradictoryCredentialOptions(InitCommandInput $initCommandInput): ?string

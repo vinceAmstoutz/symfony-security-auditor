@@ -39,14 +39,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Tran
  * symfony/ai DeferredResult contract), the resolutions overlap on the wire.
  * Any request that fails to dispatch or resolve falls back to the proven
  * sequential complete() path (full retry) so the batch path is never less
- * correct than the per-call path — except for the failures a retry cannot
+ * correct than the per-call path, except for the failures a retry cannot
  * change: an answer with nothing usable in it comes back as the matching
- * degraded response, and a request the model or the rate-limit window cannot
+ * degraded response; a request the model or the rate-limit window cannot
  * take in is answered `request_too_large`, so the caller can act on that one
  * request while its siblings keep their answers. A failure that ends the
  * window cancels the requests still in flight and books their spend.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class BatchWindowResolver
 {
@@ -131,11 +131,11 @@ final readonly class BatchWindowResolver
     }
 
     /**
-     * Every request of the window was already dispatched — and billed by the
-     * provider — so every response is resolved and its spend recorded before
+     * Every request of the window was already dispatched (and billed by the
+     * provider), so every response is resolved and its spend recorded before
      * the budget verdict is given: a window that blows the budget then aborts
      * with the whole window's spend on the books rather than the first
-     * response's alone. Any other failure ends the window, and the requests it
+     * response's alone. Any other failure ends the window: the requests it
      * leaves in flight are cancelled and booked.
      *
      * @param list<LLMRequest>              $window

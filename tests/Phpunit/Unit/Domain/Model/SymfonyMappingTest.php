@@ -366,7 +366,7 @@ final class SymfonyMappingTest extends TestCase
     }
 
     /**
-     * @deprecated covers the four Symfony-named accessors deprecated in 1.19 until they are removed in 2.0 — each must keep returning what its neutral counterpart does.
+     * @deprecated covers the four Symfony-named accessors deprecated in 1.19 until they are removed in 2.0: each must keep returning what its neutral counterpart does.
      */
     #[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]
     public function test_deprecated_voter_capabilities_still_returns_the_authorization_rules(): void

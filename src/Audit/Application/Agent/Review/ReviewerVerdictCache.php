@@ -21,17 +21,17 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterfac
 
 /**
  * Adapts the optional {@see ReviewerCacheInterface} for the review strategies:
- * a missing cache or a bypassed run degrades every lookup to a miss, and a
- * verdict that judges nothing — none, or one with no `accepted` flag — is
+ * a missing cache or a bypassed run degrades every lookup to a miss. A
+ * verdict that judges nothing (none, or one with no `accepted` flag) is
  * never persisted, since a cache entry replays as the model's own judgement.
  * Neither is a verdict given at the tool-call limit: the model may have
- * judged on less than it wanted to read, and a cached rejection would hide
+ * judged on less than it wanted to read and a cached rejection would hide
  * the finding on every later run.
- * A store failure is caught and logged rather than left to propagate — the
+ * A store failure is caught and logged rather than left to propagate: the
  * caller already has the verdict in hand by the time it stores it, so losing
  * the cache write must never cost the caller the verdict itself.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ReviewerVerdictCache
 {

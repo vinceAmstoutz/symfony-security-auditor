@@ -93,7 +93,7 @@ final class BaselineTest extends TestCase
 
     /**
      * A hand-edited or merged baseline file could carry a redundant
-     * `attacker_fingerprint` equal to its own `fingerprint` — the tool's own
+     * `attacker_fingerprint` equal to its own `fingerprint`. The tool's own
      * writer never produces this (`BaselineProcessor::entryFor()` only sets
      * `attacker_fingerprint` when it differs), but `load()` must not grant a
      * count-aware budget of 2 credits for what is really just 1 accepted
@@ -576,7 +576,7 @@ final class BaselineTest extends TestCase
 
     /**
      * A baseline file is part of the audited repository, so a pull request
-     * controls its reasons — and every reason reaches the reviewer's system
+     * controls its reasons and every reason reaches the reviewer's system
      * prompt. It is capped the way the reviewer's own triage memory is.
      *
      * @throws MalformedBaselineFileException
@@ -595,8 +595,8 @@ final class BaselineTest extends TestCase
     }
 
     /**
-     * Every field of a baseline entry is free text a pull request controls, and
-     * every one reaches the reviewer's system prompt, so each is capped — by
+     * Every field of a baseline entry is free text a pull request controls and
+     * every one reaches the reviewer's system prompt, so each is capped by
      * code points, which a run of combining marks cannot inflate the way it
      * inflates a grapheme cluster.
      *

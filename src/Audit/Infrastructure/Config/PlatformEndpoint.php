@@ -17,10 +17,10 @@ use Uri\Rfc3986\Uri;
 
 /**
  * The scheme, host and port a platform setting would send a request to. A
- * setting without an authority is no endpoint, and the userinfo, path and
+ * setting without an authority is no endpoint and the userinfo, path and
  * query of one never leave this class, since they may hold a credential.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PlatformEndpoint
 {

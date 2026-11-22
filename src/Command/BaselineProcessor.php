@@ -25,9 +25,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteEx
 /**
  * Generates and applies the accepted-finding baseline: resolves the effective
  * baseline path (CLI override before the configured default), persists or loads
- * fingerprints via the {@see BaselineInterface}, and filters the report.
+ * fingerprints via the {@see BaselineInterface} and filters the report.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class BaselineProcessor implements BaselineProcessorInterface
 {
@@ -122,7 +122,7 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
     /**
      * `AuditOrchestrator::withoutBaselineAccepted()` may already have spent
      * some of these same credits skipping a different finding before the
-     * reviewer ever ran — reloading the baseline here grants a fresh,
+     * reviewer ever ran: reloading the baseline here grants a fresh,
      * un-decremented budget, so each already-consumed occurrence is removed
      * once before this stage builds its own count-aware suppression pass,
      * rather than handing every finding still standing a second, unearned
@@ -168,8 +168,8 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
     }
 
     /**
-     * Deduplicates by `id()` — not `fingerprint()` (or `fingerprint()` +
-     * `attackerFingerprint()`) — so two distinct findings that happen to
+     * Deduplicates by `id()`, not `fingerprint()` (or `fingerprint()` +
+     * `attackerFingerprint()`), so two distinct findings that happen to
      * share a fingerprint (e.g. the same title/type/file at different lines)
      * each keep their own baseline entry instead of one silently overwriting
      * the other's.

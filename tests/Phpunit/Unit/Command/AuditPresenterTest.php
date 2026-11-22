@@ -223,7 +223,7 @@ final class AuditPresenterTest extends TestCase
 
     /**
      * `AuditExitCodeResolver` fails a run when the risk gate OR the independent
-     * `--min-score` gate trips, and only the exit code reaches the presenter —
+     * `--min-score` gate trips. Only the exit code reaches the presenter,
      * so it must not attribute the failure to one specific gate. A LOW-risk
      * report failing under `--fail-on=critical --min-score=96` is a
      * score-only failure the old wording described as a fail-on breach.
@@ -1388,7 +1388,7 @@ final class AuditPresenterTest extends TestCase
 
     /**
      * One MEDIUM finding scores 5, so risk is LOW and the normalized score is
-     * 95 — the shape a `--min-score=96` run fails on while the risk gate passes.
+     * 95: the shape a `--min-score=96` run fails on while the risk gate passes.
      *
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException

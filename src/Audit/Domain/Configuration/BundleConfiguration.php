@@ -24,7 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
  *
  * Constructed once in `SymfonySecurityAuditorBundle::loadExtension()` so the
  * nested array-shape PHPDoc no longer doubles as the public configuration
- * contract — the VOs do. Downstream code that needs to introspect the
+ * contract: the VOs do. Downstream code that needs to introspect the
  * configuration (e.g. compiler passes) depends on these immutable types
  * instead of magic array keys.
  *

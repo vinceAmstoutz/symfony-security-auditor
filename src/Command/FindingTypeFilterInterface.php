@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 interface FindingTypeFilterInterface
 {
     public function apply(AuditReport $auditReport): AuditReport;

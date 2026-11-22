@@ -18,7 +18,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
  * uses to point at a credential, parsed once so the resolver that reads it and
  * the commands that report on it agree on what a value refers to.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class EnvPlaceholder
 {

@@ -34,20 +34,20 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ControllerAccessControlParserInterface;
 
 /**
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  *
  * Walks a controller-like file's AST to extract one RouteAccessControl per
  * stacked `#[Route(path:, methods:)]` attribute on each public action method
  * (via {@see RouteAttributeParser}), plus `#[IsGranted(...)]`/`#[Security(...)]`
  * on both class and method level and `denyAccessUnlessGranted()` calls in
- * method bodies (a first-class callable reference to it does not count — it
+ * method bodies (a first-class callable reference to it does not count: it
  * is never actually invoked). Attribute names are resolved against their
  * imports (`NameResolver`) before short-name matching, so an aliased import
  * (`use Route as Get;`) is still recognised. "Controller-like" also covers
  * `#[AsLiveComponent]`/`#[ApiResource]` classes ({@see
  * ProjectFileType::isControllerLike()}), which may still declare routed,
  * access-controlled actions. Returns [] for any other file type or any parse
- * error — the mapping stage must never abort because of a single broken file.
+ * error: the mapping stage must never abort because of a single broken file.
  */
 final readonly class PhpParserControllerAccessControlParser implements ControllerAccessControlParserInterface
 {
@@ -191,7 +191,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
 
     /**
      * A class-level `#[Route('/admin', name: 'admin_')]` acts as a path and
-     * name prefix for every action's own `#[Route]` — Symfony's own attribute
+     * name prefix for every action's own `#[Route]`: Symfony's own attribute
      * route loader concatenates them, so a security.yaml `access_control`
      * rule keyed on the full `/admin/dashboard` path or `admin_dashboard`
      * route name must be matched against the same joined values, not the
@@ -259,7 +259,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
     }
 
     /**
-     * The `denyAccessUnlessGranted()`/`isGranted()` calls an action reaches —
+     * The `denyAccessUnlessGranted()`/`isGranted()` calls an action reaches,
      * including ones moved behind a shared private/protected helper (a common
      * refactor for a repeated check), which would otherwise be invisible since
      * the action method's own body only calls the helper, never the guard
@@ -276,7 +276,7 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
      * a string literal, or the class constant it names. Any other attribute
      * (enum case, variable, `new Expression(...)`) is left out rather than
      * guessed at, mirroring how route paths are only resolved from literals.
-     * Each distinct attribute is kept once, in the order it first appears, and
+     * Each distinct attribute is kept once, in the order it first appears and
      * only the first {@see self::MAX_GUARD_ATTRIBUTES_PER_ROUTE} are kept, so a
      * chain of actions each reaching every later one cannot hold a quadratic
      * number of names.
@@ -305,8 +305,8 @@ final readonly class PhpParserControllerAccessControlParser implements Controlle
 
     /**
      * `isGranted()` is recognized the same way `denyAccessUnlessGranted()`
-     * is — by presence alone, not by verifying it actually guards a
-     * `throw` — matching this parser's existing heuristic style (the class-
+     * is (by presence alone, not by verifying it actually guards a
+     * `throw`), matching this parser's existing heuristic style (the class-
      * level `#[IsGranted]` attribute check applies the identical "presence
      * is sufficient" rule). `isGranted()` + a manual
      * `throw $this->createAccessDeniedException(...)` is an equally standard

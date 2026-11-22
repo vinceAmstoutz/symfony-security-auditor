@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Excep
 
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class TypedNodeEnvPlaceholderException extends InvalidConfigurationException
 {
     /**

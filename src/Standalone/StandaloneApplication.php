@@ -32,18 +32,18 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
 /**
  * Extends the bare Symfony `Application` to append the bundled
  * `symfony/models-dev` pricing-catalog version to `--version`, to put the
- * identity banner in front of every command, and to echo the failing command
- * line under a rendered error — the base class offers no extension point for
+ * identity banner in front of every command and to echo the failing command
+ * line under a rendered error. The base class offers no extension point for
  * any of the three. `--version` never reaches a command at all, so an event
  * listener could not cover it.
  *
- * Mutable by design — non-readonly because the invocation is captured on the
+ * Mutable by design: non-readonly because the invocation is captured on the
  * way in and read back later: the command line if something throws, whether
  * the run needs provider credentials when the audit command is built, whether
- * it only describes the commands it would build, and which project it names.
+ * it only describes the commands it would build and which project it names.
  * See .claude/rules/php-classes.md for the opt-out policy.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final class StandaloneApplication extends Application
 {
@@ -56,7 +56,7 @@ final class StandaloneApplication extends Application
     /**
      * Commands that read other commands' definitions without running them,
      * matched the way the base class resolves an abbreviation. Running with
-     * no command name runs `list`, and shell completion reads definitions
+     * no command name runs `list`. Shell completion reads definitions
      * too.
      */
     private const array DESCRIBING_COMMANDS = ['help', 'list'];
@@ -123,7 +123,7 @@ final class StandaloneApplication extends Application
 
     /**
      * The base class runs `hel audit` as `help audit`, matching an abbreviation
-     * case-insensitively when nothing else does, and no other command starts
+     * case-insensitively when nothing else does. No other command starts
      * like `help` or `list`. Matching the prefix here, rather than through
      * `find()`, keeps the lookup from building a command out of the
      * configuration before this flag is set.
@@ -141,7 +141,7 @@ final class StandaloneApplication extends Application
 
     /**
      * A `--dry-run` estimates cost from the scanned files and `--show-scanned`
-     * lists them, and neither reaches the provider, so the standalone
+     * lists them. Neither reaches the provider, so the standalone
      * configuration does not have to resolve a provider credential for them.
      * Read here rather than from the command, because the failure it
      * prevents happens while that command is still being built.
@@ -153,8 +153,8 @@ final class StandaloneApplication extends Application
 
     /**
      * The `project-path` the command line gives the audit, read by binding a
-     * copy of it to the command's own definition — the only way to tell that
-     * argument from the value of an option — before the command is built from
+     * copy of it to the command's own definition (the only way to tell that
+     * argument from the value of an option) before the command is built from
      * the configuration, which is where the audited project's own file has to
      * be chosen. Null when none is given or the line does not bind, which the
      * command itself then reports.
@@ -218,7 +218,7 @@ final class StandaloneApplication extends Application
     /**
      * Help, a listing and shell completion only describe commands, so a
      * command built from the configuration can be described from its class
-     * instead — before `init` has written a configuration, or with one that
+     * instead, before `init` has written a configuration or with one that
      * would not boot. Mirrors the `--help` detection of the base class.
      */
     public function describesCommandsOnly(): bool
@@ -229,7 +229,7 @@ final class StandaloneApplication extends Application
     /**
      * The error block alone does not say what produced it, which is what a
      * pasted CI log or bug report is missing. Only a real command line is
-     * echoed — a programmatic `ArrayInput` has no invocation to reproduce.
+     * echoed: a programmatic `ArrayInput` has no invocation to reproduce.
      */
     #[Override]
     public function renderThrowable(Throwable $throwable, OutputInterface $output): void

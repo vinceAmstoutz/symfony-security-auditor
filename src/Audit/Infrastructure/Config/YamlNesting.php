@@ -16,12 +16,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 /**
  * How a YAML file nests, read from its lines alone, before a parser that
  * copies the rest of a block at every level it opens is handed the file: how
- * many levels are open at once, and the bytes it would copy, each line counted
+ * many levels are open at once and the bytes it would copy, each line counted
  * once for every level open around it, blank and comment lines included,
  * since a block carries them along. A carriage return ends a line, alone or
  * before a line feed, as it does for the parser.
  *
- * @internal not part of the BC promise — see docs/versioning.md
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class YamlNesting
 {

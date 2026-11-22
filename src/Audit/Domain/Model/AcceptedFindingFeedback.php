@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
  * One accepted (baselined) finding annotated with the maintainer's reason for
- * accepting it — the raw material of the reviewer's false-positive feedback.
+ * accepting it: the raw material of the reviewer's false-positive feedback.
  */
 final readonly class AcceptedFindingFeedback
 {

@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EnvironmentVariableName;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\EnvPlaceholder;
 
-/** @internal not part of the BC promise — see docs/versioning.md */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final class UnsupportedEnvPlaceholderException extends InvalidArgumentException
 {
     private const string PROCESSOR_SEPARATOR = ':';
@@ -52,9 +52,9 @@ final class UnsupportedEnvPlaceholderException extends InvalidArgumentException
      * The placeholder is quoted so the line of the config to fix can be found,
      * but never so that a key pasted into it is echoed: each processor is
      * shown only when Symfony names it so, the variable as
-     * `EnvironmentVariableName::shown()` quotes a refused name, and an
+     * `EnvironmentVariableName::shown()` quotes a refused name and an
      * expression holding anything else is masked as a key is, however short
-     * — its colons may be part of the key.
+     * (its colons may be part of the key).
      */
     private static function quoted(EnvPlaceholder $envPlaceholder): string
     {
