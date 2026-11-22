@@ -120,6 +120,22 @@ final class AuthRemoveCommandTest extends TestCase
         self::assertSame(Command::INVALID, $this->commandTester()->execute([]));
     }
 
+    public function test_it_succeeds_when_the_configured_platform_needs_no_api_key(): void
+    {
+        $this->writeConfig("provider: claudecode\nplatform:\n    claudecode: {}\nmodel: opus\n");
+
+        self::assertSame(Command::SUCCESS, $this->commandTester()->execute([]));
+    }
+
+    public function test_it_says_the_configured_platform_needs_no_api_key_to_forget(): void
+    {
+        $this->writeConfig("provider: claudecode\nplatform:\n    claudecode: {}\nmodel: opus\n");
+        $commandTester = $this->commandTester();
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('The configured platform needs no API key, so there is none to forget.', $this->flattened($commandTester));
+    }
+
     public function test_it_tells_an_unconfigured_user_how_to_name_the_variable(): void
     {
         $commandTester = $this->commandTester();
@@ -133,9 +149,9 @@ final class AuthRemoveCommandTest extends TestCase
         return (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
     }
 
-    private function writeConfig(): void
+    private function writeConfig(string $contents = "platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n"): void
     {
-        $this->filesystem->dumpFile($this->configHome.'/symfony-security-auditor/config.yaml', "platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n");
+        $this->filesystem->dumpFile($this->configHome.'/symfony-security-auditor/config.yaml', $contents);
     }
 
     public function test_it_reports_a_store_it_cannot_parse_instead_of_crashing(): void

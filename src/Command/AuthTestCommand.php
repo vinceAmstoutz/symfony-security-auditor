@@ -23,7 +23,7 @@ final readonly class AuthTestCommand
 {
     public const string NAME = 'auth:test';
 
-    public const string DESCRIPTION = 'Send one short request to check that the provider accepts the API key (a paid API bills it, usually well under a cent)';
+    public const string DESCRIPTION = 'Send one short request to check that the provider answers (a paid API bills it, usually well under a cent)';
 
     public function __construct(
         private ConnectionCheckInterface $connectionCheck,

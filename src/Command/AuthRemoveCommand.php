@@ -46,9 +46,7 @@ final readonly class AuthRemoveCommand
 
         $variableName = $envVar ?? $this->configuredCredentialVariable->name();
         if (null === $variableName) {
-            $symfonyStyle->error('No API-key variable is configured yet, so there is nothing to forget. Name one explicitly with --env-var if you stored it under a different name.');
-
-            return Command::INVALID;
+            return $this->reportWithoutVariable($symfonyStyle);
         }
 
         if (EnvironmentVariableRefusal::reported($symfonyStyle, $variableName)) {
@@ -72,5 +70,18 @@ final readonly class AuthRemoveCommand
         $symfonyStyle->success(\sprintf('Forgot the stored key for %1$s. Audits need %1$s in the environment again — the key itself is still valid with your provider, so revoke it there too if that was the point.', $variableName));
 
         return Command::SUCCESS;
+    }
+
+    private function reportWithoutVariable(SymfonyStyle $symfonyStyle): int
+    {
+        if ($this->configuredCredentialVariable->platformNeedsNoApiKey()) {
+            $symfonyStyle->success('The configured platform needs no API key, so there is none to forget. Name one explicitly with --env-var if you stored a key earlier.');
+
+            return Command::SUCCESS;
+        }
+
+        $symfonyStyle->error('No API-key variable is configured yet, so there is nothing to forget. Name one explicitly with --env-var if you stored it under a different name.');
+
+        return Command::INVALID;
     }
 }

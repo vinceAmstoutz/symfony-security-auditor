@@ -30,6 +30,11 @@ final class AuthTestCommandTest extends TestCase
         self::assertStringContainsString('[OK] The provider answered the test request. You can run an audit now.', $commandTester->getDisplay());
     }
 
+    public function test_its_description_holds_for_a_platform_without_an_api_key(): void
+    {
+        self::assertStringNotContainsString('API key', AuthTestCommand::DESCRIPTION);
+    }
+
     public function test_it_fails_with_the_reason_the_provider_gave(): void
     {
         $commandTester = $this->commandTester('HTTP 401: invalid x-api-key');

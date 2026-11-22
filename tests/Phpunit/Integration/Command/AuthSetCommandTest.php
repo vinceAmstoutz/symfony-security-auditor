@@ -144,6 +144,15 @@ final class AuthSetCommandTest extends TestCase
         self::assertStringContainsString('Run "init" first', $this->flattened($commandTester));
     }
 
+    public function test_it_says_the_configured_platform_needs_no_api_key_to_store(): void
+    {
+        $this->writeConfig("provider: claudecode\nplatform:\n    claudecode: {}\nmodel: opus\n");
+        $commandTester = $this->commandTester();
+        $commandTester->execute([], ['interactive' => false]);
+
+        self::assertStringContainsString('The configured platform needs no API key, so there is none to store.', $this->flattened($commandTester));
+    }
+
     public function test_it_refuses_an_empty_answer_rather_than_storing_nothing(): void
     {
         $this->writeConfig();
@@ -167,9 +176,9 @@ final class AuthSetCommandTest extends TestCase
         return (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay());
     }
 
-    private function writeConfig(): void
+    private function writeConfig(string $contents = "platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n"): void
     {
-        $this->filesystem->dumpFile($this->configHome.'/symfony-security-auditor/config.yaml', "platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n");
+        $this->filesystem->dumpFile($this->configHome.'/symfony-security-auditor/config.yaml', $contents);
     }
 
     private function commandTester(): CommandTester
