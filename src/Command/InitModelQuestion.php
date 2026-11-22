@@ -31,7 +31,10 @@ final readonly class InitModelQuestion
 {
     private const string DEFAULT_MODEL = 'claude-opus-5-5';
 
-    private const array SUBSCRIPTION_REVIEWER_MODELS = ['claudecode' => 'claude-haiku-5-5', 'codex' => 'gpt-5.4-mini'];
+    private const array SUBSCRIPTION_REVIEWER_CHOICES = [
+        'claudecode' => ['models' => CliAgentPlatformFactory::SUBSCRIPTION_MODELS['claudecode'], 'suggested' => 'claude-haiku-5-5'],
+        'codex' => ['models' => CliAgentPlatformFactory::SUBSCRIPTION_MODELS['codex'], 'suggested' => 'gpt-5.4-mini'],
+    ];
 
     private const string DEFAULT_MODEL_ID = '#(?:^|[./])claude-opus-5-5(?:@[a-z0-9-]+)?$#';
 
@@ -63,12 +66,12 @@ final readonly class InitModelQuestion
 
     public function askReviewer(SymfonyStyle $symfonyStyle, ProviderKey $providerKey): ?string
     {
-        $reviewerModel = self::SUBSCRIPTION_REVIEWER_MODELS[$providerKey->platform] ?? null;
-        if (null === $reviewerModel) {
+        $choices = self::SUBSCRIPTION_REVIEWER_CHOICES[$providerKey->platform] ?? null;
+        if (null === $choices) {
             return null;
         }
 
-        return NumberedChoice::ask($symfonyStyle, 'Which model should review the findings? Pick a number, or type a model id', CliAgentPlatformFactory::SUBSCRIPTION_MODELS[$providerKey->platform] ?? [$reviewerModel], $reviewerModel);
+        return NumberedChoice::ask($symfonyStyle, 'Which model should review the findings? Pick a number, or type a model id', $choices['models'], $choices['suggested']);
     }
 
     private function askOllamaModel(SymfonyStyle $symfonyStyle, ?string $endpoint): string
