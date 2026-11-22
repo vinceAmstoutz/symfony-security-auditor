@@ -49,7 +49,7 @@ final readonly class AuthSetCommand
 
         $variableName = $envVar ?? $this->configuredCredentialVariable->name();
         if (null === $variableName) {
-            $symfonyStyle->error('No API-key variable is configured yet. Run "init" first, or name one explicitly with --env-var.');
+            $symfonyStyle->error($this->noVariableReason());
 
             return Command::INVALID;
         }
@@ -101,5 +101,12 @@ final readonly class AuthSetCommand
             $credentialIdentity->fingerprint,
             $location,
         );
+    }
+
+    private function noVariableReason(): string
+    {
+        return $this->configuredCredentialVariable->platformNeedsNoApiKey()
+            ? 'The configured platform needs no API key, so there is none to store. Name one explicitly with --env-var to store a key anyway.'
+            : 'No API-key variable is configured yet. Run "init" first, or name one explicitly with --env-var.';
     }
 }

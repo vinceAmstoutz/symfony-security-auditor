@@ -195,6 +195,22 @@ final class AuthStatusCommandTest extends TestCase
         self::assertSame(Command::INVALID, $this->commandTester()->execute([]));
     }
 
+    public function test_it_succeeds_when_the_configured_platform_needs_no_api_key(): void
+    {
+        $this->writeConfig("provider: claudecode\nplatform:\n    claudecode: {}\nmodel: opus\n");
+
+        self::assertSame(Command::SUCCESS, $this->commandTester()->execute([]));
+    }
+
+    public function test_it_says_the_configured_platform_needs_no_api_key(): void
+    {
+        $this->writeConfig("provider: claudecode\nplatform:\n    claudecode: {}\nmodel: opus\n");
+        $commandTester = $this->commandTester();
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('The configured platform needs no API key, so an audit uses none', $this->flattened($commandTester));
+    }
+
     public function test_it_points_an_unconfigured_user_at_init(): void
     {
         $commandTester = $this->commandTester();

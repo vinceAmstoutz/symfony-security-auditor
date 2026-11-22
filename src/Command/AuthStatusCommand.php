@@ -62,9 +62,7 @@ final readonly class AuthStatusCommand
         $placeholder = $this->configuredCredentialVariable->placeholder();
         $variableName = $envVar ?? $placeholder?->variableName;
         if (null === $variableName) {
-            $symfonyStyle->error('No API-key variable is configured yet. Run "init" to create a configuration, or name one explicitly with --env-var.');
-
-            return Command::INVALID;
+            return $this->reportWithoutVariable($symfonyStyle);
         }
 
         if (EnvironmentVariableRefusal::reported($symfonyStyle, $variableName)) {
@@ -81,6 +79,19 @@ final readonly class AuthStatusCommand
         return $placeholder?->variableName === $variableName && $placeholder->readsFile
             ? $this->reportFromFile($symfonyStyle, $variableName, $exported, $shadowsStoredCredential)
             : $this->reportResolved($symfonyStyle, $variableName, $exported, self::ENVIRONMENT_SOURCE, $shadowsStoredCredential);
+    }
+
+    private function reportWithoutVariable(SymfonyStyle $symfonyStyle): int
+    {
+        if ($this->configuredCredentialVariable->platformNeedsNoApiKey()) {
+            $symfonyStyle->success('The configured platform needs no API key, so an audit uses none.');
+
+            return Command::SUCCESS;
+        }
+
+        $symfonyStyle->error('No API-key variable is configured yet. Run "init" to create a configuration, or name one explicitly with --env-var.');
+
+        return Command::INVALID;
     }
 
     /**

@@ -63,7 +63,7 @@ final class EnvironmentDoctorTest extends TestCase
         $results = $this->doctorWith($this->resolver(), [], true)->diagnose();
 
         self::assertEquals([
-            new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and an API key is available: sk-tes…ghij (SHA256:2e9cd0e8ecfb255a).'),
+            new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and an API key is available: sk-tes…ghij (SHA256:2e9cd0e8ecfb255a). Run "auth:status" to see where it comes from.'),
             new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed and the audit boots with it.'),
             new DoctorCheckResult('Composer', DoctorCheckStatus::Ok, 'Available.'),
         ], \array_slice($results, 0, 3));
@@ -257,7 +257,7 @@ final class EnvironmentDoctorTest extends TestCase
         $results = $this->doctorWith($this->resolver(), ['GW_TOKEN' => 'gw-0123456789abcdefghijklmn'], true)->diagnose();
 
         self::assertEquals(
-            new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and an API key is available: gw-012…klmn (SHA256:28c119d571da66f6).'),
+            new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and an API key is available: gw-012…klmn (SHA256:28c119d571da66f6). Run "auth:status" to see where it comes from.'),
             $results[0],
         );
     }

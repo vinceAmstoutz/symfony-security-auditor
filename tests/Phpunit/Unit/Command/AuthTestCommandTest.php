@@ -21,13 +21,18 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ConnectionCheckInterface;
 
 final class AuthTestCommandTest extends TestCase
 {
-    public function test_it_reports_a_provider_that_accepted_the_key(): void
+    public function test_it_reports_a_provider_that_answered(): void
     {
         $commandTester = $this->commandTester(null);
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('[OK] Your API key works. You can run an audit now.', $commandTester->getDisplay());
+        self::assertStringContainsString('[OK] The provider answered the test request. You can run an audit now.', $commandTester->getDisplay());
+    }
+
+    public function test_its_description_holds_for_a_platform_without_an_api_key(): void
+    {
+        self::assertStringNotContainsString('API key', AuthTestCommand::DESCRIPTION);
     }
 
     public function test_it_fails_with_the_reason_the_provider_gave(): void

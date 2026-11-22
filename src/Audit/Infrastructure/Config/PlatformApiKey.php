@@ -54,8 +54,23 @@ final readonly class PlatformApiKey
      */
     public static function valueForProvider(array $platform, ?string $provider): ?string
     {
+        $block = self::blockForProvider($platform, $provider);
+
+        return null !== $block ? self::valueIn($block) : null;
+    }
+
+    /**
+     * The block of the platform `provider:` selects, the whole platform block
+     * with no selector, or null when the selected platform is not configured.
+     *
+     * @param array<array-key, mixed> $platform
+     *
+     * @return ?array<array-key, mixed>
+     */
+    public static function blockForProvider(array $platform, ?string $provider): ?array
+    {
         if (null === $provider) {
-            return self::valueIn($platform);
+            return $platform;
         }
 
         $providerKey = ProviderKey::of($provider);
@@ -64,7 +79,7 @@ final readonly class PlatformApiKey
             $block = $block[$providerKey->instance] ?? null;
         }
 
-        return \is_array($block) ? self::valueIn($block) : null;
+        return \is_array($block) ? $block : null;
     }
 
     private static function valueAt(mixed $key, mixed $value): ?string

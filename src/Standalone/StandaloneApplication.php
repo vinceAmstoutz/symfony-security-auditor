@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 use Override;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Command\DumpCompletionCommand;
 use Symfony\Component\Console\Exception\ExceptionInterface;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Input\ArgvInput;
@@ -83,6 +84,15 @@ final class StandaloneApplication extends Application
         private readonly ConsoleBannerInterface $consoleBanner = new ConsoleBanner(),
     ) {
         parent::__construct($name, $version);
+    }
+
+    #[Override]
+    protected function getDefaultCommands(): array
+    {
+        return array_map(
+            static fn (Command $command): Command => $command instanceof DumpCompletionCommand ? $command->setHidden() : $command,
+            parent::getDefaultCommands(),
+        );
     }
 
     #[Override]

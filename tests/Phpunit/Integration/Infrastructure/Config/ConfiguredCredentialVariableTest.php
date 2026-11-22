@@ -122,6 +122,20 @@ final class ConfiguredCredentialVariableTest extends TestCase
         self::assertNull($this->configuredCredentialVariable()->name());
     }
 
+    public function test_a_selected_provider_that_is_not_configured_is_not_a_platform_needing_no_api_key(): void
+    {
+        $this->writeConfig("provider: mistral\nplatform:\n    claudecode: {}\n");
+
+        self::assertFalse($this->configuredCredentialVariable()->platformNeedsNoApiKey());
+    }
+
+    public function test_an_empty_platform_block_is_not_a_platform_needing_no_api_key(): void
+    {
+        $this->writeConfig("platform: {}\n");
+
+        self::assertFalse($this->configuredCredentialVariable()->platformNeedsNoApiKey());
+    }
+
     public function test_it_ignores_a_blank_provider_selector(): void
     {
         $this->writeConfig("provider: ''\nplatform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n");
