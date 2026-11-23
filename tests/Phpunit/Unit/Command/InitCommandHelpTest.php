@@ -25,7 +25,7 @@ final class InitCommandHelpTest extends TestCase
 
     public function test_it_names_the_reviewer_model_each_subscription_defaults_to(): void
     {
-        self::assertStringContainsString('<info>--reviewer-model</info> claude-haiku-5-5 on a Claude subscription, gpt-5.4-mini on a ChatGPT one; elsewhere --model reviews too', InitCommandHelp::HELP);
+        self::assertStringContainsString('<info>--reviewer-model</info> claude-haiku-5-5 on a Claude subscription, gpt-6-luna on a ChatGPT one; elsewhere --model reviews too', InitCommandHelp::HELP);
     }
 
     public function test_it_names_the_effort_a_subscription_defaults_to(): void

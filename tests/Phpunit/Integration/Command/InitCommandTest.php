@@ -198,14 +198,14 @@ final class InitCommandTest extends TestCase
         self::assertSame([Command::INVALID, true], [$exitCode, str_contains($this->unwrappedDisplay($commandTester), 'Only a subscription (claudecode or codex) takes an effort; leave --effort out for anthropic.')]);
     }
 
-    public function test_it_suggests_gpt_5_4_mini_to_review_on_a_chatgpt_subscription(): void
+    public function test_it_suggests_gpt_6_luna_to_review_on_a_chatgpt_subscription(): void
     {
         $commandTester = $this->commandTester();
         $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'codex', '', '', '', '']);
 
         $commandTester->execute([]);
 
-        self::assertSame('gpt-5.4-mini', $this->configuredValue('reviewer_model'));
+        self::assertSame('gpt-6-luna', $this->configuredValue('reviewer_model'));
     }
 
     public function test_it_offers_the_subscription_models_to_review(): void
@@ -215,7 +215,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('Which model should review the findings? Pick a number, or type a model id [gpt-5.4-mini]: [1] gpt-5.4 [2] gpt-5.4-mini [3] gpt-5.3-codex', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString('Which model should review the findings? Pick a number, or type a model id [gpt-6-luna]: [1] gpt-6.2-astra [2] gpt-6.2-sol [3] gpt-6-luna', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_suggests_a_medium_effort_on_a_chatgpt_subscription(): void
@@ -334,14 +334,14 @@ final class InitCommandTest extends TestCase
         self::assertStringStartsWith(' How do you access AI models? Pick a number, or type a provider name [', $this->unwrappedDisplay($commandTester));
     }
 
-    public function test_it_asks_the_model_of_a_chatgpt_subscription_suggesting_gpt_5_4(): void
+    public function test_it_asks_the_model_of_a_chatgpt_subscription_suggesting_gpt_6_2_astra(): void
     {
         $commandTester = $this->commandTester();
         $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'codex', '', '', '', '']);
 
         $commandTester->execute([]);
 
-        self::assertSame([true, 'gpt-5.4'], [str_contains($commandTester->getDisplay(), 'Which model should the auditor use?'), $this->configuredValue('model')]);
+        self::assertSame([true, 'gpt-6.2-astra'], [str_contains($commandTester->getDisplay(), 'Which model should the auditor use?'), $this->configuredValue('model')]);
     }
 
     public function test_it_says_it_sends_the_test_request_once_the_user_agreed(): void
@@ -589,14 +589,14 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_configures_the_codex_cli_with_no_api_key_gpt_5_4_gpt_5_4_mini_to_review_and_a_medium_effort(): void
+    public function test_it_configures_the_codex_cli_with_no_api_key_gpt_6_2_astra_gpt_6_luna_to_review_and_a_medium_effort(): void
     {
         $commandTester = $this->commandTester();
 
         $commandTester->execute(['--provider' => 'codex'], ['interactive' => false]);
 
         self::assertSame(
-            ['provider' => 'codex', 'platform' => ['codex' => ['effort' => 'medium']], 'model' => 'gpt-5.4', 'reviewer_model' => 'gpt-5.4-mini', 'audit' => ['report_static_findings' => true]],
+            ['provider' => 'codex', 'platform' => ['codex' => ['effort' => 'medium']], 'model' => 'gpt-6.2-astra', 'reviewer_model' => 'gpt-6-luna', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }

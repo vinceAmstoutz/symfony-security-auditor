@@ -97,7 +97,7 @@ final class CodexPlatformTest extends TestCase
         $this->invoke([]);
 
         self::assertSame(
-            ['exec', '--json', '--sandbox', 'read-only', '--skip-git-repo-check', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--config', 'features.shell_tool=false', '--config', 'web_search="disabled"', '--model', 'gpt-5.4'],
+            ['exec', '--json', '--sandbox', 'read-only', '--skip-git-repo-check', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--config', 'features.shell_tool=false', '--config', 'web_search="disabled"', '--model', 'gpt-6.2-astra'],
             \array_slice($this->arguments(), 0, -1),
         );
     }
@@ -118,7 +118,7 @@ final class CodexPlatformTest extends TestCase
 
         $this->expectException(ExceedContextSizeException::class);
 
-        $platform->invoke('gpt-5.4', new MessageBag(Message::forSystem(str_repeat('a', 70000)), Message::ofUser(str_repeat('b', 70000))));
+        $platform->invoke('gpt-6.2-astra', new MessageBag(Message::forSystem(str_repeat('a', 70000)), Message::ofUser(str_repeat('b', 70000))));
     }
 
     /**
@@ -151,7 +151,7 @@ final class CodexPlatformTest extends TestCase
         $this->invoke([], ['effort' => 'high']);
 
         self::assertSame(
-            ['exec', '--json', '--sandbox', 'read-only', '--skip-git-repo-check', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--config', 'features.shell_tool=false', '--config', 'web_search="disabled"', '--config', 'model_reasoning_effort="high"', '--model', 'gpt-5.4'],
+            ['exec', '--json', '--sandbox', 'read-only', '--skip-git-repo-check', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--config', 'features.shell_tool=false', '--config', 'web_search="disabled"', '--config', 'model_reasoning_effort="high"', '--model', 'gpt-6.2-astra'],
             \array_slice($this->arguments(), 0, -1),
         );
     }
@@ -171,7 +171,7 @@ final class CodexPlatformTest extends TestCase
         $platform = $this->container($settings)->get(PlatformInterface::class);
         self::assertInstanceOf(PlatformInterface::class, $platform);
 
-        return $platform->invoke('gpt-5.4', new MessageBag(Message::forSystem('Be terse.'), Message::ofUser('Audit this.')), $options)->asText();
+        return $platform->invoke('gpt-6.2-astra', new MessageBag(Message::forSystem('Be terse.'), Message::ofUser('Audit this.')), $options)->asText();
     }
 
     /**

@@ -34,10 +34,10 @@ final class CliAgentPlatformFactoryTest extends TestCase
         self::assertSame('claude-opus-5', $platform->getModelCatalog()->getModel('claude-opus-5')->getName());
     }
 
-    public function test_the_codex_platform_runs_a_gpt_model_it_does_not_list(): void
+    public function test_the_codex_platform_runs_a_gpt_model_its_bridge_does_not_list(): void
     {
         $platform = CliAgentPlatformFactory::create(CodexFactory::class, null);
 
-        self::assertSame('gpt-5.5', $platform->getModelCatalog()->getModel('gpt-5.5')->getName());
+        self::assertSame('gpt-6.2-astra', $platform->getModelCatalog()->getModel('gpt-6.2-astra')->getName());
     }
 }

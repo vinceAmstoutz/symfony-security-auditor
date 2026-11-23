@@ -84,7 +84,7 @@ final class CliAgentPlatformTest extends TestCase
 
         $this->expectException(ExceedContextSizeException::class);
 
-        (new CliAgentPlatform($platform, ['sandbox' => 'read-only'], promptsShareOneArgument: true))->invoke('gpt-5.4', $this->framedPrompts(self::LONGEST_COMMAND_LINE_ARGUMENT + 1));
+        (new CliAgentPlatform($platform, ['sandbox' => 'read-only'], promptsShareOneArgument: true))->invoke('gpt-6.2-astra', $this->framedPrompts(self::LONGEST_COMMAND_LINE_ARGUMENT + 1));
     }
 
     public function test_prompts_that_fill_their_shared_command_line_argument_exactly_reach_the_cli(): void
@@ -92,9 +92,9 @@ final class CliAgentPlatformTest extends TestCase
         $messageBag = $this->framedPrompts(self::LONGEST_COMMAND_LINE_ARGUMENT);
         $deferredResult = new DeferredResult(new PlainConverter(new TextResult('OK')), new InMemoryRawResult());
         $platform = $this->createMock(PlatformInterface::class);
-        $platform->expects(self::once())->method('invoke')->with('gpt-5.4', $messageBag, ['sandbox' => 'read-only'])->willReturn($deferredResult);
+        $platform->expects(self::once())->method('invoke')->with('gpt-6.2-astra', $messageBag, ['sandbox' => 'read-only'])->willReturn($deferredResult);
 
-        self::assertSame($deferredResult, (new CliAgentPlatform($platform, ['sandbox' => 'read-only'], promptsShareOneArgument: true))->invoke('gpt-5.4', $messageBag));
+        self::assertSame($deferredResult, (new CliAgentPlatform($platform, ['sandbox' => 'read-only'], promptsShareOneArgument: true))->invoke('gpt-6.2-astra', $messageBag));
     }
 
     private function framedPrompts(int $framedLength): MessageBag

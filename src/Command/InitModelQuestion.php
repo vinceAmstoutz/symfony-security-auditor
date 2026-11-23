@@ -33,7 +33,7 @@ final readonly class InitModelQuestion
 
     private const array SUBSCRIPTION_REVIEWER_CHOICES = [
         'claudecode' => ['models' => CliAgentPlatformFactory::SUBSCRIPTION_MODELS['claudecode'], 'suggested' => 'claude-haiku-5-5'],
-        'codex' => ['models' => CliAgentPlatformFactory::SUBSCRIPTION_MODELS['codex'], 'suggested' => 'gpt-5.4-mini'],
+        'codex' => ['models' => CliAgentPlatformFactory::SUBSCRIPTION_MODELS['codex'], 'suggested' => 'gpt-6-luna'],
     ];
 
     private const string DEFAULT_MODEL_ID = '#(?:^|[./])claude-opus-5-5(?:@[a-z0-9-]+)?$#';

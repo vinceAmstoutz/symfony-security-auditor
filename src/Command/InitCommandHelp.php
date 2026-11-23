@@ -27,7 +27,7 @@ final readonly class InitCommandHelp
         Defaults:
           <info>--provider</info>  anthropic
           <info>--model</info>     claude-opus-5-5 — set it for any other provider, it is not derived from one
-          <info>--reviewer-model</info> claude-haiku-5-5 on a Claude subscription, gpt-5.4-mini on a ChatGPT one; elsewhere --model reviews too
+          <info>--reviewer-model</info> claude-haiku-5-5 on a Claude subscription, gpt-6-luna on a ChatGPT one; elsewhere --model reviews too
           <info>--effort</info>    medium on a subscription (low, medium, high, xhigh or max); no other provider takes one
           <info>--env-var</info>   <PLATFORM>_API_KEY, except for a platform you host yourself, which is written without a credential unless you name one
 

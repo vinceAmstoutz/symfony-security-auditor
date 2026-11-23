@@ -57,7 +57,7 @@ final class UnpricedModelBudgetGuardTest extends TestCase
 
     public function test_it_refuses_a_budgeted_subscription_run_naming_the_budget_as_the_only_way_out(): void
     {
-        $unpricedModelBudgetGuard = new UnpricedModelBudgetGuard($this->pricingKnowing(), ['gpt-5.4'], 5.0, 'codex');
+        $unpricedModelBudgetGuard = new UnpricedModelBudgetGuard($this->pricingKnowing(), ['gpt-6.2-astra'], 5.0, 'codex');
         $bufferedOutput = new BufferedOutput();
         $input = $this->nonInteractiveInput();
         $permitted = $unpricedModelBudgetGuard->permitsRun($input, new SymfonyStyle($input, $bufferedOutput));
