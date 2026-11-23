@@ -85,6 +85,11 @@ final readonly class AuditConfigurationDefinition
                         ->append((new TextNodeDefinition('cli_binary'))
                             ->defaultNull()
                             ->info('Path to the CLI when it is not on the `PATH`.'))
+                        ->enumNode('effort')
+                            ->values([null, ...CliAgentPlatforms::EFFORT_LEVELS])
+                            ->defaultNull()
+                            ->info('_Since 1.23._ The effort the CLI runs at: `low`, `medium`, `high`, `xhigh` or `max`, passed to Claude Code as `--effort` and to Codex as `model_reasoning_effort`. Null, the default, leaves the CLI at its own default.')
+                        ->end()
                     ->end()
                 ->end()
         ;

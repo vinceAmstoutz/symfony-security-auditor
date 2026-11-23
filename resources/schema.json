@@ -57,6 +57,10 @@
             "cli_binary": {
               "type": ["string", "null"],
               "description": "Path to the CLI when it is not on the PATH. Default: null."
+            },
+            "effort": {
+              "enum": [null, "low", "medium", "high", "xhigh", "max"],
+              "description": "The effort the CLI runs at, passed to Claude Code as --effort and to Codex as model_reasoning_effort. Default: null, which keeps the CLI's own. Since 1.23."
             }
           }
         },

@@ -25,5 +25,11 @@ final readonly class PlatformConnection
         public ?string $baseUrl = null,
         public ?string $endpoint = null,
         public ?string $deployment = null,
+        public ?string $effort = null,
     ) {}
+
+    public function withEffort(?string $effort): self
+    {
+        return new self($this->baseUrl, $this->endpoint, $this->deployment, $effort);
+    }
 }

@@ -30,6 +30,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKey
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OptionalApiKeyPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PlatformServiceId;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\TerminalText;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatformFactory;
 
 /**
  * Why `init` will not write a configuration, as the sentence the user reads.
@@ -75,6 +76,16 @@ final readonly class InitRefusal
             '' === $model => 'The model must not be empty.',
             !ContainerParameterSyntax::isAbsentFrom($model) => 'The model holds "%...%", which would be read as a container parameter rather than as part of its name. Give the name itself.',
             $providerKey instanceof ProviderKey && BedrockMantleRoute::applies($providerKey) && !BedrockMantleRoute::namesAVendor($model) => \sprintf('Bedrock names a model after its vendor, for example "anthropic.claude-opus-4-8" or "openai.gpt-oss-120b"; "%s" names none, so init cannot tell which Bedrock route serves it. Give the full model id.', $model),
+            default => null,
+        };
+    }
+
+    public static function forEffort(?string $effort, ProviderKey $providerKey): ?string
+    {
+        return match (true) {
+            null === $effort => null,
+            !InitEffortQuestion::takesEffort($providerKey) => \sprintf('Only a subscription (%s) takes an effort; leave --effort out for %s.', implode(' or ', array_keys(CliAgentPlatformFactory::SUBSCRIPTION_MODELS)), $providerKey->platform),
+            !\in_array($effort, CliAgentPlatforms::EFFORT_LEVELS, true) => \sprintf('The effort must be one of %s.', implode(', ', CliAgentPlatforms::EFFORT_LEVELS)),
             default => null,
         };
     }

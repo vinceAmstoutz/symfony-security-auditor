@@ -43,6 +43,30 @@ final class UnpricedModelBudgetGuardTest extends TestCase
         self::assertStringNotContainsString('audit.budget.max_cost_usd', $rendered);
     }
 
+    public function test_it_says_a_subscription_is_not_priced_per_call_rather_than_suspecting_a_typo(): void
+    {
+        $unpricedModelBudgetGuard = new UnpricedModelBudgetGuard($this->pricingKnowing(), ['claude-opus-5-5'], null, 'claudecode');
+        $bufferedOutput = new BufferedOutput();
+        $input = $this->nonInteractiveInput();
+        $unpricedModelBudgetGuard->permitsRun($input, new SymfonyStyle($input, $bufferedOutput));
+
+        $rendered = (string) preg_replace('/[\s!]+/', ' ', $bufferedOutput->fetch());
+
+        self::assertSame([true, false], [str_contains($rendered, 'The audit runs on a subscription through the Claude Code CLI, which is not priced per call: cost reporting shows $0.00.'), str_contains($rendered, 'typo')]);
+    }
+
+    public function test_it_refuses_a_budgeted_subscription_run_naming_the_budget_as_the_only_way_out(): void
+    {
+        $unpricedModelBudgetGuard = new UnpricedModelBudgetGuard($this->pricingKnowing(), ['gpt-6.2-astra'], 5.0, 'codex');
+        $bufferedOutput = new BufferedOutput();
+        $input = $this->nonInteractiveInput();
+        $permitted = $unpricedModelBudgetGuard->permitsRun($input, new SymfonyStyle($input, $bufferedOutput));
+
+        $rendered = (string) preg_replace('/[\s!]+/', ' ', $bufferedOutput->fetch());
+
+        self::assertSame([false, true], [$permitted, str_contains($rendered, 'A subscription is not priced per call, so the cost budget cannot hold. Remove audit.budget.max_cost_usd to run on it.')]);
+    }
+
     public function test_it_stays_silent_and_permits_the_run_when_every_model_is_priced(): void
     {
         $unpricedModelBudgetGuard = new UnpricedModelBudgetGuard($this->pricingKnowing('claude-opus-4-8'), ['claude-opus-4-8'], 10.0);

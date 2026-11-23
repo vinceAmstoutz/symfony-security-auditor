@@ -125,6 +125,109 @@ final class InitCommandTest extends TestCase
         self::assertStringContainsString('Which subscription do you have? [Claude (through the Claude Code CLI)]: [1] Claude (through the Claude Code CLI) [2] ChatGPT (through the Codex CLI) >', $this->unwrappedDisplay($commandTester));
     }
 
+    public function test_it_suggests_opus_5_5_for_a_claude_subscription(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'claudecode', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('claude-opus-5-5', $this->configuredValue('model'));
+    }
+
+    public function test_it_suggests_haiku_5_5_to_review_on_a_claude_subscription(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'claudecode', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('claude-haiku-5-5', $this->configuredValue('reviewer_model'));
+    }
+
+    public function test_it_takes_the_reviewer_model_from_the_command_line(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'claudecode', '--reviewer-model' => 'claude-sonnet-5-5'], ['interactive' => false]);
+
+        self::assertSame('claude-sonnet-5-5', $this->configuredValue('reviewer_model'));
+    }
+
+    public function test_it_refuses_a_reviewer_model_the_container_would_read_as_a_parameter(): void
+    {
+        $commandTester = $this->commandTester();
+
+        self::assertSame(Command::INVALID, $commandTester->execute(['--provider' => 'claudecode', '--reviewer-model' => '%kernel.secret%'], ['interactive' => false]));
+    }
+
+    public function test_it_suggests_a_medium_effort_on_a_claude_subscription(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'claudecode', '', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(['claudecode' => ['effort' => 'medium']], $this->configuredValue('platform'));
+    }
+
+    public function test_it_takes_the_effort_from_the_command_line(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'claudecode', '--effort' => 'high'], ['interactive' => false]);
+
+        self::assertSame(['claudecode' => ['effort' => 'high']], $this->configuredValue('platform'));
+    }
+
+    public function test_it_refuses_an_effort_the_claude_code_cli_does_not_know(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--provider' => 'claudecode', '--effort' => 'banana'], ['interactive' => false]);
+
+        self::assertSame([Command::INVALID, true], [$exitCode, str_contains($this->unwrappedDisplay($commandTester), 'The effort must be one of low, medium, high, xhigh, max.')]);
+    }
+
+    public function test_it_refuses_an_effort_for_a_platform_that_takes_none(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--provider' => 'anthropic', '--effort' => 'high'], ['interactive' => false]);
+
+        self::assertSame([Command::INVALID, true], [$exitCode, str_contains($this->unwrappedDisplay($commandTester), 'Only a subscription (claudecode or codex) takes an effort; leave --effort out for anthropic.')]);
+    }
+
+    public function test_it_suggests_gpt_6_luna_to_review_on_a_chatgpt_subscription(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'codex', '', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('gpt-6-luna', $this->configuredValue('reviewer_model'));
+    }
+
+    public function test_it_offers_the_subscription_models_to_review(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'codex', '', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('Which model should review the findings? Pick a number, or type a model id [gpt-6-luna]: [1] gpt-6.2-sol [2] gpt-6.2-astra [3] gpt-6-luna', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_it_suggests_a_medium_effort_on_a_chatgpt_subscription(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'codex', '', '', '', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame(['codex' => ['effort' => 'medium']], $this->configuredValue('platform'));
+    }
+
     public function test_it_tests_the_connection_when_the_user_accepts(): void
     {
         $recordingConnectionTestRunner = new RecordingConnectionTestRunner();
@@ -231,14 +334,14 @@ final class InitCommandTest extends TestCase
         self::assertStringStartsWith(' How do you access AI models? Pick a number, or type a provider name [', $this->unwrappedDisplay($commandTester));
     }
 
-    public function test_it_asks_no_model_for_a_subscription(): void
+    public function test_it_asks_the_model_of_a_chatgpt_subscription_suggesting_gpt_6_2_sol(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), '1', '']);
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'codex', '', '', '', '']);
 
         $commandTester->execute([]);
 
-        self::assertSame([false, 'opus'], [str_contains($commandTester->getDisplay(), 'Which model should the auditor use?'), $this->configuredValue('model')]);
+        self::assertSame([true, 'gpt-6.2-sol'], [str_contains($commandTester->getDisplay(), 'Which model should the auditor use?'), $this->configuredValue('model')]);
     }
 
     public function test_it_says_it_sends_the_test_request_once_the_user_agreed(): void
@@ -474,26 +577,26 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_configures_the_claude_code_cli_with_no_api_key_and_its_opus_model(): void
+    public function test_it_configures_the_claude_code_cli_with_no_api_key_opus_5_5_haiku_5_5_to_review_and_a_medium_effort(): void
     {
         $commandTester = $this->commandTester();
 
         $commandTester->execute(['--provider' => 'claudecode'], ['interactive' => false]);
 
         self::assertSame(
-            ['provider' => 'claudecode', 'platform' => ['claudecode' => []], 'model' => 'opus', 'audit' => ['report_static_findings' => true]],
+            ['provider' => 'claudecode', 'platform' => ['claudecode' => ['effort' => 'medium']], 'model' => 'claude-opus-5-5', 'reviewer_model' => 'claude-haiku-5-5', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }
 
-    public function test_it_configures_the_codex_cli_with_no_api_key_and_its_newest_model(): void
+    public function test_it_configures_the_codex_cli_with_no_api_key_gpt_6_2_sol_gpt_6_luna_to_review_and_a_medium_effort(): void
     {
         $commandTester = $this->commandTester();
 
         $commandTester->execute(['--provider' => 'codex'], ['interactive' => false]);
 
         self::assertSame(
-            ['provider' => 'codex', 'platform' => ['codex' => []], 'model' => 'gpt-5.4', 'audit' => ['report_static_findings' => true]],
+            ['provider' => 'codex', 'platform' => ['codex' => ['effort' => 'medium']], 'model' => 'gpt-6.2-sol', 'reviewer_model' => 'gpt-6-luna', 'audit' => ['report_static_findings' => true]],
             Yaml::parseFile($this->configFile()),
         );
     }

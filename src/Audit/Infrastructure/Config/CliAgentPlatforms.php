@@ -40,12 +40,10 @@ final readonly class CliAgentPlatforms
     ];
 
     /**
-     * @var array<string, string>
+     * The effort levels both CLIs take, Claude Code as `--effort`, Codex as
+     * its `model_reasoning_effort`.
      */
-    public const array DEFAULT_MODELS = [
-        'claudecode' => 'opus',
-        'codex' => 'gpt-5.4',
-    ];
+    public const array EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
 
     /**
      * Turns each CLI's built-in tools off and makes it ignore the machine's
@@ -78,6 +76,8 @@ final readonly class CliAgentPlatforms
 
     private const string PLATFORM_SERVICE_PREFIX = 'ai.platform.';
 
+    private const string REASONING_CONFIG_PLATFORM = 'codex';
+
     private const string PLATFORM_TAG = 'ai.platform';
 
     public static function declares(ProviderKey $providerKey): bool
@@ -105,11 +105,17 @@ final readonly class CliAgentPlatforms
      */
     public static function auditConfigFor(array $auditConfig, StandalonePlatformConfig $standalonePlatformConfig): array
     {
-        if (null === $standalonePlatformConfig->activeProvider || !\array_key_exists($standalonePlatformConfig->activeProvider, self::FACTORIES)) {
-            return $auditConfig;
-        }
+        return null === self::activeAgentOf($standalonePlatformConfig) ? $auditConfig : self::withToolFreeAudit($auditConfig);
+    }
 
-        return self::withToolFreeAudit($auditConfig);
+    /**
+     * The CLI the standalone `provider:` selects, if it selects one.
+     */
+    public static function activeAgentOf(StandalonePlatformConfig $standalonePlatformConfig): ?string
+    {
+        $provider = $standalonePlatformConfig->activeProvider;
+
+        return null !== $provider && \array_key_exists($provider, self::FACTORIES) ? $provider : null;
     }
 
     /**
@@ -154,8 +160,29 @@ final readonly class CliAgentPlatforms
                 ->setFactory([CliAgentPlatformFactory::class, 'create'])
                 ->setArguments([self::FACTORIES[$name], \is_array($settings) ? ($settings['cli_binary'] ?? null) : null]);
             $containerBuilder->register($serviceId, CliAgentPlatform::class)
-                ->setArguments([new Reference($cliServiceId), self::ISOLATING_OPTIONS[$name], \in_array($name, self::SHARED_PROMPT_ARGUMENT, true)])
+                ->setArguments([new Reference($cliServiceId), self::optionsOf($name, $settings), \in_array($name, self::SHARED_PROMPT_ARGUMENT, true)])
                 ->addTag(self::PLATFORM_TAG);
         }
+    }
+
+    /**
+     * The isolating options, plus the effort in the spelling each CLI reads.
+     *
+     * @param key-of<self::ISOLATING_OPTIONS> $name
+     *
+     * @return array<string, mixed>
+     */
+    private static function optionsOf(string $name, mixed $settings): array
+    {
+        $options = self::ISOLATING_OPTIONS[$name];
+        $effort = \is_array($settings) ? ($settings['effort'] ?? null) : null;
+
+        if (!\is_string($effort)) {
+            return $options;
+        }
+
+        return self::REASONING_CONFIG_PLATFORM === $name
+            ? [...$options, 'config' => [...self::ISOLATING_OPTIONS[self::REASONING_CONFIG_PLATFORM]['config'], \sprintf('model_reasoning_effort="%s"', $effort)]]
+            : [...$options, 'effort' => $effort];
     }
 }

@@ -15,7 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatformFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModelListInterface;
@@ -31,6 +31,11 @@ final readonly class InitModelQuestion
 {
     private const string DEFAULT_MODEL = 'claude-opus-5-5';
 
+    private const array SUBSCRIPTION_REVIEWER_CHOICES = [
+        'claudecode' => ['models' => CliAgentPlatformFactory::SUBSCRIPTION_MODELS['claudecode'], 'suggested' => 'claude-haiku-5-5'],
+        'codex' => ['models' => CliAgentPlatformFactory::SUBSCRIPTION_MODELS['codex'], 'suggested' => 'gpt-6-luna'],
+    ];
+
     private const string DEFAULT_MODEL_ID = '#(?:^|[./])claude-opus-5-5(?:@[a-z0-9-]+)?$#';
 
     public function __construct(
@@ -40,9 +45,9 @@ final readonly class InitModelQuestion
 
     public function ask(SymfonyStyle $symfonyStyle, ProviderKey $providerKey, ?string $endpoint = null): string
     {
-        $subscriptionModel = CliAgentPlatforms::DEFAULT_MODELS[$providerKey->platform] ?? null;
-        if (null !== $subscriptionModel) {
-            return $subscriptionModel;
+        $subscriptionModels = CliAgentPlatformFactory::SUBSCRIPTION_MODELS[$providerKey->platform] ?? null;
+        if (null !== $subscriptionModels) {
+            return NumberedChoice::ask($symfonyStyle, 'Which model should the auditor use? Pick a number, or type a model id', $subscriptionModels, $subscriptionModels[0]);
         }
 
         if ('ollama' === $providerKey->platform) {
@@ -57,6 +62,16 @@ final readonly class InitModelQuestion
         return 'anthropic' === $providerKey->platform
             ? InitPrompt::withDefault($symfonyStyle, 'Which model should the auditor use?', self::DEFAULT_MODEL)
             : InitPrompt::required($symfonyStyle, 'Which model should the auditor use? Type its id as your provider names it');
+    }
+
+    public function askReviewer(SymfonyStyle $symfonyStyle, ProviderKey $providerKey): ?string
+    {
+        $choices = self::SUBSCRIPTION_REVIEWER_CHOICES[$providerKey->platform] ?? null;
+        if (null === $choices) {
+            return null;
+        }
+
+        return NumberedChoice::ask($symfonyStyle, 'Which model should review the findings? Pick a number, or type a model id', $choices['models'], $choices['suggested']);
     }
 
     private function askOllamaModel(SymfonyStyle $symfonyStyle, ?string $endpoint): string

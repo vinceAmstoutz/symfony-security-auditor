@@ -37,6 +37,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         private PricingProviderInterface $pricingProvider,
         private ConsoleBannerInterface $consoleBanner = new ConsoleBanner(),
         private WorkflowCommandNeutralizerInterface $workflowCommandNeutralizer = new WorkflowCommandNeutralizer(false),
+        private ?string $cliAgent = null,
     ) {}
 
     #[Override]
@@ -95,10 +96,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             return;
         }
 
-        $symfonyStyle->getErrorStyle()->warning(\sprintf(
-            'No published pricing for the configured model(s): %s. The dry-run cost estimate shows $0.00 for these. If you are running a local or self-hosted model (e.g. Ollama, LM Studio), $0.00 is correct — you can ignore this notice. Otherwise the name is likely a typo or an unlisted model: check it in your symfony_security_auditor configuration against the models supported by your symfony/ai platform.',
-            implode(', ', $unsupportedModels),
-        ));
+        $symfonyStyle->getErrorStyle()->warning(UnpricedModelNotice::forEstimate(array_values($unsupportedModels), $this->cliAgent));
     }
 
     #[Override]

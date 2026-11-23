@@ -22,7 +22,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
 final readonly class StandaloneConfigFactory implements StandaloneConfigFactoryInterface
 {
     #[Override]
-    public function create(string $provider, string $model, ?string $apiKeyEnvironmentVariable, PlatformConnection $platformConnection = new PlatformConnection()): array
+    public function create(string $provider, string $model, ?string $apiKeyEnvironmentVariable, PlatformConnection $platformConnection = new PlatformConnection(), ?string $reviewerModel = null): array
     {
         $providerKey = ProviderKey::of($provider);
         $connection = $this->connection($apiKeyEnvironmentVariable, $platformConnection);
@@ -35,6 +35,7 @@ final readonly class StandaloneConfigFactory implements StandaloneConfigFactoryI
             'provider' => $provider,
             'platform' => $this->platformBlock($providerKey, $connection),
             'model' => $model,
+            ...null === $reviewerModel ? [] : ['reviewer_model' => $reviewerModel],
             'audit' => ['report_static_findings' => true],
         ];
     }
@@ -68,6 +69,10 @@ final readonly class StandaloneConfigFactory implements StandaloneConfigFactoryI
 
         if (null !== $platformConnection->deployment) {
             $connection['deployment'] = ContainerParameterSyntax::literal($platformConnection->deployment);
+        }
+
+        if (null !== $platformConnection->effort) {
+            $connection['effort'] = $platformConnection->effort;
         }
 
         if (null !== $apiKeyEnvironmentVariable) {

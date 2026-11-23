@@ -20,11 +20,13 @@ use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\PlatformInterface;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\ProviderBridgeException;
@@ -155,20 +157,20 @@ final class ClaudeCodePlatformTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $options
-     *
      * @throws AmbiguousPlatformException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
      * @throws ProviderBridgeException
      */
-    private function invoke(array $options): string
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_claude_code_cli_runs_at_the_configured_effort_and_stays_isolated(): void
     {
-        $platform = $this->container()->get(PlatformInterface::class);
-        self::assertInstanceOf(PlatformInterface::class, $platform);
+        $this->invoke([], ['effort' => 'high']);
+        $pairs = $this->consecutiveArgumentPairs();
 
-        return $platform->invoke('opus', new MessageBag(Message::forSystem('Be terse.'), Message::ofUser('Audit this.')), $options)->asText();
+        self::assertSame([true, true, true], [\in_array(['--effort', 'high'], $pairs, true), \in_array(['--tools', ''], $pairs, true), \in_array('--strict-mcp-config', $this->arguments(), true)]);
     }
 
     /**
@@ -178,10 +180,93 @@ final class ClaudeCodePlatformTest extends TestCase
      * @throws NonLocalPlatformEndpointException
      * @throws ProviderBridgeException
      */
-    private function container(): ContainerBuilder
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_claude_code_cli_keeps_its_own_effort_when_none_is_configured(): void
+    {
+        $this->invoke([]);
+
+        self::assertNotContains('--effort', $this->arguments());
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_budgeted_run_on_a_claude_subscription_is_refused_naming_the_budget(): void
+    {
+        $project = $this->workingDirectory.'/project';
+        (new Filesystem())->dumpFile($project.'/src/Controller/HomeController.php', "<?php\n\nfinal class HomeController {}\n");
+        $auditCommand = $this->container([], ['model' => 'claude-opus-5-5', 'audit' => ['budget' => ['max_cost_usd' => 5.0]]])->get(AuditCommand::class);
+        self::assertInstanceOf(AuditCommand::class, $auditCommand);
+        $commandTester = new CommandTester($auditCommand);
+
+        $commandTester->execute(['project-path' => $project], ['interactive' => false]);
+
+        self::assertStringContainsString('A subscription is not priced per call, so the cost budget cannot hold.', (string) preg_replace('/[\s!]+/', ' ', $commandTester->getDisplay()));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_dry_run_on_a_claude_subscription_says_it_is_not_priced_per_call(): void
+    {
+        $project = $this->workingDirectory.'/project';
+        (new Filesystem())->dumpFile($project.'/src/Controller/HomeController.php', "<?php\n\nfinal class HomeController {}\n");
+        $auditCommand = $this->container([], ['model' => 'claude-opus-5-5'])->get(AuditCommand::class);
+        self::assertInstanceOf(AuditCommand::class, $auditCommand);
+        $commandTester = new CommandTester($auditCommand);
+
+        $commandTester->execute(['project-path' => $project, '--dry-run' => true], ['interactive' => false]);
+
+        $display = (string) preg_replace('/[\s!]+/', ' ', $commandTester->getDisplay());
+
+        self::assertSame([true, false], [str_contains($display, 'The audit runs on a subscription through the Claude Code CLI, which is not priced per call'), str_contains($display, 'typo')]);
+    }
+
+    /**
+     * @param array<string, mixed>  $options
+     * @param array<string, string> $settings
+     *
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    private function invoke(array $options, array $settings = []): string
+    {
+        $platform = $this->container($settings)->get(PlatformInterface::class);
+        self::assertInstanceOf(PlatformInterface::class, $platform);
+
+        return $platform->invoke('opus', new MessageBag(Message::forSystem('Be terse.'), Message::ofUser('Audit this.')), $options)->asText();
+    }
+
+    /**
+     * @param array<string, string> $settings
+     * @param array<string, mixed>  $auditConfig
+     *
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    private function container(array $settings = [], array $auditConfig = []): ContainerBuilder
     {
         return (new StandaloneContainerFactory())->create(
-            new StandaloneConfig([], new StandalonePlatformConfig(['claudecode' => ['cli_binary' => $this->fakeCli()]], 'claudecode')),
+            new StandaloneConfig($auditConfig, new StandalonePlatformConfig(['claudecode' => ['cli_binary' => $this->fakeCli(), ...$settings]], 'claudecode')),
             $this->workingDirectory.'/cache',
         );
     }

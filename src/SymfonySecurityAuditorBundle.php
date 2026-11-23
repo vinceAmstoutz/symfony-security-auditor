@@ -41,6 +41,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullCodeSlicer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullTriageMemoryRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
@@ -95,6 +96,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\Confi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
@@ -150,6 +153,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $this->registerParameters($builder, $bundleConfiguration);
 
         $services = $container->services();
+        $this->registerSubscriptionPricing($services, $cliAgent);
         $this->registerBudget($services, $bundleConfiguration);
         $this->registerRateLimiter($services, $bundleConfiguration);
         $this->registerLlmClients($services, $bundleConfiguration, $platformServiceId);
@@ -220,6 +224,18 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 ])
                 ->tag('symfony_security_auditor.attacker_skill');
         }
+    }
+
+    private function registerSubscriptionPricing(ServicesConfigurator $servicesConfigurator, ?string $cliAgent): void
+    {
+        if (null === $cliAgent) {
+            return;
+        }
+
+        $servicesConfigurator->set(NullPricingProvider::class);
+        $servicesConfigurator->alias(PricingProviderInterface::class, NullPricingProvider::class);
+        $servicesConfigurator->get(UnpricedModelBudgetGuard::class)->arg('$cliAgent', $cliAgent);
+        $servicesConfigurator->get(AuditPresenter::class)->arg('$cliAgent', $cliAgent);
     }
 
     /**

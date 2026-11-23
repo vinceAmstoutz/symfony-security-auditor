@@ -23,6 +23,8 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullPricingProvider;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterSyntax;
@@ -34,10 +36,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\CredentialConsoleBanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\NullConsoleBanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\ProviderBridgeException;
@@ -93,6 +97,7 @@ final readonly class StandaloneContainerFactory
 
         $this->announceProjectConfigs($containerBuilder, $standaloneConfig);
         $this->registerAuditHeaderBanner($containerBuilder, $standaloneConfig->platform);
+        $this->registerSubscriptionPricing($containerBuilder, CliAgentPlatforms::activeAgentOf($standaloneConfig->platform));
 
         $this->selectActivePlatform($containerBuilder, $standaloneConfig->platform);
 
@@ -156,6 +161,18 @@ final readonly class StandaloneContainerFactory
      * Names in the audit header the credential the run spends by its masked
      * preview, never the key itself.
      */
+    private function registerSubscriptionPricing(ContainerBuilder $containerBuilder, ?string $cliAgent): void
+    {
+        if (null === $cliAgent) {
+            return;
+        }
+
+        $containerBuilder->register(NullPricingProvider::class, NullPricingProvider::class);
+        $containerBuilder->setAlias(PricingProviderInterface::class, NullPricingProvider::class);
+        $containerBuilder->getDefinition(UnpricedModelBudgetGuard::class)->setArgument('$cliAgent', $cliAgent);
+        $containerBuilder->getDefinition(AuditPresenter::class)->setArgument('$cliAgent', $cliAgent);
+    }
+
     private function registerAuditHeaderBanner(ContainerBuilder $containerBuilder, StandalonePlatformConfig $standalonePlatformConfig): void
     {
         $credentialIdentity = $standalonePlatformConfig->credentialIdentity();
