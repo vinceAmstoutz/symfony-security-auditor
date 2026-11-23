@@ -62,10 +62,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPro
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 
 /**
- * End-to-end tests exercise the full audit workflow against a realistic Symfony project fixture.
- *
- * The LLM boundary is replaced with deterministic fixture responses so tests are
- * fast, reproducible and require no API credentials.
+ * Runs the full audit workflow against a realistic Symfony project fixture,
+ * with deterministic fixture responses at the LLM boundary.
  */
 final class FullAuditEndToEndTest extends TestCase
 {

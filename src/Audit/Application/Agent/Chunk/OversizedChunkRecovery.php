@@ -26,26 +26,20 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityHydrati
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 
 /**
- * Recovers a chunk the model could not take in whole. A multi-file chunk is
- * split in two and each half goes back through the analyzer's own per-chunk
- * path (so a half already in the cache costs nothing and a half still too
- * large is split again); a single file the model cannot fit is recorded as
- * errored, unless the file, as the prompt carried it after code slicing, is
- * only a small share of the refused prompt, so the prompt's fixed part is
- * what leaves no room, which no split can help: the run stops with the
- * reason.
- * Once every file of a split chunk has been judged, the merged findings are
- * stored under the whole chunk's own cache key, so the next run serves the
- * chunk from the cache instead of sending it to be refused again.
+ * Splits a chunk the model could not take in whole into halves that go back
+ * through the analyzer's per-chunk path. Records a single file that does not
+ * fit as errored, but stops the run when that file, as sliced, is a small
+ * share of the refused prompt, since the prompt's fixed part then leaves no
+ * room. Caches the merged findings under the whole chunk's key once every
+ * file is judged.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class OversizedChunkRecovery
 {
     /**
-     * Below this share of the refused prompt, a file is too small to be what
-     * made it too large: the system prompt and the project mapping around it
-     * take up the rest and they surround every other file the same way.
+     * Below this share of the refused prompt, the prompt's fixed part, not the
+     * file, is what does not fit.
      */
     private const int FIXED_PROMPT_BLAMED_BELOW_FILE_PERCENT = 10;
 
@@ -85,10 +79,8 @@ final readonly class OversizedChunkRecovery
     }
 
     /**
-     * A half cut short or errored is left out of the cache by the analyzers
-     * and so is the whole chunk then: a cache entry replays as the model's
-     * complete verdict, which the merged findings only are once every file
-     * ended analyzed or served from the cache, never on a partial look.
+     * Caches the merged findings only when every file ended analyzed or
+     * served from the cache.
      *
      * @param list<ProjectFile> $chunk
      */
@@ -132,10 +124,8 @@ final readonly class OversizedChunkRecovery
     }
 
     /**
-     * An abort while the first half is analyzed leaves the second half with
-     * a status of its own, as the analyzers do for the chunks after a failing
-     * one: a file without any status would be missing from the report's
-     * list of files that could not be fully analyzed.
+     * Gives the second half a status of its own when an abort stops the first,
+     * so its files are listed as not fully analyzed.
      *
      * @param list<ProjectFile>                                                                   $firstHalf
      * @param list<ProjectFile>                                                                   $secondHalf

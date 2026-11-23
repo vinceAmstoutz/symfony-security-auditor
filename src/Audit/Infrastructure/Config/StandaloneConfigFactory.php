@@ -55,9 +55,7 @@ final readonly class StandaloneConfigFactory implements StandaloneConfigFactoryI
     }
 
     /**
-     * A null variable is the caller saying the platform runs without a
-     * credential, so the key is left out rather than written as an
-     * `%env()%` placeholder pointing at a variable nobody will ever set.
+     * Leaves the key out when no variable is given.
      *
      * @return array<string, string>
      */

@@ -16,14 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 
 /**
- * Token + USD cost attribution for an audit run.
- *
- * `primaryModel` is the model used by the attacker (the dominant cost
- * contributor). When the audit ran with a split attacker/reviewer
- * configuration, the optional per-role breakdown lives in `byRole()` and is
- * also surfaced in `toArray()` under `by_role`, useful for dry-run reports
- * that want to show "$X for the attacker, $Y for the reviewer" instead of
- * a single bundled total.
+ * The token and USD cost of an audit run. `primaryModel` is the attacker's
+ * model; `byRole()`, listed as `by_role` by `toArray()`, breaks a split
+ * attacker/reviewer estimate down per role.
  */
 final readonly class AuditCost
 {
@@ -42,12 +37,7 @@ final readonly class AuditCost
     ) {}
 
     /**
-     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}> $byRole keyed by role name
-     *                                                                                                                      (e.g. `attacker`,
-     *                                                                                                                      `reviewer`); each
-     *                                                                                                                      entry's totals must
-     *                                                                                                                      not exceed the
-     *                                                                                                                      aggregate
+     * @param array<string, array{model: string, input_tokens: int, output_tokens: int, estimated_cost_usd: float}> $byRole keyed by role name; no entry exceeds the aggregate
      *
      * @throws InvalidAuditCostException
      */
@@ -99,18 +89,10 @@ final readonly class AuditCost
     }
 
     /**
-     * `false` when tokens were actually spent but they priced out to zero:
-     * the model has no published rate in the pricing catalog, or is a free
-     * local/self-hosted model. Zero tokens (nothing tracked yet) is not
-     * treated as a pricing gap.
-     *
-     * The aggregate total cannot answer this for a split configuration: a
-     * priced cloud attacker paired with an unpriced local reviewer still sums
-     * to something nonzero. So each breakdown is checked on its own terms
-     * where one exists: the per-model map for a real run (which records the model
-     * of every call) and `byRole()` for the `--dry-run` estimate, which
-     * projects per role. The aggregate is the last resort, correct on its own
-     * terms because a single-model run has nothing to disaggregate.
+     * False when tokens were spent but priced out to zero: the model has no
+     * published rate or is a free local model. Zero tokens is no pricing gap.
+     * Each model, or each role of a `--dry-run` estimate, is checked on its own,
+     * so an unpriced reviewer beside a priced attacker is a gap.
      */
     public function hasPublishedPricing(): bool
     {
@@ -130,11 +112,7 @@ final readonly class AuditCost
     }
 
     /**
-     * Cache reads and cache writes are billed, so a model whose whole spend
-     * arrived as cached prompt tokens has still been charged for. Counting
-     * only fresh input/output would read that as "nothing spent" and hide a
-     * pricing gap. The per-role dry-run breakdown projects no cache traffic,
-     * so those keys are absent there.
+     * Counts cache reads and writes, which are billed too.
      *
      * @param array{input_tokens: int, output_tokens: int, cache_read_tokens?: int, cache_creation_tokens?: int} $entry
      */
@@ -146,11 +124,6 @@ final readonly class AuditCost
             + ($entry['cache_creation_tokens'] ?? 0));
     }
 
-    /**
-     * A sum of counts past the largest integer, which only a `--dry-run`
-     * estimate for an iteration setting far beyond any run reaches, is held
-     * at that integer instead of turning into a float.
-     */
     private function heldAtLargestCount(int|float $tokens): int
     {
         return \is_int($tokens) ? $tokens : \PHP_INT_MAX;
@@ -165,12 +138,8 @@ final readonly class AuditCost
     }
 
     /**
-     * A real run records the model of every call but not the agent that made
-     * it, so per-model is the finest attribution it can offer; `billed_models`
-     * names the models a configured model's calls were billed as, which a
-     * gateway or an alias can make differ from it. Applied
-     * copy-on-write rather than through `of()`, which is already at the
-     * project's five-parameter ceiling.
+     * `billed_models` names the models a configured model's calls were billed
+     * as, which a gateway or an alias can make differ from it.
      *
      * @param array<string, array{model: string, input_tokens: int, output_tokens: int, cache_read_tokens?: int, cache_creation_tokens?: int, estimated_cost_usd: float, billed_models?: list<string>}> $byModel keyed by model name
      */
@@ -180,9 +149,8 @@ final readonly class AuditCost
     }
 
     /**
-     * The same cost, counting the calls cut before their answer ended: a
-     * provider may bill such a call beyond the usage it reported, so a cost
-     * with any is a minimum.
+     * Counts the calls cut before their answer ended. A provider may bill such
+     * a call beyond its reported usage, so a cost with any is a minimum.
      */
     public function withInterruptedCalls(int $interruptedCalls): self
     {
@@ -195,12 +163,7 @@ final readonly class AuditCost
     }
 
     /**
-     * `by_role` is cast to `object` so `json_encode()` always renders it as a
-     * JSON object (`{}`), never an array (`[]`): PHP's array type can't
-     * distinguish "empty map" from "empty list", so an unqualified empty
-     * array here would silently flip the field's JSON type between the
-     * populated (dry-run) and unpopulated (real-run) cases, breaking any
-     * strongly-typed consumer of the JSON report.
+     * `by_role` always encodes as a JSON object, `{}` when empty.
      *
      * @return array<string, int|float|string|object>
      */

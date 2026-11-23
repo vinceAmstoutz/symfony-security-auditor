@@ -14,11 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
 /**
- * Accumulates raw review-verdict payloads captured by RecordReviewTool during
- * a tool-using reviewer conversation. Mutable by design: opted out of the
- * final readonly rule under the same exception as AuditContext (see
- * .claude/rules/php-classes.md: documented context carriers). The agent owns
- * one collector instance per review call and drains it afterwards.
+ * Accumulates the verdict payloads `RecordReviewTool` records during one
+ * review call, until drained.
+ *
+ * Not readonly: a per-run accumulator (.claude/rules/php-classes.md).
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

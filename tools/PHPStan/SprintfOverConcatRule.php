@@ -23,13 +23,9 @@ use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
 
 /**
- * Forbids building a string by concatenating a literal with an expression in
- * production code: `$dir.'/'.$name` reads worse than
- * `sprintf('%s/%s', $dir, $name)` and scatters the format across operators.
- *
- * Only flagged when the chain mixes at least one string literal with at least
- * one non-literal operand: pure `$a.$b` and literal-only concatenations are
- * left alone, as sprintf would not improve them.
+ * Forbids concatenating a string literal with an expression in production code
+ * (`$dir.'/'.$name`): use `sprintf('%s/%s', $dir, $name)`. Pure `$a.$b` and
+ * literal-only chains pass.
  *
  * @implements Rule<Concat>
  */

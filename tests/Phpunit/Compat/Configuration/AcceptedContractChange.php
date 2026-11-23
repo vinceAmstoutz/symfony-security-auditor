@@ -16,11 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Configuration;
 use UnexpectedValueException;
 
 /**
- * One entry of `accepted-differences.php` that accepts a change to the
- * contract of recorded configuration paths: the paths, the exact narrowings
- * the comparison reports for them (such as `its default changed to
- * {"value":"claude-opus-5-5"}`), why, and the pull request (`#123`) that a
- * `CHANGELOG.md` bullet under `## [Unreleased]` links to announce it.
+ * One entry of `accepted-differences.php` accepting a contract change of
+ * recorded configuration paths: the paths, the exact narrowings reported for
+ * them, why and the pull request the `## [Unreleased]` CHANGELOG bullet links.
  */
 final readonly class AcceptedContractChange
 {

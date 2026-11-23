@@ -17,12 +17,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlRule;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 
 /**
- * Finds the roles of the `security.yaml` `access_control` rule that governs a
- * route: the first rule, in the order the map lists them, whose path pattern
- * matches it or that is keyed by its route name. Symfony applies the first
- * rule, in the order they are declared, that matches a request. A rule
- * without roles or an expression checks nothing, so a route such a rule
- * matches first has no governing roles.
+ * Finds the roles of the `access_control` rule that governs a route, the first
+ * one matching it as Symfony applies them. A route first matched by a rule
+ * without roles or an expression has no governing roles.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -31,10 +28,6 @@ final readonly class AccessControlRuleMatcher
     private const string ROUTE_TARGET_PREFIX = 'route: ';
 
     /**
-     * A rule whose path pattern cannot be decided for the route, before any
-     * rule governs it, leaves the answer open: that rule may be the one
-     * Symfony applies, so the route is neither covered nor uncovered.
-     *
      * @param array<string, list<string>> $routeAccessMap
      * @param list<AccessControlRule>     $accessControlRules the rules in the order they are declared, when the parser gave them
      *
@@ -46,11 +39,8 @@ final readonly class AccessControlRuleMatcher
     }
 
     /**
-     * The roles {@see self::rolesFor()} finds for each of several routes the
-     * same rules govern, each rule matched against every route it has yet to
-     * decide before the next one is read, so its path pattern is compiled
-     * once for all of them. The map is read only for the routes the rules, in
-     * the order they are declared, leave open.
+     * {@see self::rolesFor()} for several routes the same rules govern, each
+     * path pattern compiled once for all of them.
      *
      * @param array<int, RouteAccessControl> $routeAccessControls
      * @param array<string, list<string>>    $routeAccessMap
@@ -118,10 +108,8 @@ final readonly class AccessControlRuleMatcher
     }
 
     /**
-     * Walks the rules in the order they are declared, passing those that do
-     * not decide a route: the first that does checks nothing, or checks
-     * something and matches all of its requests. A rule whose path pattern
-     * cannot be decided for the route leaves the answer open.
+     * Walks the rules in declaration order until one decides the route: it
+     * checks nothing, or checks something and matches all of its requests.
      *
      * @param array<int, RouteAccessControl> $routeAccessControls
      * @param list<AccessControlRule>        $accessControlRules
@@ -197,10 +185,8 @@ final readonly class AccessControlRuleMatcher
     }
 
     /**
-     * A target is either `route: <name>`
-     * ({@see SymfonyYamlSecurityConfigParser::targetOf()}), which governs the
-     * route of that name, or the `path` pattern of a rule, which governs no
-     * route without a path.
+     * A `route: <name>` target governs the route of that name. A path pattern
+     * governs no route without a path.
      *
      * @param array<int, RouteAccessControl> $routeAccessControls
      * @param array<int, string>             $routePaths          by the key of each route that has a path
@@ -222,18 +208,9 @@ final readonly class AccessControlRuleMatcher
     }
 
     /**
-     * A rule's `methods: GET|POST`-style requirement (recorded verbatim by
-     * {@see SymfonyYamlSecurityConfigParser}) only actually governs a route
-     * whose own declared methods are a subset of it: Symfony evaluates
-     * `access_control` rules in order and skips to the next one on a method
-     * mismatch, it does not treat a path-only match as sufficient. A route
-     * with no declared methods answers to every HTTP verb, so a
-     * method-restricted rule can never fully cover it. A second (or third, …)
-     * `access_control` rule for the same path is recorded as one `or: ...`
-     * entry per rule ({@see SymfonyYamlSecurityConfigParser::accessControlOf()}),
-     * each its own independent alternative Symfony tries in turn: the path
-     * is covered for a route if ANY alternative covers it, not just the
-     * first.
+     * Whether any alternative of a rule (one per `or:` entry) is limited to no
+     * method or to a superset of the route's methods. A route declaring no
+     * method answers every method, which no method-limited alternative covers.
      *
      * @param list<list<string>|null> $requiredMethods the methods each alternative of a rule is limited to, as {@see self::methodsRequiredBy()} reads them
      * @param list<string>            $routeMethods    upper-case; empty for every method
@@ -250,12 +227,8 @@ final readonly class AccessControlRuleMatcher
     }
 
     /**
-     * Splits the flat, possibly-`or:`-joined roles list into one string per
-     * alternative rule: the base rule's own list items joined into a single
-     * string, then each `or:` entry on its own. The leading `or: ` marker is
-     * left on those entries: {@see self::methodsRequiredBy()} locates
-     * the `methods:` requirement anywhere in the string, so the marker never
-     * affects the check.
+     * One string per alternative: the base rule's items joined, then each
+     * `or:` entry with its marker.
      *
      * @param list<string> $roles
      *
@@ -279,15 +252,6 @@ final readonly class AccessControlRuleMatcher
     }
 
     /**
-     * Extracts the alternative's own `methods: GET|POST` requirement via a
-     * targeted regex rather than splitting the comma-joined alternative
-     * string apart: `listedRequirements()` already uses `, ` as the
-     * separator *within* an `ips: ...` requirement, so a generic split
-     * would misparse an alternative combining `ips:` and `methods:`. HTTP
-     * method names are always uppercase ASCII letters, which no other
-     * requirement value can contain, so the match is unambiguous regardless
-     * of what precedes or follows it.
-     *
      * @return list<string>|null null when the alternative is not limited to some methods
      */
     private static function methodsRequiredBy(string $alternative): ?array

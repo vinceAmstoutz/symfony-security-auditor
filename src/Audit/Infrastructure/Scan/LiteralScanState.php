@@ -18,9 +18,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
  *
  * Where a line reader stands relative to the string literals of a line, one
  * character at a time. A quote opens a literal only when an unescaped quote of
- * its kind comes after it on the line, otherwise it is plain text: that is
- * decided by {@see self::closingLimits()}, once per line, so no quote is ever
- * tried and dropped and a line is read in a single pass.
+ * its kind comes after it on the line.
  */
 final readonly class LiteralScanState
 {
@@ -35,10 +33,8 @@ final readonly class LiteralScanState
     }
 
     /**
-     * The offset of the last unescaped quote of each kind, the one that closes
-     * the last literal that kind can open; a quote at or after it opens none.
-     * A quote is unescaped when an even number of backslashes comes right
-     * before it.
+     * The offset of the last unescaped quote of each kind: a quote at or after
+     * it opens no literal.
      *
      * @return array<string, int>
      */

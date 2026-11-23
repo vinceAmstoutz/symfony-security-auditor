@@ -123,9 +123,8 @@ final readonly class StandaloneContainerFactory
     }
 
     /**
-     * The directories come from the user's home and the working directory, so
-     * their `%` signs are escaped: left as typed, a pair reads as a parameter
-     * reference, `%%` loses one sign and `%env(VAR)%` becomes the variable.
+     * Escapes the `%` signs of the directories, which come from the user's home
+     * and the working directory, so the container reads them as typed.
      *
      * @return array<string, bool|string>
      */
@@ -159,9 +158,8 @@ final readonly class StandaloneContainerFactory
     }
 
     /**
-     * The product banner is already on screen by the time a command runs, so
-     * the audit header carries the credential the run will spend instead of
-     * repeating it (named by its masked preview, never printed).
+     * Names in the audit header the credential the run spends by its masked
+     * preview, never the key itself.
      */
     private function registerSubscriptionPricing(ContainerBuilder $containerBuilder, ?string $cliAgent): void
     {

@@ -14,9 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing;
 
 /**
- * The part of a `symfony/models-dev` catalog the auditor reads: each model's
- * cost, family, dates and tool support. A loaded catalog keeps only that, a
- * fraction of the memory the whole decoded file takes.
+ * Keeps only the model fields of a `symfony/models-dev` catalog the auditor
+ * reads: cost, family, dates and tool support.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

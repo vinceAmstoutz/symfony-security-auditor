@@ -14,10 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 /**
- * What became of the config file the audited project ships when the audit does
- * not run from that project's own folder: layered over the other files, or
- * skipped as a whole, with the reason, because the run did not ask for it and
- * must not fail on it.
+ * What became of the audited project's config file when the audit runs from
+ * another folder: layered over the other files, or skipped as a whole with
+ * the reason.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -53,8 +52,8 @@ final readonly class AuditedProjectConfig
     }
 
     /**
-     * The baseline the file names, a relative one anchored to the project, or
-     * null when it names none.
+     * Returns the baseline the file names, a relative one anchored to the
+     * project, or null.
      */
     public function baseline(): ?string
     {
@@ -64,9 +63,8 @@ final readonly class AuditedProjectConfig
     }
 
     /**
-     * What the file sets, spelled as the container reads it back: the anchored
-     * baseline carries the project's folder, whose `%` signs the file itself
-     * could never hold as text, so they are escaped.
+     * Returns what the file sets as the container reads it back, the `%` signs
+     * of the anchored baseline's folder escaped.
      *
      * @return array<array-key, mixed>
      */

@@ -84,8 +84,8 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     {
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [
-                $this->makeProjectFile('a.php', '<?php // ten ch'),     // 15 chars
-                $this->makeProjectFile('b.php', '<?php /* 1 */'),       // 13 chars
+                $this->makeProjectFile('a.php', '<?php // ten ch'),
+                $this->makeProjectFile('b.php', '<?php /* 1 */'),
             ],
             'tokenEstimator' => $this->lengthEchoingEstimator(),
             'maxIterations' => 1,
@@ -103,8 +103,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      */
     public function test_input_token_estimate_scales_with_max_iterations(): void
     {
-        // Pins: `* maxIterations` (vs `/`). With perRoundTokens=10 and maxIterations=5,
-        // expected attacker = 50; with division mutation, would be 2.
+        // 10 tokens per round × 5 iterations = 50 attacker tokens.
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [$this->makeProjectFile('a.php', 'aaa')],
             'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 10),
@@ -213,8 +212,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      */
     public function test_output_token_estimate_uses_ceil_not_floor(): void
     {
-        // 100 * 0.21 = 21.0 exactly: floor=21, ceil=21, round=21. Useless to distinguish.
-        // Try 100 * 0.234 = 23.4 → ceil=24, floor=23, round=23. Picks ceil distinctly.
+        // 100 × 0.234 = 23.4: ceil gives 24, floor and round give 23.
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [$this->makeProjectFile('a.php', 'aaa')],
             'tokenEstimator' => $this->fixedEstimator(perRoundTokens: 100),
@@ -311,8 +309,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
         self::assertCount(1, $readyLogs);
         $context = $readyLogs[0][1];
         self::assertSame(2, $context['files']);
-        // per-round input = 100 (file a) + 100 (file b) = 200; attacker = 200 * 2 = 400,
-        // reviewer = ceil(400 * 0.20) = 80, total = 480
+        // attacker = (100 + 100) * 2 = 400, reviewer = ceil(400 * 0.20) = 80, total = 480
         self::assertSame(480, $context['input_tokens']);
         // attacker_out = ceil(400 * 0.5) = 200, reviewer_out = ceil(80 * 0.5) = 40, total = 240
         self::assertSame(240, $context['output_tokens']);
@@ -481,8 +478,6 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      */
     public function test_scanned_files_are_set_on_the_audit_context(): void
     {
-        // Pins: `$auditContext->setProjectFiles($files)`: if removed, the resulting
-        // AuditReport's `filesScanned` would be 0 instead of the actual count.
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [
                 $this->makeProjectFile('a.php', 'a'),
@@ -504,14 +499,12 @@ final class EstimateAuditCostUseCaseTest extends TestCase
      */
     public function test_scan_paths_filter_files_before_estimation(): void
     {
-        // Pins ScanPathFilter integration: without filter, all three files are
-        // estimated; with `apps/api`, only the matching one contributes.
         $measuringTokenEstimator = $this->measuringEstimator();
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [
-                $this->makeProjectFile('apps/api/src/A.php', 'aa'),     // 2 chars
-                $this->makeProjectFile('apps/web/src/B.php', 'bbbbbb'), // 6 chars
-                $this->makeProjectFile('libs/shared/C.php', 'cccc'),    // 4 chars
+                $this->makeProjectFile('apps/api/src/A.php', 'aa'),
+                $this->makeProjectFile('apps/web/src/B.php', 'bbbbbb'),
+                $this->makeProjectFile('libs/shared/C.php', 'cccc'),
             ],
             'tokenEstimator' => $measuringTokenEstimator,
         ]);
@@ -571,8 +564,8 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [
-                $this->makeProjectFile('src/Changed.php', 'aa'),      // 2 chars
-                $this->makeProjectFile('src/Unchanged.php', 'bbbbbb'), // 6 chars
+                $this->makeProjectFile('src/Changed.php', 'aa'),
+                $this->makeProjectFile('src/Unchanged.php', 'bbbbbb'),
             ],
             'tokenEstimator' => $this->lengthEchoingEstimator(),
             'maxIterations' => 1,
@@ -647,8 +640,8 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
         $estimateAuditCostUseCase = $this->makeUseCase([
             'files' => [
-                $this->makeProjectFile('src/Changed.php', 'aa'),      // 2 chars
-                $this->makeProjectFile('src/Unchanged.php', 'bbbbbb'), // 6 chars
+                $this->makeProjectFile('src/Changed.php', 'aa'),
+                $this->makeProjectFile('src/Unchanged.php', 'bbbbbb'),
             ],
             'tokenEstimator' => $this->lengthEchoingEstimator(),
             'maxIterations' => 1,
@@ -785,10 +778,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     }
 
     /**
-     * The reviewer prompt carries no attacker skill blocks, so
-     * `reviewerInputRatio` applies to the file-content sum alone. Deriving it
-     * from the attacker total instead would bill the reviewer for an overhead
-     * it never sends.
+     * The reviewer prompt carries no attacker skill blocks.
      *
      * @throws InvalidProjectFileException
      * @throws InvalidAuditContextException
@@ -824,12 +814,8 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     }
 
     /**
-     * A real run renders a chunk's skill block from only that chunk's own
-     * file types (`AttackerPromptBuilder::skillsForFiles()`), not the whole
-     * project's type union. Two chunks with different types therefore get
-     * differently-sized skill text: a renderer stubbed to return the same
-     * text for every call would hide a regression that flattens this back
-     * into "render once, multiply by chunk count".
+     * A real run renders each chunk's skill block from that chunk's own file
+     * types, so chunks of different types get skill text of different sizes.
      *
      * @throws InvalidProjectFileException
      * @throws InvalidAuditContextException
@@ -980,8 +966,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
 
     /**
      * The reviewer has its own tool loop (`reviewer_tools_enabled`,
-     * `reviewer_max_tool_iterations`); the attacker's multiplier must not be
-     * charged to it.
+     * `reviewer_max_tool_iterations`).
      *
      * @throws InvalidProjectFileException
      * @throws InvalidAuditContextException
@@ -1268,9 +1253,7 @@ final class EstimateAuditCostUseCaseTest extends TestCase
     }
 
     /**
-     * Non-zero pricing fixture that produces costs with at least six significant
-     * decimals, used to pin the rounding mutators on the per-role cost rows
-     * (`round(_, 6)`) which all collapse to 0.0 under `zeroPricing()`.
+     * Non-zero pricing whose costs carry at least six significant decimals.
      */
     private function nonZeroPricing(float $inputPricePerMillion, float $outputPricePerMillion): PricingProviderInterface
     {

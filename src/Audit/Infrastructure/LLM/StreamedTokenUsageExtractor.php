@@ -21,9 +21,8 @@ use Symfony\AI\Platform\TokenUsage\TokenUsageExtractorInterface;
 use Symfony\AI\Platform\TokenUsage\TokenUsageInterface;
 
 /**
- * The usage a streamed answer reported, read once the stream was drained,
- * so even an answer that could not be used is booked at what it was billed;
- * an answer given in one piece is booked at the usage its call settled on.
+ * Returns the usage a drained stream reported, so even an unusable answer is
+ * booked at its bill; an answer given in one piece keeps its call's usage.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

@@ -38,8 +38,6 @@ final class ProjectFileTest extends TestCase
     }
 
     /**
-     * Lets core logic ask what a file *is* without naming a Symfony concept.
-     *
      * @throws InvalidProjectFileException
      */
     public function test_archetype_returns_the_neutral_shape_of_the_file_type(): void

@@ -23,18 +23,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\SelfUpdateFailedException;
 
 /**
- * Downloads the latest `symfony/models-dev` catalog snapshot to a writable
- * override location: `ModelsDevPricingProvider` checks it before falling
- * back to the catalog frozen into the binary at build time. The only route a
- * standalone install otherwise has to a fresher catalog is a whole new
- * tagged release.
- *
- * The download lands in a temp file first and is only moved into place once
- * it has been confirmed to decode as JSON *and* to carry at least one
- * priced model, so neither a truncated transfer nor an unrelated document
- * served in its place can overwrite a working catalog. The URL tracks
- * upstream `main` on purpose: a pinned ref would freeze the catalog at the
- * same staleness a new tagged release already fixes.
+ * Downloads the latest `symfony/models-dev` catalog to the override location
+ * `ModelsDevPricingProvider` reads before the packaged one. Replaces the
+ * catalog only with a download that decodes as JSON and prices a model.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

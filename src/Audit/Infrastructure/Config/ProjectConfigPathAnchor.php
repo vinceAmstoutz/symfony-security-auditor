@@ -16,9 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use Symfony\Component\Filesystem\Path;
 
 /**
- * A path a project config names is the project's, not the shell's: the binary
- * may run from any folder, so a relative one is read from the folder that
- * holds the config file instead of the working directory.
+ * Reads a relative path a project config names from the folder that holds
+ * the config file, not from the working directory.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

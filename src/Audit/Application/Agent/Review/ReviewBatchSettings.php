@@ -17,8 +17,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 /**
- * The per-run knobs threaded through the batched review pass.
- *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ReviewBatchSettings

@@ -30,8 +30,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLar
 final readonly class FinalRule implements Rule
 {
     /**
-     * Concrete base exceptions that are extended by subtypes yet also thrown
-     * directly: cannot be final (extended) nor abstract (instantiated).
+     * Base exceptions both extended and thrown directly, so neither final nor
+     * abstract.
      *
      * @var list<string>
      */

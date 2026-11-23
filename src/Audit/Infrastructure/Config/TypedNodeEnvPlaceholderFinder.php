@@ -24,12 +24,9 @@ use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBa
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 
 /**
- * Symfony's configuration tree lets a `%env()%` placeholder through any node
- * and leaves it to the extension to cope. The bundle builds typed value
- * objects while the container is built, before a variable has a value, so a
- * placeholder on a number, a switch, a list or a choice read as a PHP enum
- * can only crash it. This finder names those settings; a text setting keeps
- * its placeholder for the container to resolve where the text is used.
+ * Names the number, switch, list and PHP-enum settings that hold a `%env()%`
+ * placeholder, which the bundle cannot take: it builds typed value objects
+ * before any variable has a value. A text setting keeps its placeholder.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

@@ -20,15 +20,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ScanSkippedFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\UnanalyzedFiles;
 
 /**
- * What a JSON audit report tells a comparison: its findings, the fingerprints
- * of the findings it left out because the baseline accepted them or their type
- * is muted, the files it could not fully analyze and (when it carries a
- * coverage ledger) the files its attacker analyzed or served from its cache,
- * the files its ledger names at all and the scan scope of a complete run over
- * the whole history. Only in the files it analyzed, or in a file such a run no
- * longer lists, can the absence of a finding prove anything. A file the scan
- * left out is listed for information only ({@see ScanSkippedFiles}): the
- * ledger does not name it, as the ledger of a scan that listed nothing did not.
+ * What a JSON audit report tells a comparison. The absence of a finding proves
+ * something only in a file the run analyzed, or in a file a complete run over
+ * the whole history no longer lists. A file the scan left out
+ * ({@see ScanSkippedFiles}) does not count as listed.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -51,14 +46,9 @@ final readonly class LoadedReport
 
     /**
      * @param list<DiffFinding>                                             $findings
-     * @param list<array{stage: string, file: string, status: string}>|null $coverage             null for a report written before the coverage ledger existed
-     * @param list<string>|null                                             $completeRunScanPaths the `--path` scopes of a complete run over the whole history
-     *                                                                                            (no `--since`); null when the report records no scope or ran
-     *                                                                                            otherwise
-     * @param string|null                                                   $projectPath          the folder the run audited, which an absolute path inside it is
-     *                                                                                            read against; null for a report written before 1.22, which
-     *                                                                                            lists no `suppressed_fingerprints` and names each finding as
-     *                                                                                            the model did, not by its project file
+     * @param list<array{stage: string, file: string, status: string}>|null $coverage             null for a report without a coverage ledger
+     * @param list<string>|null                                             $completeRunScanPaths the `--path` scopes of a complete run without `--since`, else null
+     * @param string|null                                                   $projectPath          the folder the run audited, which an absolute path is read against; null for a report that names each finding as the model did
      */
     public function __construct(
         public array $findings,
@@ -75,17 +65,11 @@ final readonly class LoadedReport
     }
 
     /**
-     * Whether this report can vouch that a finding absent from it is gone from
-     * `$file`: no stage of its run left the file unfinished and its ledger says
-     * the attacker analyzed the file or served it from its cache; or the run
-     * was complete over the whole history and its ledger never lists the
-     * file although its scan scope holds it, so the file is gone. A file the
-     * lean pre-scan skipped, or one outside a `--since` or `--path` scope, was
-     * never looked at. A report written before the ledger existed vouches for
-     * every file it does not name as unanalyzed, as it always did. A finding
-     * holds the path the attacker echoed and so do the reviewer's entries in
-     * the ledger, so a leading `./` is dropped on both sides before they are
-     * compared.
+     * Whether a finding absent from this report is gone from `$file`: no stage
+     * left the file unfinished and the attacker analyzed it or served it from
+     * its cache, or a complete run over the whole history no longer lists it
+     * within its scope. A report without a ledger vouches for every file it
+     * does not name as unanalyzed. A leading `./` is ignored on both sides.
      */
     public function vouchesForAbsenceIn(string $file): bool
     {

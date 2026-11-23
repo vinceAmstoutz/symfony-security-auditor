@@ -18,15 +18,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EchoedFilePath;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BaselineFilePathsInterface;
 
 /**
- * Carries the paths of the run's baseline entries and the audited project,
- * set by `audit:run` and the MCP `audit` tool before the run, to the
- * findings the run hydrates: a path names a project file when it denotes it
- * as `audit:baseline` reads it ({@see FormerFindingNames}). The paths are
- * indexed once, under the form the spellings of one file share, so naming a
- * finding's file takes two lookups whatever the size of the baseline.
+ * The paths the run's baseline names files by, set by `audit:run` and the MCP
+ * `audit` tool before the run. `naming()` returns, in baseline order, the
+ * paths that denote the given project file as `audit:baseline` reads them
+ * ({@see FormerFindingNames}).
  *
- * Mutable by design: non-readonly because the baseline is set after
- * construction. See .claude/rules/php-classes.md for the opt-out policy.
+ * Not readonly: the paths are set after construction. A late-bound holder
+ * per .claude/rules/php-classes.md.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

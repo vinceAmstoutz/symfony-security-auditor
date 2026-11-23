@@ -18,9 +18,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPacka
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TemplateLoader;
 
 /**
- * Renders a {@see ReportTrend} as a self-contained HTML page: an SVG line
- * chart of finding totals over the report series plus a table of per-report
- * new/fixed/unverified deltas.
+ * Renders a {@see ReportTrend} as a self-contained HTML page: an SVG chart of
+ * the totals and a table of per-report deltas.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -201,12 +200,6 @@ final readonly class TrendHtmlRenderer implements TrendHtmlRendererInterface
         return \sprintf('%.1F', $value);
     }
 
-    /**
-     * Report paths are echoed into markup, so (exactly as the HTML report
-     * renderer does) invalid UTF-8 is repaired, bidi overrides are stripped
-     * and the result is HTML-escaped so a crafted path cannot inject markup
-     * or visually reorder the rendered text.
-     */
     private function escape(string $value): string
     {
         $scrubbed = mb_scrub($value, 'UTF-8');

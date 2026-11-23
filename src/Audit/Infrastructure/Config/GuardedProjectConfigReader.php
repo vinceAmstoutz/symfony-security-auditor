@@ -32,12 +32,8 @@ final readonly class GuardedProjectConfigReader
     private const array SCAN_SURFACE_KEYS = ['import_sarif'];
 
     /**
-     * What a run spends, trusts and writes is the user's to decide: the
-     * audited repository may tune what is audited and how, not lift the
-     * budget cap, switch secret scrubbing or the offline guard off, put words
-     * in the attacker's system prompt or in the risk markers it is handed,
-     * widen the files the model's tools may open, or aim the cache at files it
-     * ships.
+     * What a run spends, trusts and writes: the user's to set, never a
+     * repository's.
      */
     private const array USER_ONLY_PATHS = ['cache', 'privacy', 'audit.custom_skills', 'audit.output', 'audit.tools_scope', 'scan.secret_scrubbing', 'scan.custom_risk_patterns'];
 
@@ -49,9 +45,8 @@ final readonly class GuardedProjectConfigReader
     ) {}
 
     /**
-     * The audited repository ships its own config file, so letting it define
-     * the connection would let it point the user's resolved API credentials at
-     * an endpoint of its choosing.
+     * Refuses a connection setting, which would let a repository aim the
+     * user's API credentials at an endpoint of its choosing.
      *
      * @param array<array-key, mixed> $baseConfig the configuration read before this file, which it may tighten but not loosen or erase
      *
@@ -86,11 +81,8 @@ final readonly class GuardedProjectConfigReader
     }
 
     /**
-     * A non-map project value would overwrite a whole section of the base
-     * configuration when the two are merged, so `audit: []` or `audit: ~`
-     * would drop the user's budget caps and custom skills without ever naming
-     * them; a repository may override single keys beneath a section, never the
-     * section itself.
+     * Refuses a non-map value over a section of the base configuration, which
+     * the merge would erase whole: `audit: ~` would drop the budget caps.
      *
      * @param array<array-key, mixed> $projectConfig
      * @param array<array-key, mixed> $baseConfig
@@ -115,12 +107,8 @@ final readonly class GuardedProjectConfigReader
     }
 
     /**
-     * A project file may cap the run tighter than the configuration before it
-     * (a CI repository lowering its own spend is legitimate) but never
-     * loosen it: a raised, removed or non-numeric cap decides what the run
-     * spends, so it stays the user's alone. A merge writes a null or empty
-     * `budget` over the caps before it, which is why those count as loosening
-     * too.
+     * Accepts a lower budget cap; refuses a raised, removed, non-numeric, null
+     * or empty one.
      *
      * @param array<array-key, mixed> $projectConfig
      * @param array<array-key, mixed> $baseConfig
@@ -159,9 +147,8 @@ final readonly class GuardedProjectConfigReader
     }
 
     /**
-     * A known cap, given as a finite number no higher than the number before
-     * it for that cap; a cap left open can only be tightened, which an
-     * infinite cap or a NaN never does.
+     * True for a known cap given as a finite number no higher than the base
+     * cap, if any.
      *
      * @param array<array-key, mixed> $baseBudget
      */
@@ -220,11 +207,8 @@ final readonly class GuardedProjectConfigReader
     }
 
     /**
-     * `scan.import_sarif` reads whatever file it names (an absolute path or
-     * one escaping the project root included) and folds its contents into
-     * the LLM prompt. Letting the audited repository declare it would let the
-     * repository point the scanner at paths of its own choosing, the same
-     * threat model already applied to `platform`/`provider`.
+     * Refuses `scan.import_sarif`, which reads any file it names, outside the
+     * project included, into the prompt.
      *
      * @param array<array-key, mixed> $projectConfig
      *

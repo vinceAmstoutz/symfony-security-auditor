@@ -102,8 +102,6 @@ final class GrepToolTest extends TestCase
      */
     public function test_execute_continues_past_filtered_files_to_reach_matching_ones(): void
     {
-        // Kills Continue_→break mutation: with `break`, the non-matching first file would stop iteration
-        // and the second file's matches would never be reported.
         $projectFile = ProjectFile::create('src/Entity/User.php', '/app/y', 'echo foo;');
         $controllerSecond = ProjectFile::create('src/Controller/AController.php', '/app/x', 'echo foo;');
 
@@ -243,8 +241,6 @@ final class GrepToolTest extends TestCase
      */
     public function test_execute_truncates_on_a_character_boundary_not_a_byte_boundary(): void
     {
-        // Byte 500 falls inside the 3-byte '€'; a byte-wise cut would emit a
-        // broken half-character, a character-safe cut stops before it.
         $line = str_repeat('a', 499).'€NEEDLE'; // 508 bytes, match past the cut
         $projectFile = ProjectFile::create('src/Mb.php', '/app/Mb', $line."\n");
         $grepTool = new GrepTool([$projectFile]);

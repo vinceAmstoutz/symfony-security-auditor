@@ -14,13 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
- * A survey of the audited application's security surfaces, named after what each
- * one *is* rather than what Symfony calls it.
- *
- * {@see SymfonyMapping} is the same data under Symfony vocabulary and delegates
- * here; its Symfony-named accessors are deprecated in favour of these. Prompt
- * rendering keeps the framework's words: that is the framework profile's job,
- * not this model's.
+ * The audited application's security surfaces under framework-neutral names.
+ * {@see SymfonyMapping} holds the same data and its Symfony-named accessors are
+ * deprecated in favour of these.
  */
 final readonly class ApplicationSecurityMap
 {

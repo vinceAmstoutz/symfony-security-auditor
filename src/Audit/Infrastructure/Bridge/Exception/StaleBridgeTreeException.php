@@ -18,11 +18,6 @@ use RuntimeException;
 /** @internal not part of the BC promise, see docs/versioning.md */
 final class StaleBridgeTreeException extends RuntimeException
 {
-    /**
-     * `init --force` writes a fresh configuration, so the advice says it will
-     * want the model and connection options again rather than letting it fall
-     * back to its defaults.
-     */
     public static function forTree(string $directory, string $treeVersion, string $bundledVersion, ?string $provider): self
     {
         return new self(\sprintf(

@@ -16,9 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
- * One finding awaiting a dispatched verdict: its position in the caller's
- * finding list, the finding itself and the code context to cache the verdict
- * under (`null` when caching is bypassed for this run).
+ * A finding awaiting its verdict, with its position in the caller's list and
+ * the code context to cache the verdict under, null when the cache is
+ * bypassed.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

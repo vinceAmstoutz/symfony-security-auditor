@@ -131,8 +131,8 @@ final readonly class StandaloneApplicationFactory
     ) {}
 
     /**
-     * The standalone entry point drains this on the way out, once the console
-     * application can no longer autoload from the archive being replaced.
+     * Drained by the entry point on the way out, once nothing autoloads from
+     * the archive being replaced.
      */
     public function pendingBinarySwap(): PendingBinarySwap
     {
@@ -211,11 +211,8 @@ final readonly class StandaloneApplicationFactory
     }
 
     /**
-     * `$PWD` keeps the spelling the shell shows (symlinks unresolved), but it
-     * is a shell export: absent on Windows and under cron, stale under a
-     * launcher that inherited it from another directory (an MCP client, a
-     * `Process`, a task runner). It is trusted only while it names the process
-     * working directory, which is always available and wins otherwise.
+     * Returns `$PWD` (symlinks unresolved) only while it names the process
+     * working directory, else that directory.
      *
      * @param array<string, string> $environment
      */
@@ -332,13 +329,9 @@ final readonly class StandaloneApplicationFactory
     }
 
     /**
-     * `self-update` must keep working before "init" has ever run, so this
-     * never routes through `StandaloneConfigLoader::load()`: it would throw
-     * `MissingPlatformException` on a fresh install. A config file that is
-     * present but broken (an unresolvable home directory, malformed YAML)
-     * fails closed to skipping the refresh, same as `privacy.offline_only`
-     * being enabled on purpose. A fresh install with no config file yet has
-     * nothing to fail closed on, so it defaults to online.
+     * Works before `init` has ever run. A config file that is present but
+     * broken skips the refresh, as `privacy.offline_only` does; no config file
+     * at all means online.
      */
     public static function pricingCatalogRefresher(XdgConfigPathResolver $xdgConfigPathResolver): PricingCatalogRefresherInterface
     {
@@ -432,9 +425,8 @@ final readonly class StandaloneApplicationFactory
     }
 
     /**
-     * Where a refreshed pricing catalog lands. `doctor` builds its provider
-     * with the same override the audit container passes, so the two never
-     * disagree about which catalog file the run prices from.
+     * Where a refreshed pricing catalog lands: the file both `doctor` and the
+     * audit container price from.
      */
     private function refreshedCatalogPath(): ?string
     {
@@ -459,13 +451,9 @@ final readonly class StandaloneApplicationFactory
     }
 
     /**
-     * Where the project being audited would keep its own configuration file
-     * (the folder the command line names, the working directory when it names
-     * none, or the Composer project either lies in when it is not a project
-     * itself, as the audit command reads it), or null when the working
-     * directory it is relative to cannot be told, which the audit command then
-     * reports itself. The loader layers that file over the working directory's
-     * when it exists and is another file.
+     * Returns where the audited project would keep its own configuration file,
+     * in the project the audit command resolves, or null when the working
+     * directory cannot be told.
      */
     private function auditedProjectConfigFileNamedBy(StandaloneApplication $standaloneApplication): ?string
     {
@@ -543,9 +531,8 @@ final readonly class StandaloneApplicationFactory
     }
 
     /**
-     * A bridge tree the entry point left unloaded for holding another
-     * `symfony/ai-platform` is refused before anything else: whatever the
-     * configuration says, no audit could run on it.
+     * Refuses first a bridge tree left unloaded for holding another
+     * `symfony/ai-platform`.
      *
      * @throws UnresolvableConfigPathException
      * @throws StaleBridgeTreeException
@@ -581,9 +568,8 @@ final readonly class StandaloneApplicationFactory
     }
 
     /**
-     * The baseline the audited project's own file names is decoded as the
-     * audit will decode it, so one it cannot read gets that file skipped
-     * rather than stopping the run, as any other part of the file would.
+     * Decodes the baseline the audited project's file names as the audit will,
+     * so an unreadable one skips that file instead of stopping the run.
      *
      * @throws MalformedBaselineFileException
      */
@@ -596,11 +582,9 @@ final readonly class StandaloneApplicationFactory
     }
 
     /**
-     * The configuration the audited project ships is checked by the container
-     * itself, which only a build tells: a key, a value or a type it rejects
-     * would stop a run that did not ask for that file, so the file is skipped
-     * and the container built again from the rest. A failure the rest shares
-     * is the rebuilt container's own, as it would be without the file.
+     * Builds the container again with the audited project's file skipped for
+     * the reason the first build failed. Rethrows that failure when no such
+     * file was layered in.
      *
      * @throws UnresolvableConfigPathException
      * @throws MissingPlatformException
@@ -633,8 +617,6 @@ final readonly class StandaloneApplicationFactory
     }
 
     /**
-     * Without a data directory there is no bridge tree to hold anything.
-     *
      * @throws StaleBridgeTreeException
      */
     private function assertBridgeTreeLoadable(): void

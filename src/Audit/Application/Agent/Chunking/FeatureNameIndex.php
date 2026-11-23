@@ -17,8 +17,7 @@ use function Symfony\Component\String\u;
 
 /**
  * Finds the features a file may belong to without testing it against every
- * feature, so grouping a project costs time proportional to its files rather
- * than to its files times its controllers.
+ * feature.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -47,8 +46,7 @@ final readonly class FeatureNameIndex
     }
 
     /**
-     * The features whose name is the start of `$baseName`, however the rest
-     * of it reads.
+     * Returns the features whose name starts `$baseName`.
      *
      * @return list<string>
      */
@@ -68,9 +66,8 @@ final readonly class FeatureNameIndex
     }
 
     /**
-     * The features named, whatever the case, by a directory between the
-     * project root and the file: the first segment of the path and its file
-     * name are not between two slashes.
+     * Returns the features named, in any case, by a directory between the
+     * path's first segment and its file name.
      *
      * @return list<string>
      */
@@ -85,8 +82,8 @@ final readonly class FeatureNameIndex
     }
 
     /**
-     * The longest of `$features`, the first one declared when several are as
-     * long, or `null` when there is none.
+     * Returns the longest of `$features`, the first declared among equals, or
+     * null when there is none.
      *
      * @param list<string> $features
      */

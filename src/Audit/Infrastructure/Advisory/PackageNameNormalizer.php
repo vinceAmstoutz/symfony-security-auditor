@@ -14,12 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory;
 
 /**
- * Composer/Packagist package names are conventionally lowercase, but nothing
- * stops an attacker LLM from echoing a capitalized `use` statement's
- * namespace-derived guess (`Symfony/Http-Foundation`) back as a
- * `lookup_advisory` tool argument. Normalizing both the stored keys and the
- * lookup query the same way lets a plausible but differently-cased or
- * padded package name still match a real, cached advisory.
+ * The form both the stored advisory keys and a lookup are compared in, so
+ * `Symfony/Http-Foundation` from the model matches `symfony/http-foundation`.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

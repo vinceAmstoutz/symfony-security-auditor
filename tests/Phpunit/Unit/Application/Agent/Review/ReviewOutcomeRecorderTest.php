@@ -186,8 +186,7 @@ final class ReviewOutcomeRecorderTest extends TestCase
     }
 
     /**
-     * A failed review reached no verdict, so the finding must not be fed back
-     * to the attacker as one the reviewer dismissed.
+     * A failed review reached no verdict.
      *
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
@@ -237,10 +236,8 @@ final class ReviewOutcomeRecorderTest extends TestCase
     }
 
     /**
-     * A verdict recovered after a mid-conversation abort was genuinely
-     * reached by the reviewer LLM (the same as a normal, non-aborted
-     * success), so it must be cached the same way, or a retried run pays for
-     * an LLM call that already produced a reliable answer.
+     * A verdict recovered after a mid-conversation abort was genuinely reached,
+     * so it is cached like any other.
      *
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException

@@ -14,11 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 /**
- * Opt-in companion of {@see ProjectFileScannerInterface} for a scanner that can
- * tell whether its configured scan reaches a file without reading one: the
- * command line asks it of a directory holding no `composer.json` before it
- * decides which project to audit. A scanner without it is asked through a
- * whole scan.
+ * Optional companion of {@see ProjectFileScannerInterface}, checked with
+ * `instanceof`: tells whether the configured scan reaches a file without
+ * reading one. Without it, a whole scan answers.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

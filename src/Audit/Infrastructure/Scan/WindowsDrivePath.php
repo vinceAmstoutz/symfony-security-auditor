@@ -18,13 +18,9 @@ use Symfony\Component\Filesystem\Path;
 use function Symfony\Component\String\u;
 
 /**
- * The one spelling of a Windows drive path (`C:\proj`, `c:/proj`, the
- * `/C:/proj` a `file:///C:/proj` URI leaves behind) every runtime compares by:
- * forward slashes, an upper-case drive letter, no dot segments. {@see Path}
- * reads such a path only on Windows, so a SARIF report written there and
- * audited anywhere else needs this to match the project root. Any other path
- * comes back as it was, since a backslash is a valid file name character on
- * UNIX.
+ * The one spelling of a Windows drive path (`C:\proj`, `c:/proj`, `/C:/proj`)
+ * on every platform: forward slashes, an upper-case drive letter, no dot
+ * segments. Returns any other path unchanged.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

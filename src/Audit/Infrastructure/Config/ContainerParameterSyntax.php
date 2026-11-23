@@ -16,15 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 
 /**
- * A value written into the standalone config reaches the container verbatim,
- * where `ParameterBag` reads `%name%` as a parameter reference and `%%` as an
- * escaped percent. Neither is what someone typing a URL means: the first aborts
- * the run with "You have requested a non-existent parameter", the second
- * silently rewrites the value. A whole-value `%env(VAR)%` is the exception,
- * because `StandalonePlatformConfigResolver` resolves it before the container
- * is built, escaping what it substitutes so a secret is never read as syntax.
- * A URL `init` writes is escaped the same way, so its percent-encoded octets
- * (`%2F`) reach the container as typed.
+ * Tells and escapes the container's parameter syntax (`%name%`, `%%`) in a
+ * value the standalone config hands the container, so a URL or a secret
+ * reaches it as typed. A whole-value `%env(VAR)%` is resolved before the
+ * container is built instead.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -57,9 +52,9 @@ final readonly class ContainerParameterSyntax
     }
 
     /**
-     * Whether the container would read part of the value as syntax (a
-     * `%name%` or `%env(VAR)%` reference, or an escaped `%%`), whatever the
-     * resolver makes of a whole-value placeholder first.
+     * True when the container would read part of the value as syntax: a
+     * `%name%` or `%env(VAR)%` reference or a `%%`, whole-value placeholders
+     * included.
      */
     public static function holdsReference(string $value): bool
     {
@@ -67,9 +62,8 @@ final readonly class ContainerParameterSyntax
     }
 
     /**
-     * Whether the value spells the placeholder the container writes for an
-     * `%env()%` it has already read, which it swaps for the variable wherever
-     * the text appears, whatever the case.
+     * True when the value spells, in any case, the placeholder the container
+     * swaps for the variable of an `%env()%` it has read.
      */
     public static function holdsEnvPlaceholder(string $value): bool
     {
@@ -77,12 +71,9 @@ final readonly class ContainerParameterSyntax
     }
 
     /**
-     * A URL holds a `%` only to percent-encode an octet, which `literal()`
-     * carries to the container intact; a `%` that starts none (the closing
-     * one of `%BASE_URL%`, even when the name itself opens with two hex digits)
-     * belongs to a reference the user meant, which escaping would silently
-     * turn into text, or to no valid URL at all. A whole-value `%env()%` is
-     * the caller's to accept before asking.
+     * True when every `%` of the URL percent-encodes an octet, which
+     * `literal()` carries to the container intact. A whole-value `%env()%`
+     * is the caller's to accept first.
      */
     public static function isAbsentFromUrl(string $url): bool
     {
@@ -90,12 +81,9 @@ final readonly class ContainerParameterSyntax
     }
 
     /**
-     * Text that happens to hold a `%…%` pair (a regex such as
-     * `/sprintf\(.*%s.*%d/`, a range such as `50%-60%`) must reach the
-     * setting as typed, while a reference the container can resolve
-     * (`%env(VAR)%`, `%kernel.project_dir%`) and a doubled `%%` keep their
-     * meaning. A pair naming a parameter the bag lacks would abort the run
-     * with "non-existent parameter", so it is escaped to the text it was.
+     * Escapes each `%…%` pair naming no parameter of the bag, so a regex such
+     * as `/sprintf\(.*%s.*%d/` reaches the setting as typed. A resolvable
+     * reference and a `%%` keep their meaning.
      */
     public static function escapeUnresolvable(string $value, ParameterBagInterface $parameterBag): string
     {
@@ -107,9 +95,8 @@ final readonly class ContainerParameterSyntax
     }
 
     /**
-     * The spelling the container reads back as `$value`: a whole-value
-     * `%env(VAR)%` stays a placeholder for the resolver to substitute;
-     * anything else has every `%` doubled.
+     * Returns the spelling the container reads back as `$value`: a
+     * whole-value `%env(VAR)%` as it is, anything else with every `%` doubled.
      */
     public static function literal(string $value): string
     {

@@ -19,9 +19,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 interface AttackerPromptBuilderInterface
 {
     /**
-     * @param list<ProjectFile> $files Files in the chunk; used to inject file-type-specific
-     *                                 expert skills into the system prompt. Empty array
-     *                                 returns the unspecialized base prompt.
+     * @param list<ProjectFile> $files the chunk's files, whose types pick the expert
+     *                                 skills; empty gives the base prompt
      */
     public function buildSystemPrompt(array $files = []): string;
 

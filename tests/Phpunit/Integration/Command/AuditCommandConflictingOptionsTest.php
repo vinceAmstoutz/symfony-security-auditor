@@ -52,11 +52,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\FixedFindingPipeline;
 
 /**
- * `--generate-baseline` needs real findings from a real audit run, but
- * `--dry-run`/`--show-scanned` both exit before the LLM (and therefore the
- * pipeline `FixedFindingPipeline` stands in for here) is ever invoked. This
- * verifies the combination is rejected instead of the baseline file silently
- * never being written.
+ * `--generate-baseline` is refused with `--dry-run` or `--show-scanned`, which
+ * exit before the audit runs and would never write the baseline.
  */
 final class AuditCommandConflictingOptionsTest extends TestCase
 {

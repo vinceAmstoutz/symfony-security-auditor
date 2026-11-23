@@ -39,10 +39,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecurityConfigParserI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\VoterCapabilityParserInterface;
 
 /**
- * `config/services.php` always aliases the four parser ports to their
- * `PhpParser*`/`SymfonyYamlSecurityConfigParser` implementations, so they are
- * required here rather than falling back to a Null* default.
- *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class MappingStage implements StageInterface
@@ -115,11 +111,9 @@ final readonly class MappingStage implements StageInterface
     }
 
     /**
-     * A `#[AsLiveComponent]`/`#[ApiResource]` file classifies as its own
-     * dedicated {@see ProjectFileType} (to keep its specialized attacker-skill
-     * treatment) even when it also extends `AbstractController`, so
-     * `ProjectFileInventory::controllers()` alone would miss its routed,
-     * access-controlled actions.
+     * Includes the `#[AsLiveComponent]` and `#[ApiResource]` files, which have
+     * a `ProjectFileType` of their own even when they extend
+     * `AbstractController`.
      *
      * @param list<ProjectFile> $files
      *
@@ -185,10 +179,9 @@ final readonly class MappingStage implements StageInterface
     }
 
     /**
-     * The project's rules and firewalls, the configuration files that could
-     * not be read and the rules and firewalls of each monorepo application
-     * the run is narrowed to, kept apart since they govern that application's
-     * routes only.
+     * Returns the project's rules and firewalls, the configuration files it
+     * could not read and, apart, those of each monorepo application the run is
+     * narrowed to.
      *
      * @param list<ProjectFile> $files
      * @param list<string>      $scanPaths
@@ -253,8 +246,8 @@ final readonly class MappingStage implements StageInterface
     }
 
     /**
-     * Rules apply first-match-wins in the order the application loads them,
-     * which is not the order the scan lists the files in.
+     * Orders the files as the application loads them, since the first
+     * matching rule applies.
      *
      * @param list<ProjectFile> $files
      *
@@ -279,9 +272,8 @@ final readonly class MappingStage implements StageInterface
     }
 
     /**
-     * A rule in configuration the production application never loads protects
-     * no route, so a parser that knows which files the application loads has
-     * the final word; any other parser reads every configuration file.
+     * Defers to a parser that knows which files the production application
+     * loads; with any other parser, every configuration file counts.
      */
     private function isLoadedInProduction(ProjectFile $projectFile): bool
     {
@@ -294,10 +286,8 @@ final readonly class MappingStage implements StageInterface
     }
 
     /**
-     * Mirrors {@see SymfonyYamlSecurityConfigParser::accessControlOf()}'s
-     * first-match-wins semantics across config files: a rule for a path already
-     * covered by an earlier file is appended as an `or: …` requirement instead of
-     * replacing it, so no file's rule is silently dropped.
+     * Appends a rule for a path an earlier file already covers as an `or: …`
+     * requirement, so no file's rule is dropped.
      *
      * @param array<string, list<string>> $routeAccessMap
      * @param array<string, list<string>> $incoming

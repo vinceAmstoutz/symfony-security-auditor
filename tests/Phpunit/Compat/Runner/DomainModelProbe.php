@@ -140,9 +140,7 @@ final readonly class DomainModelProbe
     }
 
     /**
-     * `Vulnerability::create()` is deprecated and still public API until
-     * 2.0: the probe calls it the way an integration written for an older
-     * release does.
+     * Calls the deprecated `Vulnerability::create()`, public API until 2.0.
      *
      * @throws ReflectionException
      */

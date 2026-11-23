@@ -35,10 +35,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFact
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
 
 /**
- * Orchestrates the attacker pass: deterministic pre-scan, optional lean-mode
- * filtering, feature/type chunking, then delegation to a per-chunk analyzer.
- * The per-chunk prompt assembly, caching and the sequential/concurrent
- * analysis strategies live in dedicated `Chunk\` collaborators built here.
+ * Runs the attacker pass: pre-scan, optional lean-mode filtering, chunking,
+ * then a sequential or concurrent per-chunk analyzer.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

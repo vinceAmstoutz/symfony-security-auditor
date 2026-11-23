@@ -22,13 +22,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CacheAwarePricingProv
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ServingPlatformPricingProviderInterface;
 
 /**
- * Sources per-million-token USD pricing (input/output and real prompt-cache
- * rates) from the daily `symfony/models-dev` catalog snapshot, read once from
- * `vendor/` with no network call. Replaces the hand-maintained price table.
- * A model is priced from the listing of the `symfony/ai` platform the audit
- * runs against first and only then from the catalog at large. Each model's
- * price is resolved once per run and remembered, since every call asks for it
- * several times.
+ * Prices models in USD per million tokens from the installed
+ * `symfony/models-dev` catalog, with no network call: from the serving
+ * platform's listing first, then from the catalog at large. Remembers each
+ * model's price for the run.
  *
  * @phpstan-import-type PricedCost from ModelsDevCatalog
  *
@@ -41,9 +38,8 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     public const string CATALOG_FILENAME = 'models-dev.json';
 
     /**
-     * Official first-party provider keys, in resolution priority order. A bare
-     * model id is priced only from these: aggregators and clouds re-list the
-     * same id at a marked-up rate, so a bare lookup must never reach them.
+     * First-party provider keys, in priority order. A bare model id is priced
+     * only from these, never from an aggregator's marked-up listing.
      *
      * @var list<string>
      */
@@ -98,8 +94,7 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     }
 
     /**
-     * The models the listing of `$platform`'s own provider holds, as the
-     * catalog the run prices from has them.
+     * Returns the models the catalog lists under `$platform`'s own provider.
      *
      * @return array<array-key, mixed>
      */
@@ -156,10 +151,6 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
         return $this->servingPlatformPricesByModel[$model];
     }
 
-    /**
-     * A platform the catalog has no listing for leaves the catalog at large
-     * as the only rate there is.
-     */
     private function hasServingPlatformListing(): bool
     {
         if (null === $this->platform) {
@@ -171,10 +162,6 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
         return null !== $provider && \array_key_exists($provider, $this->catalog());
     }
 
-    /**
-     * The platform the audit runs against bills at its own listed rate, which
-     * an aggregator or another cloud re-listing the same id does not share.
-     */
     private function priceFromServingPlatform(string $model): ?ModelPrice
     {
         if (null === $this->platform) {
@@ -211,13 +198,8 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     }
 
     /**
-     * `docs/configuration.md`'s documented `model: 'name?temperature=0.2'`
-     * query-string syntax (per `symfony/ai-bundle`'s own convention) reaches
-     * this provider unparsed: `LLMConfiguration` and `ContainerParameterRegistrar`
-     * both publish the model name verbatim, only `symfony/ai`'s own platform
-     * factory ever splits it. Stripping everything from the first `?` before
-     * every catalog lookup keeps a model configured this way priced the same
-     * as its bare name.
+     * Drops the `?temperature=0.2` options of a configured model name, so it
+     * prices as its bare name.
      */
     private function stripOptionsQueryString(string $model): string
     {
@@ -227,14 +209,9 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     }
 
     /**
-     * A qualified id can legitimately appear under several providers at once
-     * (aggregators re-listing the same upstream model) with disagreeing
-     * prices: an aggregator's stray `$0` free-tier listing must never win
-     * over a genuinely paid one just because it sorts first, since that
-     * would both under-report the real cost and, via `hasModel()` returning
-     * `true`, silently bypass the "no published pricing" budget-guard safety
-     * net. The first non-zero match wins; a fully free model (every match
-     * genuinely `$0`) still prices at `$0`.
+     * Returns the first non-zero price, so an aggregator's `$0` listing never
+     * hides a paid one nor bypasses the unpriced-model budget guard; `$0` only
+     * when every match is free.
      *
      * @param list<int|string> $providers
      */
@@ -351,11 +328,9 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     }
 
     /**
-     * The catalog file this provider actually reads, so `doctor` can name it
-     * instead of assuming the packaged one: a `self-update` refresh writes an
-     * override that takes precedence, unless it cannot serve as a catalog or the
-     * packaged one is newer, in which case the packaged one is read in its
-     * place.
+     * Returns the catalog file actually read: the `self-update` refresh,
+     * unless it is unusable or older than the packaged catalog, which is read
+     * then.
      */
     public function effectiveCatalogPath(): ?string
     {
@@ -364,13 +339,6 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
         return $this->loadedCatalogPath ?? $this->preferredCatalogPath();
     }
 
-    /**
-     * An override that does not exist yet falls through to the packaged
-     * catalog rather than shadowing it, which is what makes the override
-     * location safe to point at before anything writes there. One the packaged
-     * catalog has since overtaken, by an upgrade of the binary, gives way to
-     * it as well.
-     */
     private function preferredCatalogPath(): ?string
     {
         if (null !== $this->catalogPath && is_file($this->catalogPath) && !ModelsDevCatalog::isFileNewer($this->packagedCatalogPath(), $this->catalogPath)) {
@@ -381,15 +349,9 @@ final class ModelsDevPricingProvider implements CacheAwarePricingProviderInterfa
     }
 
     /**
-     * The catalog shipped with the installed `symfony/models-dev` package:
-     * the only file whose contents `InstalledVersions::getPrettyVersion()`
-     * actually describes, which is why `doctor` compares against it before
-     * naming a version.
-     *
-     * `InstalledVersions::getInstallPath()` resolves relative to the Composer
-     * directory, so it hands back a `vendor/composer/../symfony/...` detour.
-     * `Path::canonicalize()` collapses it lexically; `realpath()` cannot, it
-     * returns `false` for the `phar://` path a packaged binary reports.
+     * Returns the catalog shipped with the installed `symfony/models-dev`
+     * package, the one file its installed version describes. The path is
+     * canonicalized lexically, since `realpath()` fails on a `phar://` path.
      */
     public function packagedCatalogPath(): ?string
     {

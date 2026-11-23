@@ -22,12 +22,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\RecordingToolInt
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 
 /**
- * Provider-agnostic schema-enforced collection seam for reviewer verdicts.
- * The LLM is instructed to invoke this tool once per reviewed finding instead
- * of emitting a JSON array; the platform validates each call's arguments
- * against the declared input schema before invocation, so a malformed verdict
- * (missing id, prose, wrapper objects) is structurally impossible and never
- * costs a discarded response.
+ * Records one reviewer verdict per call, its arguments validated against the
+ * tool's input schema.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

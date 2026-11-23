@@ -66,8 +66,6 @@ final class AttackerContextPromptRendererTest extends TestCase
             RiskMarker::create('src/X.php', 7, 'unserialize_call', 'RCE'),
         ]);
 
-        // indent() prepends two spaces; the marker line is indented twice
-        // (once within its file block, once for the whole block list).
         self::assertMatchesRegularExpression('/^    L7 unserialize_call — RCE$/m', $output);
         self::assertMatchesRegularExpression('/^  src\/X\.php:$/m', $output);
     }

@@ -100,6 +100,38 @@ printf '<?php\n\n/**\n * Requirements: roles, `methods`,\n * `ips` and `requires
 run_check "$php_file"
 expect_pass 'a wrapped list whose next line opens with inline code passes'
 
+printf '<?php\n\n/**\n * Kept since 1.21 for old baselines.\n */\nfunction keep(): void {}\n' >"$php_file"
+run_check "$php_file"
+expect_error 'a version history in a PHP comment is refused' "::error file=$php_file,line=4::State the current contract"
+
+printf '<?php\n\n/**\n * Reads the lockfile PHP 8.4 writes.\n *\n * @deprecated since 1.22, use read() instead\n */\nfunction old(): void {}\n' >"$php_file"
+run_check "$php_file"
+expect_pass 'a deprecation tag and a third-party version in a PHP comment pass'
+
+printf '_Since 1.22._ The option is read before 1.23 ships.\n' >"$doc"
+run_check "$doc"
+expect_pass 'a version history in Markdown passes'
+
+printf '<?php\n\n// Reads the file as earlier releases did.\nfunction cache(): void {}\n' >"$php_file"
+run_check "$php_file"
+expect_error 'a history word in a PHP comment is refused' "::error file=$php_file,line=3::State the current contract"
+
+printf '<?php\n\n// Splits the chunk, see #378.\nfunction split(): void {}\n' >"$php_file"
+run_check "$php_file"
+expect_error 'an issue number in a PHP comment is refused' "::error file=$php_file,line=3::State the current contract"
+
+printf '<?php\n\n/**\n * Here we retry once.\n */\nfunction retry(): void {}\n' >"$php_file"
+run_check "$php_file"
+expect_error 'a first-person narrative in a PHP comment is refused' "::error file=$php_file,line=4::State the contract without"
+
+printf '<?php\n\n// Reads the file once.\n// Then caches it.\nfunction read(): void {}\n' >"$php_file"
+run_check "$php_file"
+expect_error 'a comment block of several // lines is refused' "::error file=$php_file,line=4::Keep a comment to one line"
+
+printf '<?php\n\n$width = 2; // in characters\n$height = 4; // in lines\n' >"$php_file"
+run_check "$php_file"
+expect_pass 'trailing comments on consecutive code lines pass'
+
 repo="$work/repo"
 mkdir -p "$repo/src" "$repo/tests/Fixture" "$repo/examples"
 printf '<?php\n// Clean comment.\n' >"$repo/src/Clean.php"

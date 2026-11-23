@@ -95,9 +95,8 @@ final readonly class AuthStatusCommand
     }
 
     /**
-     * The exported variable wins, so a store that cannot be read changes
-     * nothing about the key an audit would use: it is worth a warning, not a
-     * failure.
+     * Warns about a store that cannot be read and returns false: the exported
+     * variable wins over it anyway.
      */
     private function holdsStoredCredential(SymfonyStyle $symfonyStyle, string $variableName): bool
     {
@@ -111,9 +110,8 @@ final readonly class AuthStatusCommand
     }
 
     /**
-     * A configuration reading the key through `%env(file:VAR)%` exports the
-     * file's path, not the key, so the key an audit would use is the file's
-     * content; a file that cannot be read means no key resolves at all.
+     * Reports the key held by the file a `%env(file:VAR)%` variable names. A
+     * file that cannot be read or is blank resolves no key.
      */
     private function reportFromFile(SymfonyStyle $symfonyStyle, string $variableName, string $path, bool $shadowsStoredCredential): int
     {

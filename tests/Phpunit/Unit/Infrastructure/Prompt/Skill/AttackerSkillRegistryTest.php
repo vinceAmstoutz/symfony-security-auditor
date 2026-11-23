@@ -286,14 +286,9 @@ final class AttackerSkillRegistryTest extends TestCase
     }
 
     /**
-     * Symfony Messenger's real default serializer (when `serializer` is
-     * omitted, the overwhelmingly common case) is native PHP
-     * `serialize()`/`unserialize()` via `messenger.transport.native_php_serializer`.
-     * `messenger.transport.symfony_serializer` is an explicit, safer
-     * opt-in, never the default. Confirmed against
-     * `vendor/symfony/framework-bundle/DependencyInjection/FrameworkExtension.php`'s
-     * `default_serializer` config node, whose default value is literally
-     * `messenger.transport.native_php_serializer`.
+     * Messenger's default serializer is native PHP `serialize()`
+     * (`messenger.transport.native_php_serializer`);
+     * `messenger.transport.symfony_serializer` is an opt-in.
      */
     public function test_config_skill_does_not_claim_the_symfony_serializer_is_messengers_default(): void
     {
@@ -312,13 +307,9 @@ final class AttackerSkillRegistryTest extends TestCase
     }
 
     /**
-     * `Email::subject()` RFC-2047-encodes an embedded newline into the
-     * header body and `Email::from()`/`addBcc()` either strip control
-     * characters or throw `InvalidArgumentException` for them, verified
-     * directly against a real `symfony/mime` `Email` instance. Unconditionally
-     * flagging these calls as header injection is a broad false positive for
-     * one of the most common real-world Mailer patterns (a dynamic subject
-     * or reply-to on a transactional email).
+     * `Email::subject()` encodes an embedded newline and `Email::from()` or
+     * `addBcc()` strip or refuse control characters, so these calls are no
+     * header injection by themselves.
      */
     public function test_php_skill_does_not_unconditionally_flag_symfony_mailer_header_fields(): void
     {
@@ -328,10 +319,7 @@ final class AttackerSkillRegistryTest extends TestCase
     }
 
     /**
-     * EasyAdminBundle's real field/action permission method is `setPermission()`
-     * (`Field::new('x')->setPermission('ROLE_ADMIN')`,
-     * `$actions->setPermission(Action::DELETE, 'ROLE_SUPER_ADMIN')`), confirmed
-     * against the bundle's published security documentation.
+     * EasyAdminBundle's field and action permission method is `setPermission()`.
      */
     public function test_easyadmin_skill_references_the_real_permission_method(): void
     {

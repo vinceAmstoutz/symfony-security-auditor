@@ -14,11 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 /**
- * Where the nodes one line of YAML, without its line break, opens begin: the
- * first at its indentation, then every `-` or `?` marker and every `key:` the
- * line opens on the line of its parent, as in `- - item`, `- key: value` or
- * `<<: - item`, skipping the `&anchor` and `!tag` before them. It errs towards
- * more levels than the parser opens: a colon inside a quoted value counts too.
+ * The columns where the nodes one YAML line opens begin: its indentation,
+ * then each node it opens on its parent's line (`- - item`, `- key: value`).
+ * Errs towards more levels than the parser opens: a colon inside a quoted
+ * value counts too.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

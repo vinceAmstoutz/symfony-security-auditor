@@ -24,9 +24,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInter
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
 
 /**
- * Turns a single-finding review outcome (a verdict payload, a raw LLM
- * response, or a failure) into the reviewed finding plus its reviewer
- * coverage entry, so the accept/reject/error logic lives in one tested place.
+ * Turns a single-finding review outcome (a verdict payload, a raw answer or a
+ * failure) into the reviewed finding and its coverage entry.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -43,13 +42,9 @@ final readonly class ReviewOutcomeRecorder
     ) {}
 
     /**
-     * A null payload (empty response or no recorded verdict) or one with no
-     * `accepted` flag is a review the model never made: the finding is
-     * recorded as errored, never as rejected, so it is not reported to the
-     * attacker as a rejection and is reviewed again on the next run. A
-     * rejection given at the tool-call limit is applied but left out of
-     * triage memory, as it is left out of the cache: it may rest on less than
-     * the reviewer wanted to read.
+     * Records the finding as errored, never as rejected, when the payload is
+     * null or has no `accepted` flag. A rejection given at the tool-call limit
+     * is applied but kept out of triage memory, as it is out of the cache.
      *
      * @param array<string, mixed>|list<array<string, mixed>>|null $review
      */
@@ -86,11 +81,8 @@ final readonly class ReviewOutcomeRecorder
     }
 
     /**
-     * A response cut short (by the output token limit, a content filter, the
-     * tool-loop cap or a call that produced no content) carries no verdict
-     * the reviewer actually reached: the finding is recorded as errored, never
-     * as rejected. Nothing is cached, so the next run reviews it again
-     * instead of replaying a rejection the model never made.
+     * Records the finding of a degraded answer as errored and uncached, never
+     * as rejected.
      */
     public function recordIncompleteResponse(Vulnerability $vulnerability, LLMResponse $llmResponse, CoverageRecorderInterface $coverageRecorder): Vulnerability
     {
@@ -121,9 +113,8 @@ final readonly class ReviewOutcomeRecorder
     }
 
     /**
-     * Marks a finding the reviewer never reached because a budget/provider
-     * abort unwound the review loop first: no logging, mirroring how
-     * `ChunkCoverageRecorder` marks a chunk the attacker never reached.
+     * Marks, without logging, a finding a budget or provider abort kept the
+     * reviewer from reaching.
      */
     public function recordUnreached(Vulnerability $vulnerability, string $status, CoverageRecorderInterface $coverageRecorder): void
     {
@@ -131,15 +122,9 @@ final readonly class ReviewOutcomeRecorder
     }
 
     /**
-     * Recovers a verdict already recorded via a `record_review` tool call in
-     * an earlier round of a conversation that later aborted. Otherwise it
-     * vanishes with the exception even though the verdict was genuinely
-     * reached. Returns `null` when nothing was recorded, so the caller falls
-     * back to its own not-reached handling via {@see recordUnreached()}. A
-     * recovered verdict is cached the same way a normal, non-aborted verdict
-     * already is (it was genuinely reached, so a retried run should not pay
-     * for an LLM call that already produced a reliable answer), bypassed
-     * when the caller passes no code context (mirrors `bypassCache`).
+     * Applies a verdict recorded through `record_review` before the
+     * conversation aborted, caching it when `$codeContextForCache` is given.
+     * Returns null when nothing was recorded.
      */
     public function recoverDrainedVerdict(Vulnerability $vulnerability, StructuredReviewCollectionSession $structuredReviewCollectionSession, CoverageRecorderInterface $coverageRecorder, ?string $codeContextForCache = null): ?Vulnerability
     {

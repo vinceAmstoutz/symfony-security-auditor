@@ -14,9 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Platform;
 
 /**
- * The state of the scripted provider for the scenario being run: one scenario
- * runs per process. The bundle and the standalone binary each build their
- * own platform instance, so the script and the call log live here.
+ * The script and call log of the scripted provider for the scenario being run,
+ * shared by every platform instance of the process.
  */
 final class PlatformSession
 {

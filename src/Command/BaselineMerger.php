@@ -18,16 +18,11 @@ use Psr\Clock\ClockInterface;
 use Symfony\Component\Clock\Clock;
 
 /**
- * Merges a JSON report's findings into a baseline file without re-running
- * the audit: existing entries are preserved verbatim (hand-written keys
- * such as `reason` survive) and only findings not yet covered by an entry
- * are appended. A prune drops only the entries whose finding the report
- * shows gone: an entry whose file the report did not analyze is kept, the
- * way `audit:diff` keeps such a finding apart as unverified. An entry a
- * baseline written before 1.22 holds under a former name of the finding
- * ({@see FormerFindingNames}) covers it as its own fingerprint would; those
- * names are computed once per finding and looked up by fingerprint, so a merge
- * grows with the size of the report and of the baseline, not their product.
+ * Merges a JSON report's findings into a baseline file without re-running the
+ * audit: kept entries stay verbatim and only findings no entry covers are
+ * appended. A prune keeps an entry whose file the report did not analyze, as
+ * `audit:diff` reports such a finding unverified. An entry holding a finding
+ * under a former name ({@see FormerFindingNames}) covers it.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -96,8 +91,7 @@ final readonly class BaselineMerger implements BaselineMergerInterface
     }
 
     /**
-     * An entry that names no file cannot be placed, so the report is trusted
-     * as it always was.
+     * True for an entry naming no file: the report is taken at its word.
      */
     private function reportVouchesForItsAbsence(BaselineEntry $baselineEntry, LoadedReport $loadedReport): bool
     {
@@ -107,9 +101,8 @@ final readonly class BaselineMerger implements BaselineMergerInterface
     }
 
     /**
-     * One of the entry's own fingerprints the report still lists, else the
-     * fingerprint of the first listed finding the entry holds under a former
-     * name.
+     * One of the entry's own fingerprints the report still lists, else that of
+     * the first listed finding the entry holds under a former name.
      *
      * @param array<string, int> $remaining
      */
@@ -165,10 +158,9 @@ final readonly class BaselineMerger implements BaselineMergerInterface
     }
 
     /**
-     * The finding's own fingerprint while an entry still accepts it, else the
-     * fingerprint of the first kept entry that holds it under a former name:
-     * the order `AuditContext::consumeBaselineCreditFor()` spends a baseline
-     * in.
+     * The finding's own fingerprint while an entry still accepts it, else that
+     * of the first kept entry holding it under a former name, the order
+     * `AuditContext::consumeBaselineCreditFor()` follows.
      *
      * @param array<string, int> $credits
      * @param list<string>       $holdingFingerprints the fingerprints of the kept entries holding it under a former name, in baseline order
@@ -179,10 +171,8 @@ final readonly class BaselineMerger implements BaselineMergerInterface
     }
 
     /**
-     * Every occurrence the run found, whether its report lists the finding or
-     * leaves it out because the baseline accepted it or its type is muted: a
-     * finding left out counted under the baseline fingerprint that accepted
-     * it, which an entry written under another type or path holds.
+     * Every occurrence the run found, a finding its report left out counted
+     * under the baseline fingerprint that left it out.
      *
      * @return array<string, int>
      */

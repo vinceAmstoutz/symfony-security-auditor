@@ -14,9 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Patch;
 
 /**
- * One hunk of a unified diff: the lines it expects from line `oldStart` of the
- * file on and the lines that replace them. A hunk that only adds lines
- * expects none and `oldStart` is the line they go before.
+ * One hunk of a unified diff: the lines it expects from line `oldStart` on
+ * and the lines that replace them. For a hunk that only adds lines,
+ * `oldStart` is the line they go before.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

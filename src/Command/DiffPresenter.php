@@ -21,8 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\WorkflowCom
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /**
- * Renders a {@see ReportDiff} as human-readable console sections or as a raw
- * JSON document.
+ * Renders a {@see ReportDiff} as console sections or as JSON.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -56,8 +55,7 @@ final readonly class DiffPresenter implements DiffPresenterInterface
     }
 
     /**
-     * Shown only when the current report could not vouch for a file, so a
-     * comparison of two complete reports reads exactly as it always did.
+     * Printed only when the current report could not vouch for some file.
      *
      * @param list<DiffFinding> $findings
      */
@@ -96,14 +94,9 @@ final readonly class DiffPresenter implements DiffPresenterInterface
     }
 
     /**
-     * The diff reads its `DiffFinding` fields from two untrusted JSON report
-     * files whose titles/paths ultimately come from LLM-produced or
-     * project-derived text. `OUTPUT_RAW` bypasses Symfony's formatter but not
-     * the terminal itself, so (exactly as the console audit-report renderer
-     * does) each single-line field is collapsed and stripped of
-     * control/ANSI/bidi characters so a crafted value cannot forge a fake
-     * `[SEVERITY]` finding line or spoof the terminal. A legacy
-     * `##[command]` in it is defused for a CI runner's log.
+     * Collapses an untrusted field to one line, stripped of control and bidi
+     * characters and defused for a CI runner's log, since `OUTPUT_RAW` still
+     * reaches the terminal.
      */
     private function sanitize(string $value): string
     {

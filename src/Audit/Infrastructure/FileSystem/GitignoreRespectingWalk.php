@@ -21,11 +21,9 @@ use Symfony\Component\Finder\SplFileInfo;
 
 /**
  * Walks a Finder with the project's `.gitignore` files applied when the scan
- * respects them. Finder's own `ignoreVCSIgnored()` stops the whole walk on a
- * `.gitignore` that is not a file, such as a directory a repository commits
- * under that name, so the walk is made again with {@see ReadableGitignores},
- * which reads the same rules and finds none in it. A file the stopped walk
- * already gave comes again; the scan reads it once and keeps it once.
+ * respects them. A `.gitignore` that is not a file, which stops Finder's
+ * `ignoreVCSIgnored()`, holds no rule: the walk starts again through
+ * {@see ReadableGitignores} and may yield a file twice.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

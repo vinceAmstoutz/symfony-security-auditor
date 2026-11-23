@@ -15,10 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Configuration;
 
 /**
  * Where an added configuration path must be documented: `docs/versioning.md`
- * lists the key that was added (the path itself, or the first of its
- * ancestors the recorded release did not have) and `resources/schema.json`
- * describes the path, as `ConfigurationSchemaEnumParityTest` checks its
- * choices.
+ * lists the added key (the path, or its first ancestor the recorded release
+ * lacked) and `resources/schema.json` describes the path.
  */
 final readonly class DocumentedPaths
 {

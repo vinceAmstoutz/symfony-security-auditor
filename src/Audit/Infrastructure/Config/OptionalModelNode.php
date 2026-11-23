@@ -20,13 +20,10 @@ use Symfony\Component\Config\Definition\NodeInterface;
 use Symfony\Component\Config\Definition\ScalarNode;
 
 /**
- * A model id: text, never a number or a switch. Symfony checks an `%env()%`
- * placeholder against a node with a stand-in value (empty when its variable
- * declares no default, typed after its processor), so a validation closure
- * would refuse every placeholder; this node judges only a value written as
- * such. Given an empty-string error it carries a model override, which may be
- * left out or set to null but not to an empty string; given none it carries
- * `model`, whose `cannotBeEmpty()` refuses both.
+ * A model id: refuses a number or a switch written as such, takes any
+ * `%env()%` placeholder. Given an empty-string error it is a model override,
+ * which may be left out or null but not empty; given none it is `model`,
+ * which may be neither.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

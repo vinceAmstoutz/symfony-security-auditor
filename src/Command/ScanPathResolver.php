@@ -20,11 +20,9 @@ use function Symfony\Component\String\u;
 
 /**
  * Turns the `--path` values into the project-relative form the scan filters
- * by: a relative path is kept as given, an absolute one inside the project is
- * made relative to its root and one outside it is refused: it would match
- * nothing and a scan that silently matches nothing reads as a clean run.
- * A Windows path (`C:\Users\…`) is read as one on every platform: `Path` only
- * knows a drive letter or a backslash where it runs on Windows itself.
+ * by: a relative path is kept, an absolute one inside the project is made
+ * relative and one outside it is refused. A Windows path (`C:\Users\…`) is
+ * read as one on every platform.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -64,12 +62,10 @@ final readonly class ScanPathResolver
     }
 
     /**
-     * Compared as typed and, failing that, through the folder above it that is
-     * the project once both are resolved: a shell's `$PWD` keeps the symbolic
-     * link that `getcwd()`, which names the project, resolves (macOS `/tmp` is
-     * `/private/tmp`). Only that folder is resolved: the rest of the path
-     * reads as typed, so a link inside the project names itself, as it does
-     * when the project is spelled directly, not the folder it points to.
+     * Null outside the project. Compares the path as typed, then through the
+     * folder above it that resolves to the project, since a shell's `$PWD`
+     * keeps a symlink `getcwd()` resolves. The rest of the path is read as
+     * typed.
      */
     private static function relativeToProject(string $absolutePath, string $projectRoot): ?string
     {

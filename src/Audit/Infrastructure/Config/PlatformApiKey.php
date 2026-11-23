@@ -16,8 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 
 /**
- * Every symfony/ai platform that authenticates spells its credential
- * `api_key`, whichever provider it is, so one lookup serves them all.
+ * Finds the `api_key` every authenticating symfony/ai platform spells its
+ * credential with.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -46,9 +46,8 @@ final readonly class PlatformApiKey
     }
 
     /**
-     * The key of the platform `provider:` selects, so a configuration holding
-     * several platforms is described by the one the run authenticates with;
-     * with no selector the whole block is searched.
+     * Returns the key of the platform `provider:` selects, searching the whole
+     * block when no provider is set.
      *
      * @param array<array-key, mixed> $platform
      */
@@ -60,8 +59,8 @@ final readonly class PlatformApiKey
     }
 
     /**
-     * The block of the platform `provider:` selects, the whole platform block
-     * with no selector, or null when the selected platform is not configured.
+     * Returns the block of the platform `provider:` selects, the whole block
+     * when no provider is set, or null when the selected one is not configured.
      *
      * @param array<array-key, mixed> $platform
      *

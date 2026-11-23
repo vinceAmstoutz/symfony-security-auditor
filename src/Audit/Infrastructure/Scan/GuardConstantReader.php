@@ -24,11 +24,9 @@ use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 
 /**
- * The class constant a guard passes as its attribute instead of a literal
- * (`#[IsGranted(PostVoter::EDIT)]`, `denyAccessUnlessGranted(PostVoter::EDIT)`)
- * as `Fully\Qualified\Class::NAME`, read from an AST whose names are already
- * resolved against their imports. Which string the constant holds is left to
- * a caller that knows the class.
+ * The class constant a guard passes instead of a literal
+ * (`#[IsGranted(PostVoter::EDIT)]`) as `Fully\Qualified\Class::NAME`, read
+ * from an AST whose names are resolved.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

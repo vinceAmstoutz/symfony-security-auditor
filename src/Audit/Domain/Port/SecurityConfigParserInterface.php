@@ -14,10 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 /**
- * Extracts the access-control map and firewall rules from a security
- * configuration file's raw content. Implementations must degrade gracefully:
- * content that is not parseable security configuration yields empty results,
- * never an exception: a broken config file must not abort the audit.
+ * Extracts the access-control map and firewall rules of a security
+ * configuration file's content. Implementations MUST return empty results for
+ * content they cannot parse, never throw.
  */
 interface SecurityConfigParserInterface
 {

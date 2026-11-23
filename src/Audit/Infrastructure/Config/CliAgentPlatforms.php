@@ -23,9 +23,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatfo
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatformFactory;
 
 /**
- * The platforms that run a coding agent's own CLI on the user's subscription
- * instead of calling an API. `symfony/ai-bundle` declares none of them, so
- * their blocks are kept out of its configuration and wired here.
+ * The platforms that run a coding agent's CLI on the user's subscription
+ * instead of calling an API, wired here since `symfony/ai-bundle` declares
+ * none of them.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -46,9 +46,8 @@ final readonly class CliAgentPlatforms
     public const array EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
 
     /**
-     * Built-in tools off, the machine's own configuration ignored: Claude
-     * Code takes an empty tool list and no MCP server but the command line's;
-     * Codex runs read-only with its shell and web search off, nothing kept.
+     * Turns each CLI's built-in tools off and makes it ignore the machine's
+     * own configuration.
      */
     private const array ISOLATING_OPTIONS = [
         'claudecode' => ['tools' => [], 'strict_mcp_config' => true],
@@ -97,9 +96,8 @@ final readonly class CliAgentPlatforms
     }
 
     /**
-     * The CLI runs with its built-in tools off and takes no tool of the
-     * auditor's, so a run on it reads the attacker's and the reviewer's
-     * answers as JSON.
+     * On a CLI agent provider, reads the attacker's and the reviewer's answers
+     * as JSON: the CLI takes no tool.
      *
      * @param array<array-key, mixed> $auditConfig
      *
@@ -133,7 +131,7 @@ final readonly class CliAgentPlatforms
     }
 
     /**
-     * The CLI an application's `cli_agent.platform` names, if any.
+     * Returns the CLI an application's `cli_agent.platform` names, if any.
      *
      * @param array<array-key, mixed> $config the processed bundle configuration
      */

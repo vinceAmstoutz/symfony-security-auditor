@@ -33,13 +33,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\TerminalTex
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatformFactory;
 
 /**
- * Why `init` will not write a configuration for what it was asked for, as the
- * sentence the user reads. The order is what keeps a refusal from sending the
- * reader into a second one: the shape of the provider string comes before
- * `--base-url`, so a provider that names a platform wrongly hears why before
- * it hears that `--base-url` does not apply to what it named. The option refusals come last
- * and in the order the options are written, so a run passing two that do not
- * apply is told about the connection field before the credential.
+ * Why `init` will not write a configuration, as the sentence the user reads.
+ * `forProvider()` refuses the provider's shape before an option that does not
+ * apply to it, then the options in the order they are written.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -48,8 +44,8 @@ final readonly class InitRefusal
     private const string PICK_A_NAME = 'Pick a plain name such as "%s.my_gateway".';
 
     /**
-     * Checked on the raw bytes, before `ProviderKeyNormalizer`: its `u()` call
-     * throws on non-UTF-8 input, which must refuse rather than crash.
+     * Checks the raw bytes, before `ProviderKeyNormalizer`, whose `u()` throws
+     * on invalid UTF-8.
      */
     public static function forProviderText(string $provider): ?string
     {
@@ -62,8 +58,8 @@ final readonly class InitRefusal
     }
 
     /**
-     * Checked before a hand-written platform's block quotes the model, so no
-     * model reaches the terminal before it is known to be plain text.
+     * Refuses a model that is not plain text, before any printed block quotes
+     * it.
      */
     public static function forModelText(string $model): ?string
     {
@@ -95,8 +91,7 @@ final readonly class InitRefusal
     }
 
     /**
-     * Null is a platform written without a credential, which has no name to
-     * validate.
+     * Null, a platform written without a credential, passes.
      */
     public static function forEnvironmentVariable(?string $envVar): ?string
     {
@@ -144,9 +139,8 @@ final readonly class InitRefusal
     }
 
     /**
-     * A whole-value `%env()%` is read by the standalone resolver, so it is held
-     * to the spellings that resolver reads; anything else must not be taken
-     * for a container parameter.
+     * Accepts a whole-value `%env()%` naming a valid variable and refuses any
+     * other `%` that starts no percent-encoded octet.
      */
     private static function forUrl(string $setting, string $provider, string $url): ?string
     {
@@ -161,9 +155,8 @@ final readonly class InitRefusal
     }
 
     /**
-     * Checked before anything else about the provider: `init` still installs
-     * the bridge for such a platform and prints the block to complete, so the
-     * user is told what to write rather than refused outright.
+     * Checked first: `init` still installs such a platform's bridge and prints
+     * the block to complete.
      */
     public static function forHandWrittenPlatform(ProviderKey $providerKey, string $provider, string $configFile): ?string
     {
@@ -175,9 +168,8 @@ final readonly class InitRefusal
     }
 
     /**
-     * Named before the instance shape: whatever instance the provider names,
-     * nothing written for such a platform boots in the standalone binary, so
-     * neither a block to paste nor its bridge is offered.
+     * Checked before the instance shape: nothing written for such a platform
+     * boots in the standalone binary.
      */
     private static function forCompoundPlatform(ProviderKey $providerKey, string $provider): ?string
     {
@@ -198,9 +190,8 @@ final readonly class InitRefusal
     }
 
     /**
-     * Also asked of a platform whose block `init` prints rather than writes,
-     * before its bridge is installed: the block names the instance as given,
-     * or, for a platform taking a single block, quietly drops it.
+     * Also checked for a platform whose block `init` prints, before its bridge
+     * is installed.
      */
     public static function forNamedInstance(ProviderKey $providerKey, string $provider): ?string
     {
@@ -245,9 +236,7 @@ final readonly class InitRefusal
     }
 
     /**
-     * Named before the platform is consulted: whichever of the two the user
-     * drops, the answer is the same. Silently honouring one while ignoring
-     * the other is how a run ends up with a credential nobody asked for.
+     * Checked before the platform, whatever it is.
      */
     private static function forContradictoryCredentialOptions(InitCommandInput $initCommandInput): ?string
     {

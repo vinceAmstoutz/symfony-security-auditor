@@ -16,8 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
 /**
- * Outcome of applying a baseline: the (possibly filtered) report, how many
- * findings the baseline suppressed and the fingerprints that matched it.
+ * The outcome of applying a baseline.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

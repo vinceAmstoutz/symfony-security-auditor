@@ -69,10 +69,8 @@ final readonly class ReportDiffer implements ReportDifferInterface
     }
 
     /**
-     * A finding the current run found again and left out of its report
-     * (accepted by the baseline, or muted by type) is not fixed. Each
-     * fingerprint the report lists as suppressed shelters one disappeared
-     * finding, the way a baseline entry covers one finding.
+     * Splits off the findings the current report left out as accepted or
+     * muted, one per fingerprint it lists as suppressed.
      *
      * @param list<DiffFinding> $disappeared
      * @param list<string>      $suppressedFingerprints
@@ -99,9 +97,8 @@ final readonly class ReportDiffer implements ReportDifferInterface
     }
 
     /**
-     * A finding that disappeared from a file the current run never finished
-     * analyzing, or never looked at, is not fixed (nobody looked), so it is
-     * kept apart from the ones whose file was analyzed and came back clean.
+     * Splits the fixed findings from those whose file the current report
+     * cannot vouch for.
      *
      * @param list<DiffFinding> $disappeared
      *
@@ -125,12 +122,8 @@ final readonly class ReportDiffer implements ReportDifferInterface
     }
 
     /**
-     * Two distinct findings can share a fingerprint (same type/file/title,
-     * different line): grouping by fingerprint instead of overwriting keeps
-     * both instead of silently dropping one. Buckets are paired off by count:
-     * a fingerprint with more entries in `$findings` than in `$excluded`
-     * contributes only its excess as "not excluded", matching each shared
-     * entry 1:1 before counting anything as new/fixed.
+     * The findings of each fingerprint beyond its count in `$excluded`, so two
+     * findings sharing a fingerprint count twice.
      *
      * @param array<string, list<DiffFinding>> $findings
      * @param array<string, list<DiffFinding>> $excluded

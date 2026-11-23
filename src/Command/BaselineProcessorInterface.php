@@ -22,16 +22,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteEx
 interface BaselineProcessorInterface
 {
     /**
-     * Maintainer-authored false-positive feedback (baseline entries annotated
-     * with a `reason`) from the effective baseline file, resolving the CLI
-     * `--baseline` override against the configured default path. Empty when
-     * neither is set.
+     * The entries of the `--baseline` file, else of the configured one, that
+     * carry a `reason`. None when neither is set.
      */
     public function feedback(?string $cliBaseline): ReviewerFeedback;
 
     /**
-     * Refuses a path a baseline could never be generated to, before the audit
-     * that would fill it spends anything.
+     * Refuses a path a baseline could never be generated to.
      *
      * @param string $projectPath the audited project, whose directories are walked for a symlink like the working directory's
      *
@@ -41,35 +38,31 @@ interface BaselineProcessorInterface
     public function assertWritable(string $path, string $projectPath): void;
 
     /**
-     * Writes the report's finding fingerprints to a baseline file and returns
-     * how many were written.
+     * Writes the report's findings to a baseline file and returns how many.
      */
     public function generate(AuditReport $auditReport, string $path): int;
 
     /**
-     * Fingerprints of accepted findings from the effective baseline file,
-     * resolving the CLI `--baseline` override against the configured default
-     * path. Empty when neither is set.
+     * The accepted fingerprints of the `--baseline` file, else of the
+     * configured one. None when neither is set.
      *
      * @return list<string>
      */
     public function acceptedFingerprints(?string $cliBaseline): array;
 
     /**
-     * The paths the effective baseline file's entries name their findings'
-     * files by, in its order, resolving the CLI `--baseline` override against
-     * the configured default path. Empty when neither is set.
+     * The files the entries of the `--baseline` file, else of the configured
+     * one, name, in its order. None when neither is set.
      *
      * @return list<string>
      */
     public function filePaths(?string $cliBaseline): array;
 
     /**
-     * Suppresses baselined findings from the report, resolving the CLI
-     * `--baseline` override against the configured default path. When no path
-     * is set, the report is returned unchanged with a zero suppressed count.
-     * The returned {@see BaselineResult} also carries the matched fingerprints
-     * so callers can render suppressed findings instead of dropping them.
+     * Leaves the findings the `--baseline` file, else the configured one,
+     * accepts out of the report, which stays unchanged when neither is set.
+     * The result carries the matched fingerprints, so a format can render
+     * those findings as suppressed.
      */
     public function apply(AuditReport $auditReport, ?string $cliBaseline): BaselineResult;
 }

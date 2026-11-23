@@ -17,14 +17,9 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 
 /**
- * Static, test-friendly advisory database. Bundle's default is
- * `ComposerAuditAdvisoryDatabase`, which queries Packagist's live advisory feed via
- * `composer audit`; this implementation is the deterministic fallback used by tests
- * and by hosts that explicitly opt out of running composer at audit time.
- *
- * Returns every advisory registered for the package. Version-constraint filtering
- * is delegated to the LLM, which already has the installed version and the
- * advisory's `affected_versions` text in front of it.
+ * Advisory database of fixed entries, for tests and hosts that do not run
+ * composer. Returns every advisory of the package whatever the installed
+ * version: the LLM compares it with `affected_versions`.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

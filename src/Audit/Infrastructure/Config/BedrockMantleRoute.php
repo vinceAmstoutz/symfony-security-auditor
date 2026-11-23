@@ -18,13 +18,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
 use function Symfony\Component\String\u;
 
 /**
- * The Bedrock Mantle route `init` writes for a model. Mantle takes an API key
- * where the default InvokeModel route needs an AWS SDK client service. It
- * serves each vendor on its own protocol: Anthropic models on the Messages
- * API, Gemma on Responses, every other open-weight model on Chat Completions,
- * as the `symfony/ai-bedrock-platform` Mantle model catalogs list them. A model
- * is named after its vendor there (`anthropic.claude-opus-4-8`), which is what
- * the route is read from.
+ * The Bedrock Mantle route `init` writes for a model, read from its vendor
+ * prefix (`anthropic.claude-opus-4-8`): Messages for Anthropic, Responses for
+ * Gemma, Chat Completions for every other model.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -35,8 +31,8 @@ final readonly class BedrockMantleRoute
     private const string VENDOR_PREFIX = '/^[a-z]+\./';
 
     /**
-     * The bridge each non-Anthropic route borrows its protocol from, which the
-     * Bedrock bridge only suggests: without it the configuration does not build.
+     * The bridge each non-Anthropic route needs beside Bedrock's, which only
+     * suggests it.
      */
     private const array COMPANION_PLATFORMS = ['completions' => 'generic', 'responses' => 'openresponses'];
 

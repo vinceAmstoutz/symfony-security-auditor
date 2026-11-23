@@ -115,8 +115,6 @@ final class AuditBudgetTest extends TestCase
      */
     public function test_for_tokens_accepts_one_at_boundary(): void
     {
-        // Pins `<= 0` boundary: mutation to `< 0` would still accept 1, but
-        // mutation to `> 0` would reject 1.
         $auditBudget = AuditBudget::forTokens(1);
 
         self::assertSame(1, $auditBudget->maxTokens());
@@ -127,7 +125,6 @@ final class AuditBudgetTest extends TestCase
      */
     public function test_for_cost_accepts_tiny_positive_at_boundary(): void
     {
-        // Pins `<= 0.0` boundary: mutation to `> 0.0` would reject this.
         $auditBudget = AuditBudget::forCost(0.000001);
 
         self::assertSame(0.000001, $auditBudget->maxCostUsd());
@@ -230,7 +227,6 @@ final class AuditBudgetTest extends TestCase
      */
     public function test_is_unlimited_returns_false_when_token_cap_set(): void
     {
-        // Pins the logical-and on `null === $maxTokens && null === $maxCostUsd`.
         $auditBudget = AuditBudget::forTokens(100);
 
         self::assertFalse($auditBudget->isUnlimited());

@@ -234,9 +234,8 @@ final class BaselineMergerTest extends TestCase
     }
 
     /**
-     * A report that never analyzed a file says nothing about the findings in
-     * it, so a prune keeps their accepted entries (and the reasons a
-     * maintainer wrote for them).
+     * A report that never analyzed a file says nothing about its findings, so a
+     * prune keeps their accepted entries.
      *
      * @param list<array{stage: string, file: string, status: string}> $coverage
      *
@@ -353,9 +352,8 @@ final class BaselineMergerTest extends TestCase
     }
 
     /**
-     * A run under a baseline leaves the findings it accepted out of its report,
-     * so the report lists them by fingerprint instead: their entries (and the
-     * reasons a maintainer wrote for them) outlive a prune.
+     * A run under a baseline lists the findings it accepted by fingerprint, so
+     * their entries outlive a prune.
      *
      * @throws MalformedBaselineFileException
      * @throws MalformedReportFileException
@@ -406,10 +404,9 @@ final class BaselineMergerTest extends TestCase
     }
 
     /**
-     * A baseline written before `xss` existed holds the finding under the type
-     * the model reported it as then: the report lists the finding under its
-     * own `xss` fingerprint and the baseline fingerprint that accepted it
-     * beside it.
+     * The baseline holds the finding under another type than `xss`: the report
+     * lists the finding under its `xss` fingerprint, beside the baseline
+     * fingerprint that accepted it.
      *
      * @throws MalformedBaselineFileException
      * @throws MalformedReportFileException
@@ -1087,9 +1084,8 @@ final class BaselineMergerTest extends TestCase
     }
 
     /**
-     * An entry a baseline written before 1.22 holds the `Injection` finding of
-     * `src/Foo.php` under: the path the model echoed with a leading `./` and
-     * the type it was reported as.
+     * A legacy baseline entry for the `Injection` finding of `src/Foo.php`: the
+     * path the model echoed with a leading `./` and the type it was reported as.
      *
      * @return array<string, string>
      */
@@ -1146,9 +1142,8 @@ final class BaselineMergerTest extends TestCase
     }
 
     /**
-     * Each generated case gets files of its own, written in place: replacing a
-     * file, as `Filesystem::dumpFile()` does through a rename, waits on the
-     * disk on ext4 and made this test take seconds.
+     * Writes each generated case to files of its own, in place: a rename, as
+     * `Filesystem::dumpFile()` does, waits on the disk on ext4.
      *
      * @param array<array-key, mixed> $contents
      */
@@ -1255,8 +1250,8 @@ final class BaselineMergerTest extends TestCase
 
     /**
      * A complete run over the whole project at `/abs/project` whose attacker
-     * analyzed `src/Foo.php`, so the absence of a finding there is proven,
-     * written since reports list `suppressed_fingerprints`.
+     * analyzed `src/Foo.php`, so the absence of a finding there is proven, in
+     * the report format that lists `suppressed_fingerprints`.
      *
      * @param list<array<string, string>> $vulnerabilities
      */

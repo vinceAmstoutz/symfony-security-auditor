@@ -30,10 +30,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
 
 /**
- * An application whose `ai.yaml` configures several platforms gets no
- * `PlatformInterface` from `symfony/ai-bundle`, which wires it only for a
- * single platform: the application selects the one to audit with by aliasing
- * the interface to it in its own services.
+ * An application whose `ai.yaml` configures several platforms, which gets no
+ * `PlatformInterface` from `symfony/ai-bundle`, audits with the platform it
+ * aliases the interface to.
  */
 final class SeveralAiPlatformsEndToEndTest extends TestCase
 {

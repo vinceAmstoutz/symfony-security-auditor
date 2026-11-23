@@ -20,9 +20,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\RecordingToolInt
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 
 /**
- * Tells the collector about every call the wrapped recording tool refuses, so a
- * finding the model sent and the tool turned away is not mistaken for a chunk
- * with nothing to report. The model still reads the tool's own answer.
+ * Reports every call the wrapped recording tool refuses to the collector, so
+ * a turned-away finding is not taken for a chunk with nothing to report. The
+ * model still reads the tool's own answer.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

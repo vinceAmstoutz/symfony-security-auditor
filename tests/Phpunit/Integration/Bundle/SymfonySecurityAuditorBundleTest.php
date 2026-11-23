@@ -2545,10 +2545,8 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     /**
-     * Loads the bundle extension into a bare container (no kernel boot, no
-     * FrameworkBundle compilation) and resolves parameter references. Use this
-     * for tests that only assert on container parameters; it is an order of
-     * magnitude faster than {@see self::boot()}.
+     * Loads the bundle extension into a bare container and resolves parameter
+     * references, much faster than {@see self::boot()} for parameter checks.
      *
      * @param array<string, mixed> $bundleConfig
      */

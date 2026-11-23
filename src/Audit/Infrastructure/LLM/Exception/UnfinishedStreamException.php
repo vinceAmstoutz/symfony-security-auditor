@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exceptio
 use Symfony\AI\Platform\Exception\IncompleteStreamException;
 
 /**
- * A stream that ended without saying why the model stopped: cut on the way,
+ * A stream that ended without saying why the model stopped, so it was cut
  * though its bridge did not report it.
  *
  * @internal not part of the BC promise, see docs/versioning.md

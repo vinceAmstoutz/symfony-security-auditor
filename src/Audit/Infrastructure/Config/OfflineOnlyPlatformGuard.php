@@ -17,12 +17,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\N
 
 /**
  * Fails a `privacy.offline_only` run before it boots unless every configured
- * platform talks to this machine (or its private network). A provider is
- * accepted only when it carries at least one URL and every URL it carries
- * resolves to a loopback, link-local or private-range host, so a hosted
- * provider (an `api_key` and nothing else) and a cloud endpoint
- * (`base_url: https://…azure.com`) are both rejected. A provider whose only
- * candidate endpoint a dry run read from an unset variable is not judged.
+ * platform carries a URL and every URL names a loopback, link-local or
+ * private-range host. A platform whose only endpoint a dry run read from an
+ * unset variable is not judged.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -39,8 +36,8 @@ final readonly class OfflineOnlyPlatformGuard
     }
 
     /**
-     * Whether every endpoint of every configured platform is on the loopback
-     * interface, which no proxy can reach on the caller's behalf.
+     * True when every endpoint of every configured platform is on the loopback
+     * interface.
      */
     public function reachesOnlyLoopback(StandalonePlatformConfig $standalonePlatformConfig): bool
     {
@@ -98,9 +95,8 @@ final readonly class OfflineOnlyPlatformGuard
     }
 
     /**
-     * A dry run stands in for a setting whose `%env()%` variable is unset,
-     * since it never reaches the provider: whether that setting is a local
-     * endpoint only the real run can tell; it names the variable instead.
+     * True when a dry run stood in for a setting whose `%env()%` variable is
+     * unset, which only the real run can judge.
      *
      * @param array<array-key, mixed> $providerConfig
      */
@@ -151,11 +147,8 @@ final readonly class OfflineOnlyPlatformGuard
     }
 
     /**
-     * Unwraps an IPv4-mapped IPv6 host (`::ffff:a.b.c.d`, or its hex form) to
-     * the embedded IPv4 address so the private/reserved check runs against the
-     * real target. Without this, PHP flags the whole `::ffff:0:0/96` range as
-     * reserved and a public endpoint like `[::ffff:8.8.8.8]` is wrongly treated
-     * as local, bypassing the offline-only guard.
+     * Unwraps an IPv4-mapped IPv6 host (`::ffff:a.b.c.d` or its hex form), so
+     * a public target such as `[::ffff:8.8.8.8]` is not taken for a local one.
      */
     private function embeddedIpv4(string $host): string
     {

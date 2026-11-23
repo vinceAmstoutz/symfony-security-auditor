@@ -14,9 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 
 /**
- * Renders LLM-authored text into Markdown without letting it escape the
- * construct it was spliced into. Shared by every Markdown-emitting renderer, so
- * a new one inherits these defenses instead of restating them.
+ * Escapes model-written text so it cannot break out of the Markdown construct
+ * it is spliced into. Every Markdown renderer goes through it.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -32,19 +31,10 @@ final readonly class MarkdownTextEscaper
     }
 
     /**
-     * A backtick/tilde run would open a code fence, `#` a fake heading and
-     * `[`/`]` a live link: each would swallow or rewrite everything rendered
-     * after it. `<`/`>` are HTML-entity-encoded since CommonMark passes raw
-     * inline HTML through verbatim. `@` is followed by a word joiner (U+2060),
-     * which renders as nothing: GitHub turns a bare `@handle` into a live
-     * profile mention (notifying that account when a report is posted as a
-     * pull-request comment) and a `user@host` address, `mailto:` and `xmpp:`
-     * ones included, into a live link, both from the text an entity decodes
-     * to, so an encoded `@` would defuse neither: `&` is encoded before the
-     * others, so no character reference the text writes, `&commat;` among
-     * them, decodes to the character it names. A backslash already present
-     * is escaped first, so it can't combine with an escape added below into a
-     * sequence CommonMark still parses as live.
+     * Neutralizes code fences, headings, links and raw HTML. Follows `@` with
+     * a word joiner so GitHub turns no `@handle` into a mention and no
+     * email address into a link. The backslash and `&` are escaped first, so
+     * no escape or character reference the text writes stays live.
      */
     private static function escapeStructuralMarkers(string $text): string
     {
@@ -58,10 +48,8 @@ final readonly class MarkdownTextEscaper
     }
 
     /**
-     * GFM turns a bare `scheme://` URL or `www.` address into a live link with
-     * no markup around it, so a finding could render a clickable attacker link.
-     * The colon of `://` and the dot after `www` are entity-encoded; an email
-     * address is defused at its `@` ({@see self::escapeStructuralMarkers()}).
+     * Encodes the colon of `://` and the dot after `www`, so GFM links no bare
+     * URL; an email address is defused at its `@`.
      */
     private static function bareAutolinks(string $text): string
     {
@@ -69,10 +57,8 @@ final readonly class MarkdownTextEscaper
     }
 
     /**
-     * A finding's title is spliced directly into a single-line heading, with no
-     * surrounding code fence or paragraph break to contain it: an embedded
-     * newline could forge a fake heading or horizontal rule as unguarded
-     * top-level Markdown right where the title was expected.
+     * Collapses the text to one line, so a title cannot forge a heading or a
+     * rule below the one it fills.
      */
     public static function heading(string $text): string
     {
@@ -80,13 +66,8 @@ final readonly class MarkdownTextEscaper
     }
 
     /**
-     * A code span can't use backslash escapes, so the delimiter is instead a
-     * backtick run longer than any the text contains, padded with a leading
-     * space if the text starts with a backtick; `<`/`>` need no encoding since
-     * CommonMark renders span content as literal text automatically. A blank
-     * line still ends a span regardless of delimiter width, so the text is
-     * collapsed to a single line first, the same defense the sibling renderers
-     * apply.
+     * Delimits the text with a backtick run longer than any it holds, then
+     * collapses it to one line, since a blank line ends a code span.
      */
     public static function inlineCode(string $text): string
     {
@@ -98,12 +79,8 @@ final readonly class MarkdownTextEscaper
     }
 
     /**
-     * A bare `\r` (0x0D not part of a `\r\n`) is a CommonMark line ending, so
-     * an LLM-sourced code snippet containing one would split inside a "line"
-     * and land the remainder at column 0 (outside the four-space indent) as
-     * live Markdown/HTML. Control characters are stripped first (the same
-     * {@see TerminalTextSanitizer} defense the inline paths apply), so every
-     * retained `\n`-delimited line stays inside the indented code block.
+     * Strips control characters, a bare `\r` among them, so every line stays
+     * inside the indented code block.
      */
     public static function codeBlock(string $text): string
     {
@@ -114,10 +91,8 @@ final readonly class MarkdownTextEscaper
     }
 
     /**
-     * A Markdown table cell is delimited by `|`; a newline ends the row
-     * altogether. Either would let one cell's text forge extra columns or
-     * extra rows. `|` is backslash-escaped and the text is collapsed to a
-     * single line on top of the {@see self::fences()} defenses.
+     * Escapes `|` and collapses the text to one line on top of fences(), so a
+     * cell cannot forge a column or a row.
      */
     public static function tableCell(string $text): string
     {
@@ -125,10 +100,8 @@ final readonly class MarkdownTextEscaper
     }
 
     /**
-     * GFM splits a table row on unescaped `|` before inline parsing, so a code
-     * span does not shield one: {@see self::inlineCode()} alone still lets a
-     * pipe in the text forge a column. The escape is applied only here because
-     * a code span outside a table renders `\|` literally.
+     * Escapes `|`, on which GFM splits a row even inside a code span. Outside
+     * a table, use inlineCode(): a code span there renders `\|` literally.
      */
     public static function tableInlineCode(string $text): string
     {
@@ -136,12 +109,8 @@ final readonly class MarkdownTextEscaper
     }
 
     /**
-     * Escaping `#` blocks a forged ATX heading, but CommonMark also promotes a
-     * paragraph line to a heading when the *next* line is a run of only `=`
-     * (H1) or `-` (H2): a setext underline, no `#` involved. Any line
-     * consisting solely of `=`/`-` (up to three leading spaces, the CommonMark
-     * limit) has its run backslash-escaped so it renders as literal characters
-     * instead.
+     * Escapes a line of only `=` or `-`, which would turn the line above it
+     * into a setext heading.
      */
     private static function setextUnderlines(string $text): string
     {

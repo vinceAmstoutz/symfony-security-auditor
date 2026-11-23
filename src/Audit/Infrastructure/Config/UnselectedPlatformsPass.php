@@ -19,11 +19,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /**
  * Publishes the `symfony/ai` platforms an application configures when none is
- * selected for the audit: `symfony/ai-bundle` aliases its platform interface
- * only when a single platform is configured, so with several the audit has
- * no platform until the application aliases the interface to one of them.
- * The composition root names that interface here, so this class touches no
- * `symfony/ai` type itself.
+ * selected for the audit, which happens when it configures several.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

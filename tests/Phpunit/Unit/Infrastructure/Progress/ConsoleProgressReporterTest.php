@@ -404,8 +404,7 @@ final class ConsoleProgressReporterTest extends TestCase
     }
 
     /**
-     * A reason the reporter does not recognise must not borrow another reason's
-     * wording: naming the wrong cause is worse than naming none.
+     * An unrecognised reason never borrows another reason's wording.
      */
     public function test_it_falls_back_to_a_neutral_line_for_an_unrecognised_reason(): void
     {

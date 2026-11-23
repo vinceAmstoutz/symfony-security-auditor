@@ -20,11 +20,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 
 /**
- * Books the usage the answers of a client that does not book it itself
- * report (into the run's token totals and the audit budget) and stops the
- * run once the budget is spent, checking it before and after each call as the
- * bundled client does. A cost cap holds only for a model the pricing catalog
- * prices, which {@see UnpricedCostCapWarning} says once per model.
+ * Books the usage reported by a client that does not book it itself on the
+ * token totals and the budget, then stops the run once the budget is spent.
+ * A cost cap holds only for a model the catalog prices.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

@@ -16,9 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use Symfony\Component\Console\Attribute\Option;
 
 /**
- * Symfony Console MapInput reflects class properties and requires public mutable fields
- * with property-level defaults; promoted readonly ctor params are invisible to its reflection.
- * Treated as a context carrier per .claude/rules/php-classes.md.
+ * Not readonly: Console's MapInput needs public mutable properties with
+ * defaults. A context carrier per .claude/rules/php-classes.md.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

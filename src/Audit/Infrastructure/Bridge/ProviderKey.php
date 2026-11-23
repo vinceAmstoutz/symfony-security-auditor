@@ -14,13 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge;
 
 /**
- * Splits a configured `provider` into the `symfony/ai` platform it names and
- * the optional instance within it. Platforms declared with
- * `useAttributeAsKey` (`generic`, `azure`, `bedrock`, `openresponses`, …)
- * register one service per instance as `ai.platform.<platform>.<instance>`,
- * so `provider: generic.my_gateway` selects the `my_gateway` instance of the
- * `generic` platform while its bridge package is still built from `generic`
- * alone.
+ * Splits a configured `provider` into its `symfony/ai` platform and optional
+ * instance: `generic.my_gateway` names the `my_gateway` instance of the
+ * `generic` platform.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

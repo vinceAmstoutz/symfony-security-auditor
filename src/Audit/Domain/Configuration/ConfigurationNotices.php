@@ -16,8 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 
 /**
- * Derives the pre-flight notices `audit:run` prints for configuration
- * combinations that silently disable a cost saver.
+ * The notices `audit:run` prints for configuration combinations that silently
+ * disable a cost saver.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -54,8 +54,8 @@ final readonly class ConfigurationNotices
     }
 
     /**
-     * A bucket is matched against a file's type as written, so one that names
-     * no type (`controlers`, `Controller`) is accepted and never runs.
+     * Returns a notice per bucket that names no file type exactly
+     * (`controlers`, `Controller`): such a bucket never runs.
      *
      * @param array<array-key, mixed> $customRiskPatterns
      *

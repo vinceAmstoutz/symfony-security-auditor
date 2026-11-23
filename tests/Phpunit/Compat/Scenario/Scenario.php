@@ -22,10 +22,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Runner\Workspace;
  * One recorded behaviour: a workspace (the audited project, a home, config
  * files), the commands run in it and what is captured afterwards.
  *
- * The `prepare` commands run only when recording: the release being recorded
- * produces the `artifacts` (its reports, baselines, caches, configuration
- * files) and the recording keeps them, so a replay hands the tree under test
- * the very files that release wrote instead of its own.
+ * The `prepare` commands run only when recording. The recording keeps the
+ * `artifacts` they produce and a replay hands them to the tree under test.
  */
 final readonly class Scenario
 {
@@ -192,9 +190,8 @@ final readonly class Scenario
     }
 
     /**
-     * Whether a command writes to `{null-device}`: a release that replaces
-     * its output file through a rename replaced the device itself, so such a
-     * scenario is recorded only where that cannot reach the system's.
+     * Whether a command writes to `{null-device}`, which a release replacing
+     * its output file through a rename would replace.
      */
     public function usesNullDevice(): bool
     {

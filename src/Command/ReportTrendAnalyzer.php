@@ -17,11 +17,9 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InsufficientTrendReportsException;
 
 /**
- * Builds a trend by diffing each consecutive report pair. Every count comes
- * from the fingerprint-paired buckets of {@see ReportDifferInterface}, so a
- * report total is `new + persisting` of the diff that ends on it; the
- * very first report, which no diff ends on, gets `fixed + unverified +
- * persisting` of the first pair instead.
+ * Builds a trend by diffing each consecutive report pair. A report's total is
+ * `new + persisting` of the diff ending on it, the first report's is
+ * `fixed + unverified + persisting` of the first diff.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

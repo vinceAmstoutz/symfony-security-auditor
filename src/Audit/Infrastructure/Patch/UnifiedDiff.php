@@ -16,11 +16,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Patch;
 use function Symfony\Component\String\u;
 
 /**
- * A unified-diff patch as a model writes it: the `--- a/` and `+++ b/` header
- * of each file, then its `@@` hunks, with any prose or code fence around them
- * left out and any byte that is not UTF-8 replaced. A patch that does not read as one (a hunk shorter or longer than
- * its header says, a file it creates or deletes, a header with no hunk) is
- * none, as applying any part of it could leave the file half fixed.
+ * A unified-diff patch read from a model's answer, ignoring the prose and code
+ * fences around it and replacing invalid UTF-8. parse() returns null for a
+ * patch that creates, deletes or renames a file, leaves the project, has a
+ * header with no hunk or a hunk whose counts do not add up, so no part of it
+ * is applied.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

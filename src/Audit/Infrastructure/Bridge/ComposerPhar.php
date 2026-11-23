@@ -18,10 +18,8 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 
 /**
- * The pinned `composer.phar` the standalone binary bundles and installs
- * provider bridges with, run on the binary's own PHP so `init` needs no PHP
- * or Composer on the host. PHP cannot run a PHAR held inside another, so it
- * is copied out to the bridge tree and checked against its SHA-256 there.
+ * The pinned `composer.phar` the standalone binary installs provider bridges
+ * with. Refuses a copy whose SHA-256 is not the pinned one.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -43,7 +41,7 @@ final readonly class ComposerPhar
     }
 
     /**
-     * @return string Composer's entry script, unpacked from the PHAR: Composer refuses to run from one on a SAPI other than `cli` while `register_argc_argv` is on, which phpmicro hard-codes
+     * @return string Composer's entry script, unpacked from the PHAR, which Composer refuses to run from on phpmicro
      *
      * @throws BridgeInstallationFailedException
      */

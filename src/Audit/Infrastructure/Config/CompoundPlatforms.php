@@ -16,11 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 
 /**
- * The `symfony/ai` platforms that wrap other platforms instead of reaching a
- * provider, mapped to the container service `symfony/ai-bundle` wires them to
- * beyond the platforms themselves. Only a Symfony application defines those
- * services: the standalone container has none of them and its config file
- * cannot declare one, so no block written for these platforms boots there.
+ * The `symfony/ai` platforms that wrap other platforms, mapped to the service
+ * `symfony/ai-bundle` wires them to. Only a Symfony application defines it,
+ * so none of them boots in the standalone binary.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

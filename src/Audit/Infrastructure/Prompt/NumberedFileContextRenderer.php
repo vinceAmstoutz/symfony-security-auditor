@@ -17,8 +17,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /**
  * Renders the `<file>` source blocks of the attacker user message, each line
- * prefixed with its 1-based number (`NNN | code`) so the model can populate
- * `line_start` / `line_end` without counting.
+ * prefixed with its 1-based number (`NNN | code`).
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -41,11 +40,8 @@ final readonly class NumberedFileContextRenderer
     }
 
     /**
-     * A scanned file's path comes from the audited project's filesystem, not
-     * from us: a POSIX filename may contain `"` or a newline, either of
-     * which would otherwise let a crafted filename close this attribute
-     * early and forge additional `<file>` blocks in the attacker/reviewer
-     * prompt.
+     * Folds line breaks and `"`, so a crafted file name cannot close the
+     * attribute and forge a `<file>` block.
      */
     private static function sanitizePathAttribute(string $path): string
     {

@@ -14,11 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress;
 
 /**
- * Builds the one-line attack-surface overview shown when the audit starts,
- * shared by the console and plain reporters. Categories with a zero count are
- * omitted so the line stays signal-dense (e.g. a project with no voters or
- * forms reads `Auditing 21 file(s) — 15 controller(s)` rather than padding it
- * with `0 voter(s), 0 form(s)`).
+ * The one-line attack-surface overview printed when the audit starts. Leaves
+ * out the categories counted zero.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

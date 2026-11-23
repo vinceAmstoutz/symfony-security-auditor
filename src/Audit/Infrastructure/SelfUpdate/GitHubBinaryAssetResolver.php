@@ -16,9 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Exception\UnsupportedSelfUpdatePlatformException;
 
 /**
- * Resolves the release asset for the running platform, mirroring the OS/arch
- * detection in `install.sh` so the binary self-updates to the same asset the
- * installer would have fetched.
+ * Resolves the release asset `install.sh` would fetch for the running OS and
+ * architecture.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

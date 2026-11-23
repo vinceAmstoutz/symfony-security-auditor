@@ -14,17 +14,12 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 /**
- * Opt-in extension of {@see PricingProviderInterface} for providers that
- * expose real per-model prompt-cache rates. Consumers check
- * `instanceof CacheAwarePricingProviderInterface` and fall back to pricing
- * cache traffic at the base input rate ({@see
- * PricingProviderInterface::pricePerMillionInputTokens()}) when it is not
- * implemented, so adding this capability never breaks an existing provider.
+ * Optional extension of {@see PricingProviderInterface}, checked with
+ * `instanceof`: per-model prompt-cache rates. Without it, cache traffic is
+ * priced at the base input rate.
  *
- * Prompt caching is genuinely optional: not every provider bills it. A
- * provider that does not should not be forced to stub these methods. For an
- * unpriced or cache-free model an implementation SHOULD return the base input
- * rate so cache traffic is never under-priced relative to plain input.
+ * For an unpriced or cache-free model an implementation SHOULD return the base
+ * input rate, so cache traffic is never priced below plain input.
  */
 interface CacheAwarePricingProviderInterface extends PricingProviderInterface
 {

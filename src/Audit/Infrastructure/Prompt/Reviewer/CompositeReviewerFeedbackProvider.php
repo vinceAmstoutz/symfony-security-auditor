@@ -20,26 +20,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackProvi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerFeedbackSnapshotInterface;
 
 /**
- * Merges feedback from two sources (the baseline-backed
- * {@see ReviewerFeedbackHolder} and, when `audit.triage_memory` is enabled,
- * the reviewer's own cross-run rejections) into the single feedback set the
- * reviewer prompt and cache key see, snapshotting it once per run.
+ * Merges the primary feedback (the baseline) with the secondary one (triage
+ * memory) and freezes the result on first read, so the reviewer prompt and
+ * cache key stay stable for the whole run while triage memory grows.
+ * {@see resetForNewRun()} discards the snapshot.
  *
- * The merged set is memoized on first read. The triage-memory secondary is
- * written to mid-run (every reviewer rejection appends an entry), so reading
- * it live would shift the reviewer cache-key digest between findings within a
- * single run, making every verdict after the first miss its own freshly-written
- * cache entry. Freezing the set on first read keeps the digest and the reviewer
- * system prompt stable for the whole run.
- *
- * The snapshot is discarded at the start of each run via
- * {@see resetForNewRun()} (called by `RunAuditUseCase::execute()`), so a
- * long-lived process (`mcp:serve`) picks up the entries recorded during the
- * previous run instead of serving the first run's frozen feedback forever.
- *
- * Mutable by design: non-readonly because the snapshot is filled lazily on
- * first read and cleared per run. See .claude/rules/php-classes.md for the
- * opt-out policy.
+ * Not readonly: holds the snapshot of one run (stateful collaborator, see
+ * .claude/rules/php-classes.md).
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -62,16 +49,9 @@ final class CompositeReviewerFeedbackProvider implements ReviewerFeedbackProvide
     }
 
     /**
-     * Keeps the first entry per finding identity (type+file+title) so a finding
-     * present in both the baseline (primary) and triage memory (secondary)
-     * occupies a single reviewer-prompt slot instead of two: the baseline
-     * reason wins, since primary is spread first.
-     *
-     * `file`/`title` are LLM- or file-path-sourced and never NUL-sanitized, so
-     * each field is hashed individually before joining the key (mirroring
-     * `ChunkContextKeyDeriver::derive()`), so a NUL byte cannot shift a value
-     * across the `file`/`title` boundary and collide two distinct findings
-     * onto the same dedup key, silently dropping one's guidance.
+     * Keeps the first entry of each type, file and title, the primary one when
+     * both have it. Each field is hashed on its own, so a separator in `file`
+     * or `title` cannot merge two findings.
      *
      * @param list<AcceptedFindingFeedback> $entries
      *

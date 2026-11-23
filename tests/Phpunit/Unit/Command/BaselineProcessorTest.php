@@ -435,11 +435,8 @@ final class BaselineProcessorTest extends TestCase
     }
 
     /**
-     * `AuditOrchestrator::withoutBaselineAccepted()` already spent this
-     * baseline credit skipping a different, never-reviewed finding before the
-     * reviewer ever ran this run. Re-applying the same credit here against a
-     * distinct, genuinely new, already-validated finding that merely shares
-     * its fingerprint must not silently drop it from the final report.
+     * `AuditOrchestrator::withoutBaselineAccepted()` already spent this credit
+     * skipping another, never-reviewed finding sharing the fingerprint.
      *
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException
@@ -465,8 +462,8 @@ final class BaselineProcessorTest extends TestCase
     }
 
     /**
-     * A baseline written before `xss` existed holds the finding under the type
-     * the model then reported it as.
+     * The baseline holds the finding under the type the model reported it as
+     * instead of `xss`.
      *
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException

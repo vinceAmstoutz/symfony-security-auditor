@@ -16,8 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Revie
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
- * Renders the reviewer user messages (single finding and batch): the
- * line-numbered finding report plus its closing instruction.
+ * Renders the reviewer user messages: the line-numbered finding report and its
+ * closing instruction.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

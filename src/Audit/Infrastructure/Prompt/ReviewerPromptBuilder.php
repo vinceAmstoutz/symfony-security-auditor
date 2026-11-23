@@ -30,31 +30,19 @@ use function Symfony\Component\String\u;
 final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInterface
 {
     /**
-     * Wire-format version of the prompt this builder emits. Folded into the
-     * reviewer cache key so that a wording change automatically invalidates
-     * previously-cached verdicts. Bump whenever the decision-rules text
-     * changes in a way expected to alter accept/reject outcomes.
+     * Part of the reviewer cache key: bump it when a prompt change should
+     * invalidate the cached verdicts.
      */
     public const int PROMPT_VERSION = 4;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = false;
 
-    /**
-     * Upper bound on baseline-feedback entries injected into the system
-     * prompt, so a large baseline cannot crowd out the finding under review.
-     */
     public const int MAX_FEEDBACK_PROMPT_ENTRIES = 20;
 
-    /**
-     * Upper bound, in bytes, on the feedback lines injected into the system
-     * prompt: the entries that fit are kept in order, so no baseline can push
-     * every review past the model's context.
-     */
     public const int MAX_FEEDBACK_PROMPT_BYTES = 32_768;
 
     /**
-     * Every double quotation mark a field could close its quote with, folded
-     * to an apostrophe.
+     * Folded to an apostrophe in a quoted field.
      */
     private const array DOUBLE_QUOTATION_MARKS = ['"', "\u{201C}", "\u{201D}", "\u{201E}", "\u{201F}", "\u{00AB}", "\u{00BB}", "\u{2033}", "\u{FF02}"];
 
@@ -150,11 +138,6 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
         return implode("\n\n", array_filter($sections, static fn (?string $section): bool => null !== $section));
     }
 
-    /**
-     * Absent (null) when the run carries no baseline feedback, so the emitted
-     * prompt stays byte-identical to earlier releases and previously cached
-     * verdicts remain valid.
-     */
     private function feedbackSection(): ?string
     {
         $lines = $this->feedbackLines($this->reviewerFeedbackProvider->feedback());
@@ -171,9 +154,8 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
     }
 
     /**
-     * One line per entry, as long as the lines fit in the byte budget: an entry
-     * too large for what is left is skipped and the next ones still get their
-     * chance.
+     * One line per entry within the byte budget: an entry too large for what
+     * is left is skipped, the next ones still kept.
      *
      * @return list<string>
      */
@@ -201,10 +183,8 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
     }
 
     /**
-     * Every field is free text from the audited repository's baseline file (a
-     * pull request can write it), so it is quoted as data on a single line,
-     * with its own double quotation marks folded so none can close the quote
-     * early.
+     * Quotes a baseline field, which the audited repository controls, on one
+     * line with its double quotation marks folded, so it cannot close the quote.
      */
     private function quoted(string $value): string
     {

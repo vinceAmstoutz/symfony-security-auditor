@@ -26,23 +26,20 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\Inv
 /**
  * @internal not part of the BC promise, see docs/versioning.md
  *
- * Pattern dictionary is split by file-type bucket. Each entry maps a regex
- * to a short pattern label and a human-readable description. The scanner
- * walks every file once, matches per-line and emits one marker per match.
+ * Matches each file line by line against the patterns of its file-type
+ * bucket, one marker per match.
  */
 final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
 {
     /**
-     * Bump when the built-in PATTERNS dictionary changes in a way that would
-     * alter scan output for existing chunk content. Folded into the attacker
-     * cache key so stale entries are invalidated.
+     * Part of the attacker cache key: bump it when a pattern change alters the
+     * markers of existing content.
      */
     public const int CACHE_VERSION = 32;
 
     /**
-     * Detects the `s` (DOTALL) flag among a PCRE pattern's trailing modifier
-     * letters: the run of letters after the closing delimiter, which is never
-     * itself a letter, so no in-pattern `s` is mistaken for the modifier.
+     * The `s` (DOTALL) flag among the modifier letters after the closing
+     * delimiter.
      */
     private const string TRAILING_DOT_ALL_MODIFIER = '/s[a-zA-Z]*$/';
 
@@ -499,10 +496,8 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
     }
 
     /**
-     * The mapping parsers skip a controller or voter that {@see NestingDepthGuard}
-     * refuses, so its routes and guards are missing from the access-control
-     * map the attacker reads: this marker tells the attacker so, instead of
-     * letting the file pass as one with nothing to map.
+     * Marks a controller or voter {@see NestingDepthGuard} refuses, whose
+     * routes and guards the access-control map therefore lacks.
      *
      * @return list<RiskMarker>
      *
@@ -523,20 +518,8 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
     }
 
     /**
-     * The `php` bucket's generic sink patterns (unserialize, eval, shell exec,
-     * weak crypto, insecure RNG, SSRF-prone HttpClient calls, mailer header
-     * setters, non-constant-time compares, ExpressionLanguage evaluation) are
-     * dangerous in any PHP source file, not only plain services: a controller
-     * or messenger handler calling `unserialize()` on request input is at least
-     * as exploitable. `scan()` selects a single type bucket per file, so
-     * without this every non-`php` component (controller, voter, entity,
-     * repository, form, authenticator, …) would miss those markers; under
-     * the `fast` profile's lean-mode filter, which drops files carrying zero
-     * markers, such a file would be excluded from the audit entirely. Keyed by
-     * label, so a `php`-typed file (whose own bucket already is the `php` set)
-     * gets each pattern exactly once after the spread merge. Non-PHP files
-     * (Twig templates, YAML config) are excluded: these patterns are
-     * PHP-source specific.
+     * The sink patterns of the `php` bucket, which apply to every `.php` file
+     * whatever its type.
      *
      * @return array<string, array{regex: string, description: string}>
      */
@@ -550,17 +533,8 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
     }
 
     /**
-     * The request-input markers (`request_get`, `redirect_with_input`,
-     * `submit_request_all`, `request_mapping_attribute`) live in the CONTROLLER
-     * bucket, but `#[ApiResource]` classes, `#[AsLiveComponent]` classes and
-     * EasyAdmin `AbstractCrudController` classes classify as their own type
-     * while still declaring `#[Route]`-mapped or custom actions that read
-     * `$request`, the controller-like pattern the mapping parsers and the
-     * chunker already honour via {@see ProjectFileType::isControllerLike()}.
-     * Without this merge, such an action produces zero markers and is excluded
-     * by the `fast` profile's lean-mode filter, which drops files carrying no
-     * markers. Keyed by label, so a CONTROLLER-typed file (whose own bucket is
-     * this set) gets each pattern exactly once after the spread merge.
+     * The patterns of the controller bucket, which apply to every
+     * controller-like file ({@see ProjectFileType::isControllerLike()}).
      *
      * @return array<string, array{regex: string, description: string}>
      */
@@ -601,13 +575,6 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         return $matches;
     }
 
-    /**
-     * A pattern the PCRE engine refuses to evaluate on one line will refuse on
-     * every remaining line too (e.g. `pcre.backtrack_limit` exhausted by a
-     * catastrophic-backtracking pattern), so evaluation stops for this pattern
-     * rather than repeating a failing (and CPU-costly) call once per remaining
-     * line.
-     */
     private function logEvaluationFailure(string $regex): void
     {
         $this->logger->warning('Risk-pattern evaluation failed, skipping the remainder of this file for this pattern', [
@@ -616,24 +583,14 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         ]);
     }
 
-    /**
-     * A well-formed PCRE pattern always has a non-empty delimiter and its
-     * closing counterpart somewhere in the string: both are asserted rather
-     * than branched on, since a pattern violating either is already
-     * malformed and will fail its own `preg_match()` call regardless of what
-     * this method returns.
-     */
     private function hasDotAllModifier(string $regex): bool
     {
         return 1 === preg_match(self::TRAILING_DOT_ALL_MODIFIER, $regex);
     }
 
     /**
-     * A cross-line match's own security-relevant token (`return null;`, the
-     * actual `->request(` call) sits at the END of the match, not its start:
-     * a marker line pointing to the match's opening keyword (e.g. `public
-     * function supports(`) is often a structural line the code slicer already
-     * retains unconditionally, restoring nothing.
+     * The line each cross-line match ends on, where its security-relevant
+     * token sits.
      *
      * @return list<int>
      */

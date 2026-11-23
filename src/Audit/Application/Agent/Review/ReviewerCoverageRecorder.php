@@ -22,9 +22,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\RejectedFindingRe
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
 /**
- * Records a finding's reviewer coverage entry and emits the matching
- * `review.finding.reviewed` progress event in one step, so every review
- * outcome (validated, rejected, or errored, on every review path) advances
+ * Records a finding's reviewer coverage entry and emits its
+ * `review.finding.reviewed` progress event, so every review outcome advances
  * the progress counter exactly once.
  *
  * @internal not part of the BC promise, see docs/versioning.md

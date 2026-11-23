@@ -14,12 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 
 /**
- * Names the lines a statement spans from the line it starts on: every line
- * that follows while a parenthesis opened on the way is still open. String
- * literals and comments, which may span lines themselves, never count. A
- * statement whose parentheses are never closed spans its first line only and
- * so does one that stays open past the next {@see self::MAX_LOOKAHEAD_LINES}
- * lines: the cost of one statement is bounded, not the length of the file.
+ * Names the lines a statement spans from its first: every following line
+ * while a parenthesis it opened is still open, string literals and comments
+ * aside. A statement never closed, or still open after
+ * {@see self::MAX_LOOKAHEAD_LINES} lines, spans its first line only.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

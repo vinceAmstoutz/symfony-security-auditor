@@ -29,9 +29,8 @@ final readonly class ReportTrend
     ) {}
 
     /**
-     * The trend in one sentence: the first and last totals with the signed
-     * change and how many findings disappeared from files a later run could
-     * not analyze: those are unverified, not fixed, whatever the totals say.
+     * The first and last totals with the signed change and how many findings
+     * are unverified rather than fixed.
      */
     public function summary(): string
     {

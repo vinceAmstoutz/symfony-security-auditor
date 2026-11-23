@@ -16,8 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 /**
- * One tool-using conversation bound for a tool-batch-capable client. Separate
- * from {@see LLMRequest} so the registry is never nullable.
+ * One tool-using conversation bound for a tool-batch-capable client.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

@@ -19,9 +19,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 interface FixSynthesizerInterface
 {
     /**
-     * Returns the validated findings with a `suggestedFix` populated for the
-     * ones that warranted a patch. Findings that did not (low severity,
-     * synthesizer failure, nothing safely patchable) are returned unchanged.
+     * Returns the findings with a `suggestedFix` on those that warranted a
+     * patch, the others unchanged.
      *
      * @param list<Vulnerability> $vulnerabilities
      *

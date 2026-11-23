@@ -17,13 +17,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProductionConfigurat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /**
- * Opt-in extension of {@see LoadOrderAwareSecurityConfigParserInterface} for
- * parsers that know how the application assembles its configuration: the
- * files it loads, the files those import, and, for a run narrowed to a
- * folder, the configuration of the application that folder belongs to.
- * `MappingStage` checks `instanceof ImportAwareSecurityConfigParserInterface`
- * and otherwise asks {@see ProductionAwareSecurityConfigParserInterface::isLoadedInProduction()}
- * and {@see LoadOrderAwareSecurityConfigParserInterface::loadRank()} file by file.
+ * Optional extension of {@see LoadOrderAwareSecurityConfigParserInterface},
+ * checked with `instanceof`: the files the application loads, those they
+ * import and, for a run narrowed to a folder, the configuration of that
+ * folder's application. Without it, each file goes through
+ * {@see ProductionAwareSecurityConfigParserInterface::isLoadedInProduction()}
+ * and {@see LoadOrderAwareSecurityConfigParserInterface::loadRank()}.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

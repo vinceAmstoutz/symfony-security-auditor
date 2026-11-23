@@ -16,10 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 
 /**
- * Immutable snapshot of input/output token counts at a point in time.
- *
- * Returned by `TokenUsageRecorder::snapshot()` to expose cumulative usage
- * without allowing the caller to mutate the recorder's internal state.
+ * Cumulative token counts at a point in time.
  */
 final readonly class TokenUsageSnapshot
 {

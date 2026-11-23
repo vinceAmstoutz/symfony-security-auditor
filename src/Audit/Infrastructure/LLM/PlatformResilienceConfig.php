@@ -19,12 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\UsleepSl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\RetryAfterHeaderParser;
 
-/**
- * The retry/throttle stack: retry policy + transient-failure classification,
- * Retry-After parsing, the sleeper and the shared rate limiter.
- *
- * @internal not part of the BC promise, see docs/versioning.md
- */
+/** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class PlatformResilienceConfig
 {
     public function __construct(

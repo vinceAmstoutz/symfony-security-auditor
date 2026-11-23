@@ -31,10 +31,8 @@ final readonly class ScenarioRunner
     private const string FIXTURE_DIR = __DIR__.'/../Fixture';
 
     /**
-     * Runs the preparing commands, keeps the artifacts they wrote, then
-     * observes the scenario from a fresh workspace holding only those
-     * artifacts, as a replay does: nothing else the preparation left behind
-     * (a kernel cache, a warmed attacker cache) reaches the recording.
+     * Observes the scenario from a fresh workspace holding only the artifacts
+     * its preparing commands wrote, as a replay does.
      *
      * @return array{artifacts: array<string, array{mode: string, base64: string}>, result: array<string, mixed>}
      */

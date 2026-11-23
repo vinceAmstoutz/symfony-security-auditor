@@ -23,7 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputForm
 interface ReportWriterInterface
 {
     /**
-     * @param list<string> $baselinedFingerprints fingerprints rendered as suppressed instead of dropped, by formats that support it (currently SARIF)
+     * @param list<string> $baselinedFingerprints fingerprints SARIF renders as suppressed instead of dropping them
      *
      * @throws UnsupportedOutputFormatException
      * @throws UnsafeReportWriteException
@@ -32,8 +32,7 @@ interface ReportWriterInterface
     public function write(AuditReport $auditReport, OutputFormat $outputFormat, ?string $outputFile, SymfonyStyle $symfonyStyle, array $baselinedFingerprints = []): void;
 
     /**
-     * Refuses an output path the report could not be saved to, before the
-     * audit spends anything on it.
+     * Refuses an output path the report could not be saved to.
      *
      * @param string $projectPath the audited project, whose directories are walked for a symlink like the working directory's
      *

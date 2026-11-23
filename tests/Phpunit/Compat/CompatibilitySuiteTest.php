@@ -29,11 +29,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Scenario\Scenario;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Scenario\ScenarioCatalog;
 
 /**
- * Replays every scenario recorded from the last release on this tree and
- * compares what it observes with the recording. A difference fails unless
- * `accepted-differences.php` lists it; an entry there that no longer
- * matches any difference fails too, so the list never outlives what it
- * accepts. See CONTRIBUTING.md, "Compatibility Checks".
+ * Replays every scenario recorded from the last release on this tree. Fails on
+ * a difference `accepted-differences.php` does not list and on an entry there
+ * that matches no difference. See CONTRIBUTING.md, "Compatibility Checks".
  */
 final class CompatibilitySuiteTest extends TestCase
 {

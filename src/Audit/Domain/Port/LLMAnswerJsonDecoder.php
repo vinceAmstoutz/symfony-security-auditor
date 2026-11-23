@@ -28,9 +28,8 @@ final readonly class LLMAnswerJsonDecoder
     private const int MAX_RECOVERY_CANDIDATES = 64;
 
     /**
-     * Returns the decoded value as `mixed` so the not-array guard in
-     * `LLMResponse::parseJson` remains the single place that enforces the
-     * array contract.
+     * Returns any decoded value: `LLMResponse::parseJson()` enforces the array
+     * contract.
      *
      * @throws JsonException when the answer is not valid JSON and holds no block that decodes
      */
@@ -46,11 +45,9 @@ final readonly class LLMAnswerJsonDecoder
     }
 
     /**
-     * Whether the answer's JSON is one value alone: the only block at its top
-     * level that can stand for it, with no block left open after it. Values
-     * written apart (one object per line, an object after an array) or one
-     * the output cut off make it one of several, of which `decode()` returns
-     * only one.
+     * Whether the answer's JSON is one value alone: the only top-level block
+     * that can stand for it, with no block left open after it. Otherwise
+     * `decode()` returns only one of several.
      */
     public static function holdsOneValue(string $answer): bool
     {
@@ -63,9 +60,8 @@ final readonly class LLMAnswerJsonDecoder
     }
 
     /**
-     * Only a Markdown fence around the whole answer is stripped: the same
-     * backticks inside a JSON string, such as a finding quoting a code block,
-     * are part of the payload.
+     * Strips only a Markdown fence around the whole answer: backticks inside a
+     * JSON string belong to the payload.
      */
     private static function withoutWrappingFence(string $content): string
     {
@@ -73,23 +69,13 @@ final readonly class LLMAnswerJsonDecoder
     }
 
     /**
-     * Takes the last balanced block at the top level of the answer that
-     * decodes to an object or to a list holding one: a model that reasons
-     * before its verdict may quote JSON (from the audited code, say) that
-     * must not stand for the verdict that follows it. A bracket in the
-     * prose after its answer must not either. When no top-level block
-     * qualifies, as when the output limit cut an array off before its closing
-     * bracket, the first balanced block anywhere that decodes is taken (the
-     * first complete object of that array), or `null` when none do, among the
-     * first {@see self::MAX_RECOVERY_CANDIDATES} openers only. A JSON
-     * object written after the answer still stands for it: nothing here knows
-     * the shape the caller expects.
-     *
-     * When the content itself spans a single balanced block (`[ ... ]` or
-     * `{ ... }` with no surrounding prose), the top-level `json_decode` has
-     * already attempted exactly that payload: re-trying nested openers within
-     * it would silently accept shallower inner blocks (defeating depth limits,
-     * for one), so recovery is skipped in that case.
+     * The last top-level balanced block that decodes to an object or a list
+     * holding one, so JSON quoted while reasoning never stands for the verdict
+     * after it. Else the first balanced block anywhere that decodes, such as
+     * the first complete object of an array the output limit cut off, among
+     * the first {@see self::MAX_RECOVERY_CANDIDATES} openers; null when none
+     * does. Nothing is recovered from content that is a single balanced block,
+     * which `json_decode` already tried: an inner block must not pass for it.
      */
     private static function recoverDecodedJsonBlock(string $content): mixed
     {
@@ -105,8 +91,7 @@ final readonly class LLMAnswerJsonDecoder
 
     /**
      * The balanced blocks those openers start outside any other block, in
-     * order. An opener that never closes holds the rest of the answer, so the
-     * scan stops there.
+     * order, up to the first opener that never closes.
      *
      * @param list<int> $openerPositions
      *
@@ -158,9 +143,9 @@ final readonly class LLMAnswerJsonDecoder
     }
 
     /**
-     * An object, or a list holding one. Anything else is what prose brackets
-     * decode to (`[1]` citing a source, `[ ]` in a checklist, `[[12, 14]]`
-     * listing line ranges), so it never outranks an earlier block.
+     * An object or a list holding one. Anything else is what prose brackets
+     * decode to (`[1]`, `[ ]`, `[[12, 14]]`), which never outranks an earlier
+     * block.
      *
      * @param array<mixed> $decoded
      */
@@ -198,8 +183,7 @@ final readonly class LLMAnswerJsonDecoder
     }
 
     /**
-     * The decoded block, or `null` when it does not decode: the caller moves
-     * on to the next candidate.
+     * The decoded block, or null when it does not decode.
      */
     private static function decodeBlock(string $block): mixed
     {

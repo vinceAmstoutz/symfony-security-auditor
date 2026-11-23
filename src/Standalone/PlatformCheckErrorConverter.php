@@ -16,24 +16,22 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnloadableBridgeTreeException;
 
 /**
- * The `vendor/composer/platform_check.php` of a bridge tree refuses a PHP it
- * was not resolved for by throwing since Composer 2.8.10 and before that
- * through `trigger_error(…, E_USER_ERROR)`, which ends the process. While the
- * tree's autoloader is required, this error handler turns the older form into
- * the exception the newer one throws, so both are reported the same way.
+ * Turns the `E_USER_ERROR` a bridge tree's `vendor/composer/platform_check.php`
+ * raises before Composer 2.8.10 into the exception later Composer releases
+ * throw, so both refusals are reported the same way.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PlatformCheckErrorConverter
 {
     /**
-     * PHP 8.4 deprecates the call raising that error, just ahead of it.
+     * The deprecation PHP 8.4 raises just before that error.
      */
     private const string RAISING_CALL_DEPRECATION = 'Passing E_USER_ERROR to trigger_error()';
 
     /**
-     * True for the deprecation that only announces the error, which reports
-     * the same refusal; false hands every other error to PHP.
+     * Returns true for the deprecation announcing the error and false, which
+     * hands the error to PHP, for any other.
      *
      * @throws UnloadableBridgeTreeException
      */

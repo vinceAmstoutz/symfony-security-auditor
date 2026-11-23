@@ -302,9 +302,6 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
         $this->createBranch('feature');
         $this->commit('src/sub/Bar.php', '<?php // new', 'add bar');
 
-        // From src/ there is no .git; the resolver must rely on `git rev-parse
-        // --is-inside-work-tree` to recognise it as a working tree rather than
-        // throwing. Any mutation that breaks that detection makes this throw.
         $changed = (new ProcessGitChangedFilesResolver())->changedSince($this->tmpDir.'/src', 'main');
 
         self::assertContains('sub/Bar.php', $changed);
@@ -342,10 +339,8 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     }
 
     /**
-     * Git refuses a repository it considers unsafe (owned by another user, or
-     * using an extension it does not know) with its own reason and exit code
-     * 128: that reason, not a claim that the ref is missing, is what the user
-     * has to act on.
+     * Git refuses an unsafe repository (owned by another user or using an
+     * unknown extension) with exit code 128 and its own reason.
      *
      * @throws GitChangedFilesUnavailableException
      */
@@ -485,12 +480,8 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     }
 
     /**
-     * The audited project is untrusted: its own `.git/config` is attacker
-     * data. `core.fsmonitor` lets a repo declare an arbitrary command that git
-     * runs on any working-tree comparison, including the plain `git diff
-     * --name-only HEAD` this resolver issues for uncommitted changes. Left
-     * unneutralized, auditing a malicious clone with `--since` executes that
-     * command as the auditor's own process.
+     * The audited repository's `.git/config` is attacker data: its
+     * `core.fsmonitor` command would run on any working-tree comparison.
      *
      * @throws GitChangedFilesUnavailableException
      */
@@ -509,9 +500,7 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     }
 
     /**
-     * Listing the untracked files consults the same `core.fsmonitor` hook, so a
-     * repo that declares one runs its command on a bare `git ls-files
-     * --others` too.
+     * Listing the untracked files consults the same `core.fsmonitor` hook.
      *
      * @throws GitChangedFilesUnavailableException
      */
@@ -531,16 +520,9 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     }
 
     /**
-     * `core.fsmonitor=` (added above) only closes one config-driven command
-     * hook. A `.gitattributes` `filter=` assignment plus a matching
-     * `filter.<name>.clean` command in the same untrusted `.git/config`
-     * reaches an arbitrary command too: git runs the clean filter to
-     * normalize a working-tree file before comparing it against the index,
-     * which `git diff HEAD` (the plain worktree-vs-HEAD comparison this
-     * resolver used for uncommitted changes) triggers for any file whose
-     * stat info looks changed. `git diff-index --cached` (index vs HEAD) and
-     * `git diff-files` (worktree vs index) together cover the same ground
-     * without ever invoking a content filter.
+     * A `filter.<name>.clean` command in the untrusted `.git/config`, assigned
+     * through `.gitattributes`, would run when git normalizes a working-tree
+     * file before comparing it.
      *
      * @throws GitChangedFilesUnavailableException
      */
@@ -562,11 +544,9 @@ final class ProcessGitChangedFilesResolverTest extends TestCase
     }
 
     /**
-     * A checkout shipped with its own `.git` directory (an archive, a build
-     * context) can carry an index whose entries git finds racily clean once
-     * extracted and a `.git/config` that relaxes the stat check to what the
-     * extraction keeps, so `git diff-files` re-hashes the file through the
-     * repository's own clean filter.
+     * An extracted checkout's racily clean index and relaxed stat check would
+     * make `git diff-files` re-hash a file through the repository's clean
+     * filter.
      *
      * @throws GitChangedFilesUnavailableException
      */

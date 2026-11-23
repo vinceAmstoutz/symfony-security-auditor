@@ -17,13 +17,11 @@ use Closure;
 use Override;
 
 /**
- * Holds the verified download's final move until the entry point commits it,
- * once the console application has finished and no further class can be
- * autoloaded from the archive being replaced.
+ * Holds the verified download's move until the entry point commits it, once
+ * no class can be autoloaded from the replaced archive any more.
  *
- * Mutable by design: {@see SelfUpdater} registers the move through
- * {@see schedule()} mid-run and the standalone entry point drains it through
- * {@see commit()} on the way out.
+ * Mutable: {@see SelfUpdater} schedules the move mid-run and the entry point
+ * commits it on the way out.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

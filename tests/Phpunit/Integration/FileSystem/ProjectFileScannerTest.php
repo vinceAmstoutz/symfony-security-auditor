@@ -35,8 +35,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\Wa
 
 final class ProjectFileScannerTest extends TestCase
 {
-    // Split via constant so neither CS Fixer's `no_useless_concat_operator`
-    // nor GitHub's secret scanner sees a contiguous credential-shaped string.
+    // Kept apart so GitHub's secret scanner sees no credential-shaped string.
     private const string STRIPE_LIVE_PREFIX = 'sk_live';
 
     private const int UNPRIVILEGED_USER_ID = 65534;
@@ -926,7 +925,6 @@ final class ProjectFileScannerTest extends TestCase
     public function test_it_keeps_explicit_file_at_exact_max_size_boundary(): void
     {
         mkdir($this->tmpDir.'/public', 0o777, true);
-        // 2 KB exactly: `str_repeat('a', 2 * 1024)` is 2048 bytes on disk.
         file_put_contents($this->tmpDir.'/public/index.php', str_repeat('a', 2 * 1024));
 
         $projectFileScanner = new ProjectFileScanner(new NullLogger(), maxFileSizeKb: 2);

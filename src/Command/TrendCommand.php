@@ -55,12 +55,6 @@ final readonly class TrendCommand
         return ExitCode::Success->value;
     }
 
-    /**
-     * Human-facing error messages move to stderr when stdout carries a
-     * machine-readable document, so `--format=json > trend.json` and
-     * `--format=html > trend.html` receive the document alone. This mirrors
-     * `DiffCommand::errorStyle()`.
-     */
     private function errorStyle(SymfonyStyle $symfonyStyle, TrendOutputFormat $trendOutputFormat): SymfonyStyle
     {
         return TrendOutputFormat::Console !== $trendOutputFormat ? $symfonyStyle->getErrorStyle() : $symfonyStyle;

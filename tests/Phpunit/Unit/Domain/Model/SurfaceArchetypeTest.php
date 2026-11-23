@@ -65,11 +65,6 @@ final class SurfaceArchetypeTest extends TestCase
         yield 'and neither does anything else' => [ProjectFileType::OTHER, SurfaceArchetype::OTHER];
     }
 
-    /**
-     * Guards the mapping against a new `ProjectFileType` case being added
-     * without a matching archetype: `archetype()` would then throw at runtime
-     * on a file the classifier happily produced.
-     */
     public function test_no_project_file_type_is_left_unmapped(): void
     {
         $mapped = array_map(
@@ -85,11 +80,9 @@ final class SurfaceArchetypeTest extends TestCase
     }
 
     /**
-     * `HTTP_ENTRYPOINT` is deliberately narrow: a route-guarded action surface,
-     * which is exactly what {@see ProjectFileType::isControllerLike()} means. A
-     * webhook consumer receives a request but is invoked by the webhook
-     * transport rather than a route, so widening this would silently change
-     * which files reach the access-control and form-binding maps.
+     * `HTTP_ENTRYPOINT` is a route-guarded action surface, as
+     * {@see ProjectFileType::isControllerLike()} means; a webhook consumer,
+     * invoked by its transport rather than a route, is not one.
      */
     public function test_the_http_entrypoint_archetype_is_exactly_the_controller_like_types(): void
     {

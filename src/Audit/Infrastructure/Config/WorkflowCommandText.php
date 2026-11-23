@@ -14,13 +14,11 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 /**
- * A GitHub Actions runner reads a job-log line that starts with `::`, leading
- * whitespace aside, as a workflow command and the legacy `##[command]` form
- * wherever it sits in a line. Text from the audited repository or the model
- * is defused before it reaches such a log: a backslash breaks each marker, so
- * the text still reads as written. Which markers need breaking depends on
- * where the text lands: after a prefix of ours, in a message the console may
- * wrap anywhere, in a document printed line by line, or inside JSON strings.
+ * Defuses the GitHub Actions workflow commands of text from the audited
+ * repository or the model (`::` starting a line, `##[` anywhere) with a
+ * backslash, so the text still reads as written. Each method suits where the
+ * text lands: after a prefix, in a message the console may wrap, in a
+ * document or in JSON.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -45,10 +43,8 @@ final readonly class WorkflowCommandText
     }
 
     /**
-     * The runner starts a line after a carriage return too and trims Unicode
-     * whitespace, so both are looked through; text that is not UTF-8 is
-     * scrubbed first, since only valid UTF-8 can be matched for that
-     * whitespace.
+     * Starts a line after a carriage return too and looks through Unicode
+     * whitespace, as the runner does; scrubs text that is not UTF-8 first.
      */
     public static function inDocument(string $text): string
     {
@@ -58,8 +54,7 @@ final readonly class WorkflowCommandText
     }
 
     /**
-     * The marker can only sit inside a JSON string, where `#` reads back
-     * as the `#` it replaces.
+     * Escapes the marker in a JSON string, which reads back as written.
      */
     public static function inJson(string $json): string
     {

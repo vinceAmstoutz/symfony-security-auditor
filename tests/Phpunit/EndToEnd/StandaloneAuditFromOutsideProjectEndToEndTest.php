@@ -22,12 +22,10 @@ use Symfony\Component\Process\Process;
 
 /**
  * Runs the real `bin/symfony-security-auditor` entry script in a process of
- * its own, from a folder that is not the audited project, against a Symfony
- * project laid out like `symfony/demo` (the way a person types
- * `symfony-security-auditor audit <project> --path src/Command`), so the
- * working directory, the project argument and the `--path` option are
- * resolved by the shipped application and not by a hand-built command.
- * `--show-scanned` and `--dry-run` make no LLM call.
+ * its own, from a folder that is not the audited project, against a project
+ * laid out like `symfony/demo`, so the shipped application resolves the
+ * working directory, the project argument and `--path`. `--show-scanned` and
+ * `--dry-run` make no LLM call.
  */
 final class StandaloneAuditFromOutsideProjectEndToEndTest extends TestCase
 {

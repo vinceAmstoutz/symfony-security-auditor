@@ -19,9 +19,8 @@ use Symfony\AI\Platform\Result\RawHttpResult;
 use function Symfony\Component\String\u;
 
 /**
- * Whether a gateway answered a streamed request with one JSON document, as
- * a gateway that cannot stream does: the bridge would read it as an empty
- * stream, so it is read as the buffered answer it is.
+ * Whether a gateway answered a streamed request with one JSON document,
+ * which the bridge would read as an empty stream.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

@@ -39,37 +39,20 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonT
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 
 /**
- * Runs every tool-using conversation in a concurrency window as a wavefront:
- * each round dispatches the next platform invocation for every still-pending
- * conversation WITHOUT blocking, then resolves them, executes the requested
- * tools against that conversation's own registry and queues the follow-up
- * round. On an async transport (the symfony/ai DeferredResult contract) the
- * per-round invocations overlap on the wire. A conversation whose last round
- * still asks to read gets one closing request ({@see FinalRound}); one
- * that reads again ends at the iteration cap. Any dispatch or resolution
- * failure first retries the same conversation through
- * `RetryingPlatformInvoker` (the same classify-then-retry-or-fail seam the
- * sequential path uses) once the budget allows another call. When every
- * attempt of that retry fails transiently, the audit aborts as it does on the
- * sequential path, under an attempt count that includes the dispatch. When the
- * retry fails otherwise, a conversation that hasn't run a tool yet falls back
- * to the proven sequential completeWithTools() path (full restart). One that
- * already ran a tool cannot restart without executing it twice: a failure
- * classified non-transient is rethrown instead of masked, per the LLM seam's
- * contract that non-transient provider failures must never be swallowed into
- * a false-negative SAFE result; anything else finalizes it as an empty
- * `empty_content` response.
+ * Runs the tool conversations of a concurrency window round by round,
+ * dispatching the next call of every pending conversation before resolving
+ * any. A conversation still reading on its last round gets one closing
+ * request; one that reads again ends as `max_tool_iterations`.
  *
- * An answer with nothing usable in it (empty, cut off by the output limit or
- * withheld by a content filter) is never retried or restarted either: the
- * conversation ends as the matching degraded response.
- *
- * A prompt the model cannot take in is never retried or restarted: before any
- * tool ran, the conversation ends as a `request_too_large` response the
- * caller splits the work on; after a tool ran, as an `empty_content` response
- * that keeps what it recorded. A failure that does end the round cancels the
- * requests still in flight, so their HTTP responses neither wait for the
- * provider in their destructors nor replace the failure with their own.
+ * A failed call is retried through `RetryingPlatformInvoker`; when every
+ * attempt fails transiently, the audit aborts. On any other retry failure, a
+ * conversation that ran no tool restarts through completeWithTools(); one
+ * that ran a tool rethrows a non-transient failure (never masking it as a
+ * SAFE result) and otherwise ends as `empty_content`. A degraded answer is
+ * never retried: it ends the conversation as that degraded response. A prompt
+ * the model cannot take in ends it as `request_too_large` before any tool
+ * ran, as `empty_content` after. A conversation that ran a tool keeps what it
+ * recorded. A failure that ends the round cancels the requests in flight.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -141,10 +124,8 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * Refuses to dispatch a round once the budget is spent and gives the
-     * budget verdict only after every conversation the round did dispatch has
-     * been advanced: each was billed by the provider, so its spend belongs on
-     * the books before the abort, not just the first one's.
+     * Refuses a round once the budget is spent. Checks it again only after
+     * every dispatched conversation is advanced, so each billed call is booked.
      *
      * @param array<int, ConversationState> $states
      * @param list<ToolLLMRequest>          $window
@@ -168,8 +149,8 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * A conversation whose estimate no longer fits the rate-limit window ends
-     * on the spot instead of taking the whole window down with it.
+     * Ends a conversation whose estimate no longer fits the rate-limit window,
+     * leaving the others running.
      *
      * @param array<int, ConversationState> $states
      *
@@ -249,12 +230,9 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * Every in-flight request left open is cancelled (including the
-     * conversation whose own advance threw, whose HTTP handle may still be
-     * open) and booked as spent. The conversation that threw is not booked:
-     * it was read to completion (its real usage is already recorded) or it
-     * errored before generating anything. A conversation whose dispatch failed
-     * never reached the provider: only its rate-limit reservation is released.
+     * Cancels every request still open (the failed one's included) and books
+     * each but the failed one as spent. A conversation whose dispatch failed
+     * only releases its rate-limit reservation.
      *
      * @param array<int, DeferredResult|Throwable> $unconsumed
      * @param array<int, ConversationState>        $states
@@ -312,8 +290,8 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * A prompt the model cannot take in is not worth a retry or a restart
-     * (the same prompt is refused again), so it ends the conversation at once.
+     * Ends the conversation without a retry on a degraded answer or a prompt
+     * the model cannot take in.
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
@@ -368,13 +346,9 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * Retries a failed dispatch/resolution through the same
-     * classify-then-retry-or-fail seam the sequential path uses. A retry whose
-     * attempts all fail transiently aborts the audit, as the sequential path
-     * does, counting the dispatch that failed first. A retry that fails
-     * otherwise goes to `abortConversation()`; a retry the model refuses
-     * as too large ends the conversation without the restart, which would
-     * only send the same prompt a third time.
+     * Aborts the audit when every retry attempt fails transiently, the failed
+     * dispatch counted. A retry refused as too large ends the conversation
+     * without a restart.
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
@@ -398,12 +372,9 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * The retried answer, or the state the conversation ends in when the
-     * retry itself fails. The conversation's own answer, or a sibling advanced
-     * earlier in the round, may have spent the budget, so it is checked before
-     * the retry is dispatched; a retry whose billed attempts spend it aborts
-     * on the budget too, rather than ending the conversation as one that
-     * failed.
+     * Returns the retried answer, or the state the conversation ends in when
+     * the retry fails. Checks the budget first; a retry that spends it aborts
+     * on the budget.
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
@@ -452,12 +423,10 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * A conversation that cannot go on. Before any tool ran it restarts from
-     * scratch through completeWithTools(). After one ran it cannot restart
-     * without executing that tool a second time: a failure classified
-     * non-transient is rethrown, since finalizing it would mask a failure that
-     * repeats on every call behind a false-negative SAFE result; anything
-     * else ends the conversation as `empty_content`, keeping what it recorded.
+     * Restarts a conversation that ran no tool through completeWithTools(). One
+     * that ran a tool rethrows a non-transient failure (never masking it as a
+     * SAFE result) and otherwise ends as `empty_content`, keeping what it
+     * recorded.
      *
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
@@ -507,11 +476,8 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * The model answered, but with nothing usable: cut off by the output
-     * limit, withheld by a content filter, or empty. Asking again would get the
-     * same answer at the same price, so the conversation ends as the degraded
-     * response the sequential path returns for it, keeping any tool results it
-     * already recorded.
+     * Ends the conversation as the degraded response for an answer cut off,
+     * filtered or empty, keeping the tool results it recorded.
      *
      * @throws InvalidTokenUsageException
      */
@@ -533,11 +499,9 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * Before any tool ran, the refusal is the caller's to act on: the
-     * `request_too_large` response carries it as content and the chunk it
-     * stands for gets split. After a tool ran it is the tool results that
-     * outgrew the model, which splitting the chunk would not change, so the
-     * conversation ends with what it recorded.
+     * Before any tool ran, ends the conversation as `request_too_large`,
+     * carrying the refusal, so the caller splits the chunk. After a tool ran,
+     * ends it as `empty_content`, keeping what it recorded.
      *
      * @throws InvalidTokenUsageException
      */

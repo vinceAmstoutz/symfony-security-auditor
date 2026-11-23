@@ -104,7 +104,6 @@ final class ReadFileToolTest extends TestCase
      */
     public function test_execute_returns_full_content_when_exactly_at_size_limit(): void
     {
-        // Boundary: `>` mutated to `>=` would truncate at exactly MAX_BYTES; original passes through.
         $content = str_repeat('a', self::MAX_BYTES);
         $projectFile = ProjectFile::create('src/Edge.php', '/app/src/Edge.php', $content);
         $readFileTool = new ReadFileTool([$projectFile]);
@@ -136,8 +135,6 @@ final class ReadFileToolTest extends TestCase
      */
     public function test_execute_truncation_preserves_original_leading_byte(): void
     {
-        // Kills DecrementInteger / IncrementInteger on substr offset: truncated output must start
-        // with the first byte of the original content.
         $content = 'Z'.str_repeat('a', self::MAX_BYTES + 10);
         $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
         $readFileTool = new ReadFileTool([$projectFile]);

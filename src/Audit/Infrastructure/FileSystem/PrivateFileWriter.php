@@ -16,13 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 use Symfony\Component\Filesystem\Filesystem;
 
 /**
- * Writes what the audit caches about the audited code (source excerpts,
- * findings, reviewer reasoning) so that only its owner can read it.
- * `Filesystem::dumpFile()` gives a new file the process umask, which leaves it
- * world-readable on a typical host, so the file is created empty and tightened
- * first and `dumpFile()` keeps the permissions of a file that exists. The
- * directories it has to create are owner-only too; one that exists is left as
- * its owner set it.
+ * Writes a file only its owner can read, from before its content is written.
+ * Creates any missing directory owner-only and leaves an existing one as it
+ * is.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

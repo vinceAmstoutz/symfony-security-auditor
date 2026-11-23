@@ -18,11 +18,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 
 /**
- * The LLM/finding seam the attacker agent turns chunk responses into findings
- * with. `codeSlicer` is always resolved by DI (`SymfonySecurityAuditorBundle`
- * aliases it to a Null* or real implementation unconditionally), so it is
- * required here.
- *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class AttackerLlmCollaborators

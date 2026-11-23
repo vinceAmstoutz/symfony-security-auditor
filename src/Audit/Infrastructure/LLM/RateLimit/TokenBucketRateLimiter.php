@@ -23,26 +23,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Rate
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Exception\InvalidRateLimiterConfigurationException;
 
 /**
- * Fixed-minute token bucket with three independent dimensions (RPM, ITPM, OTPM).
+ * Fixed-minute token bucket over requests, input tokens and output tokens per
+ * minute, with at least one limit set. acquire() blocks until the request
+ * fits the window, record() replaces its input estimate with the usage and
+ * pauseUntil() makes every later acquire() wait out a server's Retry-After.
+ * Its state is per process.
  *
- * `acquire()` blocks until the next request fits inside the current window,
- * either because capacity is available or because the next reset is reached.
- * `record()` reconciles the pre-call input estimate with the post-call actual
- * so subsequent `acquire()` decisions stay accurate. `pauseUntil()` propagates
- * a server-issued `Retry-After` into the bucket so chunks scheduled after the
- * 429 cooperatively wait instead of stampeding the provider.
- *
- * Class invariant: at least one rate-limit dimension is set. The bundle wires
- * `NullRateLimiter` when all dimensions are null, so this class is never
- * instantiated with a fully-disabled configuration (enforced in the
- * constructor).
- *
- * State is per-process: multiple processes sharing one API key still need
- * out-of-process coordination (Redis/file lock), out of scope here.
- *
- * Not `readonly` because the bucket carries mutable accounting state; see
- * `.claude/rules/php-classes.md` (stateful collaborator carve-out, same
- * shape as `BudgetTracker`).
+ * Not `readonly`: it keeps a rate window (`.claude/rules/php-classes.md`).
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -187,14 +174,9 @@ final class TokenBucketRateLimiter implements RateLimiterInterface
     }
 
     /**
-     * The reset also zeroes the *amounts* of the pending estimates while
-     * keeping their FIFO slots: the reservations they credit were wiped with
-     * the window counters, so a straddling call's later `record()` must not
-     * subtract a reservation the new window never carried: that would drive
-     * `inputTokensUsed` negative and over-admit the fresh window. The slot is
-     * kept so reconciliation order stays aligned; the straddling call's
-     * actual usage is charged to the current window, erring on the side of
-     * blocking rather than a provider 429.
+     * Zeroes the pending estimates but keeps their slots, so a call that
+     * straddles the reset neither subtracts a reservation the new window never
+     * held nor shifts the reconciliation order.
      */
     private function resetWindowIfExpired(DateTimeImmutable $now): void
     {

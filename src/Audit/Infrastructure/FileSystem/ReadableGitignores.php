@@ -22,16 +22,12 @@ use Symfony\Component\String\AbstractString;
 use function Symfony\Component\String\b;
 
 /**
- * The `.gitignore` rules of a project, read the way Finder's
- * `ignoreVCSIgnored()` reads them: the `.gitignore` files from the root of the
- * git repository holding the project, or of the project itself, down to the
- * file; the last matching rule of the deepest one decides and a file inside
- * an ignored directory is ignored with it. A `.gitignore` that is not a file,
- * such as a directory a repository commits under that name, holds no rule.
+ * The `.gitignore` rules of a project, read as Finder's `ignoreVCSIgnored()`
+ * reads them, from the root of the git repository (or of the project) down to
+ * the file. A `.gitignore` that is not a file holds no rule.
  *
- * Mutable by design: it keeps the rules it read across the files of a walk,
- * so it opts out of the final readonly rule as a stateful collaborator (see
- * .claude/rules/php-classes.md).
+ * Not readonly: keeps the rules it read across a walk (stateful collaborator,
+ * see .claude/rules/php-classes.md).
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -137,8 +133,8 @@ final class ReadableGitignores
     }
 
     /**
-     * A line opening with `#` is a comment, so a pattern that opens with one
-     * once its `!` is set aside is escaped.
+     * Escapes a pattern that opens with `#` once its `!` is set aside, which
+     * would otherwise read as a comment.
      *
      * @return array{0: string, 1: bool, 2: bool}
      */

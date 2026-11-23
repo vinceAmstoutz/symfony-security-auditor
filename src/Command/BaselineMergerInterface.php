@@ -22,11 +22,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteEx
 interface BaselineMergerInterface
 {
     /**
-     * Plans a merge of a JSON report's findings into a baseline file: which
-     * existing entries stay, which findings are new and (with `$prune`)
-     * how many stale entries go. Coverage is count-aware: each entry accepts
-     * one occurrence, so a finding duplicated beyond its accepted count is
-     * new again.
+     * Plans a merge of a JSON report's findings into a baseline file. Each
+     * entry accepts one occurrence, so a finding duplicated beyond its
+     * accepted count is new again.
      *
      * @throws ReportFileNotReadableException
      * @throws MalformedReportFileException
@@ -35,8 +33,7 @@ interface BaselineMergerInterface
     public function plan(string $reportPath, string $baselinePath, bool $prune): BaselineMergePlan;
 
     /**
-     * Writes the planned baseline: kept entries verbatim (hand-written keys
-     * such as `reason` survive), then one dated entry per new finding.
+     * Writes the kept entries verbatim, then one dated entry per new finding.
      *
      * @param array<int, string> $reasons acceptance reason per `newFindings` index
      *

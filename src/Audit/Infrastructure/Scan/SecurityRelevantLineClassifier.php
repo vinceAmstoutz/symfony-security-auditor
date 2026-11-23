@@ -26,8 +26,7 @@ use function Symfony\Component\String\u;
 final readonly class SecurityRelevantLineClassifier implements LineRetentionDeciderInterface
 {
     /**
-     * Prefixes (matched after left-trim) that mark a line as structurally
-     * relevant and therefore always retained.
+     * Matched after the leading blanks.
      *
      * @var list<string>
      */
@@ -136,13 +135,6 @@ final readonly class SecurityRelevantLineClassifier implements LineRetentionDeci
         'getSession()',
     ];
 
-    /**
-     * Bare-keyword security tokens that must be word-boundary matched rather
-     * than substring matched: a leading-character enumeration (space, `(`,
-     * `=`) misses column-0 statements (e.g. a bootstrap script's first line)
-     * and tab-indented ones, silently eliding a real file-inclusion or
-     * command-execution line instead of retaining it.
-     */
     private const string BARE_KEYWORD_PATTERN = '/\b(?:exec|rand|include|include_once|require|require_once)\b/';
 
     private const string NON_ASCII_BYTE = '/[^\x00-\x7F]/';
@@ -160,10 +152,8 @@ final readonly class SecurityRelevantLineClassifier implements LineRetentionDeci
     }
 
     /**
-     * A line of ASCII alone holds no grapheme, normalization form or Unicode
-     * space that would set its bytes apart from its text, so it is matched
-     * byte by byte, with the same outcome and many times faster than as a
-     * Unicode string; any other line is read as Unicode text.
+     * Matches an ASCII line byte by byte and any other line as Unicode text,
+     * with the same outcome.
      */
     private function isStructuralOrHoldsSecurityToken(string $line): bool
     {

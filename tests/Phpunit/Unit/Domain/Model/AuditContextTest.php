@@ -115,10 +115,6 @@ final class AuditContextTest extends TestCase
     }
 
     /**
-     * A fingerprint accepted twice in the baseline (two distinct originally
-     * accepted findings sharing the same fingerprint) grants two credits:
-     * `array_count_values()`-style budgeting, not plain membership.
-     *
      * @throws InvalidAuditContextException
      */
     public function test_it_grants_one_credit_per_repeated_occurrence_of_an_accepted_fingerprint(): void
@@ -394,15 +390,11 @@ final class AuditContextTest extends TestCase
     {
         $auditContext = AuditContext::forProject($this->tmpDir);
 
-        // critical + validated → included
         $vulnerability = $this->makeVulnerability('cv', VulnerabilitySeverity::CRITICAL)
             ->withReviewerValidation(true);
-        // critical + NOT validated → excluded
         $criticalUnvalidated = $this->makeVulnerability('cu', VulnerabilitySeverity::CRITICAL);
-        // high + validated → excluded (not critical)
         $highValidated = $this->makeVulnerability('hv', VulnerabilitySeverity::HIGH)
             ->withReviewerValidation(true);
-        // high + NOT validated → excluded
         $highUnvalidated = $this->makeVulnerability('hu', VulnerabilitySeverity::HIGH);
 
         $auditContext->addVulnerability($vulnerability);
@@ -474,7 +466,7 @@ final class AuditContextTest extends TestCase
             ->withReviewerValidation(true); // score 10
         $high = $this->makeVulnerability('v2', VulnerabilitySeverity::HIGH)
             ->withReviewerValidation(true); // score 7
-        $notValidated = $this->makeVulnerability('v3', VulnerabilitySeverity::CRITICAL); // not counted
+        $notValidated = $this->makeVulnerability('v3', VulnerabilitySeverity::CRITICAL);
 
         $auditContext->addVulnerability($vulnerability);
         $auditContext->addVulnerability($high);

@@ -18,10 +18,8 @@ use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * The standalone binary renders the product banner before any command starts,
- * which leaves the audit's own banner slot free for the one thing only the
- * resolved configuration knows: which API key the run is about to spend. The
- * credential is named by its masked preview, never printed.
+ * Names the API key the run spends, in the standalone binary's audit header,
+ * by its masked preview only.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

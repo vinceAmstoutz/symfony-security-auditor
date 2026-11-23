@@ -22,10 +22,8 @@ final readonly class AccessControlRequirementReader
     private const array REQUIREMENT_KEYS = ['roles', 'role', 'allow_if', 'methods', 'ips', 'requires_channel', 'host', 'port'];
 
     /**
-     * Distinguishes an entry that declares a requirement key but with an
-     * empty value (`roles: []`, a deliberate public rule) from one that
-     * declares no requirement key at all (a degenerate entry with nothing to
-     * record).
+     * True for an entry declaring a requirement key, even an empty one
+     * (`roles: []`, a deliberate public rule).
      *
      * @param array<string, mixed> $entry
      */
@@ -41,9 +39,9 @@ final readonly class AccessControlRequirementReader
     }
 
     /**
-     * A rule checks something only with roles or an `allow_if` expression.
-     * A roles value the parser cannot read as text, such as a `!php/const`
-     * it cannot resolve, still names roles; an empty list or text names none.
+     * True for a rule with roles or an `allow_if` expression. A roles value
+     * that is not text, such as an unresolved `!php/const`, still names roles;
+     * an empty list or empty text names none.
      *
      * @param array<string, mixed> $entry
      */

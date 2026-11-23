@@ -22,9 +22,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 use function Symfony\Component\String\u;
 
 /**
- * Renders the stakeholder-facing view of a report: risk level, what it means
- * for the business and the severity / type / hotspot distributions, without
- * the per-finding technical detail the `console` format carries.
+ * Renders the stakeholder view of a report: the risk level, what it means for
+ * the business and the severity, type and hotspot distributions, with no
+ * per-finding detail.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

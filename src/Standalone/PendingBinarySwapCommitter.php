@@ -20,12 +20,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\PendingBinarySwap;
 
 /**
- * Commits the binary swap `self-update` deferred to the end of the process.
- * By then the command has already reported the verified update and exited, so
- * a swap that fails can only be reported here: on the error output and as
- * the exit code the entry point leaves with. A successful swap writes nothing
- * and loads no further class: the archive those classes would come from has
- * just been replaced.
+ * Commits the binary swap `self-update` deferred to the end of the process and
+ * reports a failed one on the error output and in the exit code. A successful
+ * swap writes nothing and loads no further class from the replaced archive.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

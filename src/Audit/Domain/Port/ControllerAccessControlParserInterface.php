@@ -17,9 +17,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 
 /**
- * Extracts route/access-control metadata from a single controller file. Implementations
- * must degrade silently (return an empty list) when the file cannot be parsed: a
- * single broken controller must not abort the mapping stage.
+ * Extracts the route and access-control metadata of a controller file.
+ * Implementations MUST return an empty list for a file they cannot parse,
+ * never throw.
  */
 interface ControllerAccessControlParserInterface
 {

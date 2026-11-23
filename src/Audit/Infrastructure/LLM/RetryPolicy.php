@@ -28,26 +28,20 @@ final readonly class RetryPolicy
     public const float DEFAULT_JITTER_RATIO = 0.2;
 
     /**
-     * Initial delay used when retrying after a rate-limit (429) response.
-     * Anthropic's rate-limit windows reset within 60 seconds, so this default
-     * ensures the first retry does not fire until the window has elapsed.
+     * First delay after a 429, long enough for a 60-second rate-limit window
+     * to reset.
      */
     public const int DEFAULT_RATE_LIMIT_DELAY_MS = 60_000;
 
     /**
-     * Upper bound applied to any rate-limit delay (exponential backoff or
-     * server-provided `Retry-After`), so a misbehaving provider cannot wedge
-     * the audit for hours.
+     * Caps any rate-limit delay, `Retry-After` included, so a provider cannot
+     * stall the audit for hours.
      */
     public const int DEFAULT_RATE_LIMIT_MAX_DELAY_MS = 300_000;
 
     /**
-     * Upper bound applied to a transient-failure retry delay, mirroring
-     * {@see DEFAULT_RATE_LIMIT_MAX_DELAY_MS}: without it, a high
-     * `max_attempts` combined with the default `backoff_multiplier` grows the
-     * delay exponentially without limit (e.g. attempt 19 computes to roughly
-     * a day), wedging the audit exactly as the rate-limit ceiling above was
-     * introduced to prevent.
+     * Caps a transient-failure delay, which a high `max_attempts` would
+     * otherwise grow without bound.
      */
     public const int DEFAULT_MAX_DELAY_MS = 300_000;
 
@@ -81,16 +75,9 @@ final readonly class RetryPolicy
     }
 
     /**
-     * Returns the delay before retrying a rate-limited (429) request.
-     *
-     * When `$serverHintSeconds` is a positive integer (typically parsed from a
-     * `Retry-After` response header via `RetryAfterHeaderParser`), the hint
-     * wins over the local exponential schedule. Otherwise the delay is
-     * `rateLimitInitialDelayMs` grown by `backoffMultiplier ** (attempt − 1)`
-     * jittered upward-only (unlike `delayMs()`'s symmetric jitter) so it never
-     * undercuts a provider's requested wait. The result is always clamped to
-     * `rateLimitMaxDelayMs` so a hostile provider cannot push the wait past
-     * a sane ceiling.
+     * Returns the delay before retrying a 429: a positive `$serverHintSeconds`
+     * wins, else the rate-limit schedule, jittered upward only so it never
+     * undercuts the provider's wait. Clamped to the rate-limit ceiling.
      *
      * @throws InvalidRetryConfigurationException
      */
@@ -108,9 +95,8 @@ final readonly class RetryPolicy
     }
 
     /**
-     * Returns `rateLimitDelayMs()`, or the longer wait the provider names
-     * besides (`$suggestedWaitMs`, read by `SuggestedWaitParser`), clamped to
-     * `rateLimitMaxDelayMs` all the same.
+     * Returns rateLimitDelayMs(), or the longer `$suggestedWaitMs`, clamped to
+     * the rate-limit ceiling.
      *
      * @throws InvalidRetryConfigurationException
      */
@@ -120,12 +106,8 @@ final readonly class RetryPolicy
     }
 
     /**
-     * Returns the unclamped, unrounded delay so callers can clamp against
-     * their own ceiling in float space before rounding. Clamping after an
-     * `(int)` cast is too late: the exponential term can exceed `PHP_INT_MAX`
-     * long before any realistic ceiling; casting an out-of-range float to
-     * int is undefined (observed as a nonsensical negative value), which
-     * `min()` would then wrongly treat as "smaller than the ceiling".
+     * Returns the unclamped float delay; clamp it before an int cast, which
+     * overflows on a large attempt.
      */
     private function computeDelay(int $baseInitialDelayMs, int $attempt, bool $upwardOnlyJitter = false): float
     {

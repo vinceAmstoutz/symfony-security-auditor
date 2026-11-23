@@ -36,9 +36,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFact
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
 
 /**
- * Orchestrates the reviewer pass: resolves the review mode (tools, structured
- * collection, batching, concurrency) and delegates each finding to the
- * matching `Review\` analysis strategy built here.
+ * Runs the reviewer pass through the analyzer its review mode (tools,
+ * structured collection, batching, concurrency) selects.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

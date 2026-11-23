@@ -20,9 +20,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolInterface;
 
 /**
- * Returns the textual content of a project file by its relative path. The set
- * of readable files is fixed at construction time to the project files scanned
- * by IngestionStage: the LLM cannot escape outside the audited project tree.
+ * Returns the content of a project file by its relative path. Reads only the
+ * files given at construction, so the model cannot read outside the audited
+ * project.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

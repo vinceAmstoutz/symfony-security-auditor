@@ -20,15 +20,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\FixtureSeal;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\UnreleasedChangelog;
 
 /**
- * The bundle configuration of this tree is a compatible superset of the one
- * recorded from the last release (`Fixture/<X.Y.Z>.json`, written by
- * `tools/Compat/record-configuration.php`): no path is gone, no default
- * changed, no choice or bound narrowed, no value the release took is refused
- * or read differently, a key a project configuration could set still can,
- * one only the user could set still cannot and every published container
- * parameter keeps its value, for the default configuration and for each
- * profile, unless `accepted-differences.php` accepts the change. A new path
- * must be documented.
+ * Checks that this tree's bundle configuration, default and per profile, is a
+ * compatible superset of the one recorded from the last release
+ * (`Fixture/<X.Y.Z>.json`): no path gone, no default changed, nothing narrowed
+ * or read differently, each key's project-config reach unchanged and every
+ * published container parameter kept, unless `accepted-differences.php`
+ * accepts the change. A new path must be documented.
  */
 final class ConfigurationCompatibilityTest extends TestCase
 {

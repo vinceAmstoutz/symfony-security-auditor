@@ -14,9 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 /**
- * Attempts to assemble the audit command exactly the way `audit` does at
- * startup, without running it, so a preflight can report why an audit would
- * fail to boot before one is attempted.
+ * Assembles the audit command as `audit` does at startup, without running it.
+ * `failureReason()` says why it fails to boot, null when it boots.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

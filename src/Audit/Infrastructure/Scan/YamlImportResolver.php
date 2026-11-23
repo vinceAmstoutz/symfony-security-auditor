@@ -18,11 +18,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\UnreadableYamlException;
 
 /**
- * The files of the scan a YAML configuration file imports: the `resource` of
- * each `imports` entry, read relative to the importing file, with at most one
- * `*` in the file name. Only files the scan already holds can match, so an
- * import never reaches outside the project and nothing is read from the
- * disk; each import looks among the files of the one folder it names.
+ * The scanned files a YAML configuration file imports: each `imports`
+ * resource, relative to the importing file, with at most one `*` in its file
+ * name. Matches only files the scan holds, so an import never reaches outside
+ * the project or reads the disk.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -74,8 +73,7 @@ final readonly class YamlImportResolver
     }
 
     /**
-     * One `*` is read as a wildcard, so matching stays linear in the length
-     * of the name whatever the repository writes.
+     * Reads one `*` as a wildcard. A pattern with more matches nothing.
      */
     private static function nameMatches(string $pattern, string $name): bool
     {
@@ -89,9 +87,8 @@ final readonly class YamlImportResolver
     }
 
     /**
-     * The production kernel reads the imports of the root block, then those
-     * of the `when@prod` block; a `when@test` or `when@dev` block imports
-     * nothing in production.
+     * The imports of the root block, then those of the `when@prod` block, as
+     * the production kernel reads them.
      *
      * @param array<mixed> $document
      *

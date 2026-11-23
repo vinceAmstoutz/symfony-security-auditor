@@ -16,9 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolDefinitionException;
 
 /**
- * Provider-agnostic description of a tool the LLM may call. The infrastructure
- * adapter is responsible for translating this into the wire format expected by
- * the chosen platform (Anthropic, OpenAI, Mistral, …).
+ * Provider-agnostic description of a tool the LLM may call.
  */
 final readonly class ToolDefinition
 {

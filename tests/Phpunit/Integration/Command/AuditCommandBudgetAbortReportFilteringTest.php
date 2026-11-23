@@ -55,11 +55,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\BudgetAbortingPipeline;
 
 /**
- * Drives {@see AuditCommand} with a pipeline that adds one already-validated
- * finding and then throws `BudgetExceededException`, to verify the partial
- * report `handleBudgetAbort()` writes is shaped by the same finding-type
- * filter and baseline suppression a completed run applies, not written out
- * raw.
+ * Checks that the partial report {@see AuditCommand} writes on a budget abort
+ * goes through the finding-type filter and baseline suppression a completed
+ * run applies.
  */
 final class AuditCommandBudgetAbortReportFilteringTest extends TestCase
 {

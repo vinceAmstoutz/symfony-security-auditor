@@ -18,22 +18,17 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
 
 /**
  * Renders the {@see SymfonyMapping} sections of the attacker user message:
- * the route access-control map (with firewall-coverage and LACKS markers),
- * voter coverage and form bindings. Empty mappings render as empty strings
- * so the surrounding prompt collapses cleanly.
+ * the route access-control map, voter coverage and form bindings. An empty
+ * mapping renders as an empty string.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class SymfonyMappingContextRenderer
 {
     /**
-     * `access_control` role tokens that grant access to everyone: the
-     * `PUBLIC_ACCESS` attribute, its deprecated predecessor
-     * `IS_AUTHENTICATED_ANONYMOUSLY` and the `PUBLIC` marker
-     * {@see SymfonyYamlSecurityConfigParser} records for a requirement-less
-     * rule. A route reachable only through such a rule is not protected by the
-     * firewall at all, so it must not be presented as `COVERED_BY`: that would
-     * tell the attacker model to skip a genuinely unauthenticated route.
+     * The `access_control` roles that grant access to everyone, including the
+     * `PUBLIC` marker {@see SymfonyYamlSecurityConfigParser} records for a
+     * rule with no requirement. A route they govern is never `COVERED_BY`.
      *
      * @var list<string>
      */
@@ -168,8 +163,8 @@ final readonly class SymfonyMappingContextRenderer
     }
 
     /**
-     * The roles of the `access_control` rule that governs each route, the
-     * routes of one application matched against its rules together.
+     * The roles of the `access_control` rule that governs each route, matched
+     * against the rules of the route's own application.
      *
      * @param list<RouteAccessControl> $routeAccessControls
      *
@@ -217,14 +212,8 @@ final readonly class SymfonyMappingContextRenderer
     }
 
     /**
-     * `PhpParserControllerAccessControlParser` emits a `RouteAccessControl`
-     * entry for every public method on a controller-like class, not just its
-     * routed actions: a plain constructor or helper method still gets one,
-     * with `hasRouteAttribute() === false`. Rendering those would tag every
-     * such method `LACKS_ACCESS_CHECK` even though it is not an HTTP action
-     * at all, injecting a false-positive `broken_access_control` candidate
-     * for virtually every controller (which almost always has a
-     * constructor).
+     * Leaves out the public methods that are no routed action, such as a
+     * constructor, which would otherwise read `LACKS_ACCESS_CHECK`.
      *
      * @return list<RouteAccessControl>
      */
@@ -249,9 +238,8 @@ final readonly class SymfonyMappingContextRenderer
     }
 
     /**
-     * Every list rendered from the audited repository is repeated in each
-     * chunk prompt, so it is cut at a number of items and of bytes. A cut
-     * list ends with `… and N more`.
+     * Cuts the list at a number of items and of bytes, ending a cut list with
+     * `… and N more`.
      *
      * @param list<string> $values
      *
@@ -305,12 +293,9 @@ final readonly class SymfonyMappingContextRenderer
     }
 
     /**
-     * A matched `access_control` rule protects a route only if it actually
-     * restricts access. When no rule matches, or the matching one grants
-     * {@see self::PUBLIC_ACCESS_PSEUDO_ROLES public access}, the route is
-     * reachable by anyone, so it is tagged `LACKS_ACCESS_CHECK` rather than
-     * suppressed as `COVERED_BY`. When the matcher cannot tell which rule
-     * governs the route, it is tagged as unknown, never as covered.
+     * Tags a route no rule governs, or one whose rule grants
+     * {@see self::PUBLIC_ACCESS_PSEUDO_ROLES public access}, `LACKS_ACCESS_CHECK`
+     * and one whose rule cannot be told unknown, never covered.
      *
      * @param list<string>|false|null $firewallRoles
      */
@@ -338,12 +323,8 @@ final readonly class SymfonyMappingContextRenderer
     }
 
     /**
-     * Every value rendered here (a file path, a class name, or a raw
-     * `#[IsGranted("...")]` attribute-argument string literal collected by
-     * the AST parsers) comes from the audited (untrusted) project, not from
-     * us. A raw embedded `\n` or bare `\r` would let a crafted value forge a
-     * fake `##`-prefixed section (e.g. the literal `## Source Code` heading
-     * further down the attacker prompt) as unguarded top-level prompt text.
+     * Folds line breaks, so a value from the audited project cannot forge a
+     * `##` section of the prompt.
      */
     private static function sanitizeLine(string $value): string
     {

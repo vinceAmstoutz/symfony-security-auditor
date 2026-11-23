@@ -16,10 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat;
 use JsonException;
 
 /**
- * The digest a recorder writes into the fixture it records, over everything
- * else the fixture holds. A fixture is only ever recorded from a release, so
- * a digest that no longer matches means it was edited by hand: record it
- * again instead.
+ * The digest a recorder writes into a fixture over everything else it holds. A
+ * mismatch means the fixture was edited by hand: record it again instead.
  */
 final readonly class FixtureSeal
 {

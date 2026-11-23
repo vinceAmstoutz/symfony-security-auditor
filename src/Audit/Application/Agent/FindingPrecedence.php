@@ -62,8 +62,8 @@ final readonly class FindingPrecedence
     }
 
     /**
-     * Whether the challenger differs from the validated findings it replaces by
-     * nothing but a higher confidence, which is no new information.
+     * Tells whether every finding the challenger replaces is validated with
+     * its severity and type, so it outranks them on confidence alone.
      *
      * @param list<Vulnerability> $replaced
      */

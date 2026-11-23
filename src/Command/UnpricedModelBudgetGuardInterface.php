@@ -21,17 +21,15 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 interface UnpricedModelBudgetGuardInterface
 {
     /**
-     * Warns when a configured model has no published price (cost reporting will
-     * read `$0.00` for it). When a cost budget is also set the guard cannot
-     * enforce it, so it prompts interactively and returns `false` (fail closed)
-     * under `--no-interaction`. Returns `true` to let the run proceed.
+     * Warns when a configured model has no published price. With a cost budget
+     * set, which then cannot be enforced, it asks for confirmation and returns
+     * false under `--no-interaction`.
      */
     public function permitsRun(InputInterface $input, SymfonyStyle $symfonyStyle): bool;
 
     /**
-     * The entry point with nobody to confirm (the MCP server) runs as it did
-     * before the guard existed (the cap never trips for an unpriced model)
-     * and says so in the log instead of refusing.
+     * Logs that the cost budget cannot be enforced on an unpriced model, for
+     * an entry point with nobody to confirm, such as the MCP server.
      */
     public function warnWhenBudgetCannotBeEnforced(LoggerInterface $logger): void;
 }

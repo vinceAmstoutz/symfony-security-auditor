@@ -14,9 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 /**
- * One entry of a baseline file: its accepted fingerprint(s) plus the raw
- * decoded payload, preserved verbatim so merging never loses hand-written
- * keys such as `reason`.
+ * One entry of a baseline file, with its raw decoded payload kept verbatim so
+ * a merge keeps hand-written keys such as `reason`.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -32,8 +31,7 @@ final readonly class BaselineEntry
     ) {}
 
     /**
-     * The file the accepted finding was reported in, when the entry names one:
-     * a legacy entry is a bare fingerprint.
+     * The file the entry names, null for a bare fingerprint.
      */
     public function file(): ?string
     {
@@ -43,9 +41,8 @@ final readonly class BaselineEntry
     }
 
     /**
-     * A redundant `attacker_fingerprint` equal to its own `fingerprint` must
-     * not grant a count-aware budget of 2 credits for what is really just 1
-     * accepted occurrence.
+     * Lists an `attacker_fingerprint` equal to the `fingerprint` once, so the
+     * entry still accepts one occurrence.
      *
      * @return list<string>
      */

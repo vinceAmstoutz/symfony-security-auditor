@@ -16,10 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Renders the product identity banner. Exactly one collaborator per entry
- * point owns it: the audit command in a bundle install and the application
- * itself in the standalone binary, where the audit command is handed a
- * `NullConsoleBanner` so the two can never both print one.
+ * Renders the product identity banner. One collaborator per entry point owns
+ * it: the audit command in a bundle, the application in the standalone
+ * binary, whose audit command gets a `NullConsoleBanner`.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

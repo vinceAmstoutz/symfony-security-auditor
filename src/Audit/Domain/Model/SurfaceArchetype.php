@@ -15,22 +15,15 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
  * The framework-neutral shape of a scanned file: what it *does* in an
- * application, stripped of the vocabulary of any one framework.
- *
- * {@see ProjectFileType} stays the precise, framework-specific taxonomy that
- * prompts and skill lookup need. This is the coarser axis core logic switches
- * on, so that logic does not have to name a Symfony concept to ask a structural
- * question. A PHP enum cannot be extended, so a second framework's taxonomy will
- * map onto these same archetypes rather than widening `ProjectFileType`.
+ * application. {@see ProjectFileType} stays the precise taxonomy for prompts
+ * and skill lookup.
  */
 enum SurfaceArchetype: string
 {
     /**
-     * A route-guarded action surface, deliberately narrow. A file whose
-     * requests arrive through a transport rather than a route (a webhook
-     * consumer, a queue worker) is an {@see self::ASYNC_HANDLER}, because this
-     * archetype is what decides which files reach the access-control and
-     * form-binding maps.
+     * A route-guarded action surface: the files that reach the access-control
+     * and form-binding maps. A file reached through a transport rather than a
+     * route is an {@see self::ASYNC_HANDLER}.
      */
     case HTTP_ENTRYPOINT = 'http_entrypoint';
 

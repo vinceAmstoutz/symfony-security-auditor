@@ -63,9 +63,8 @@ final class AuditReportTest extends TestCase
     }
 
     /**
-     * `BaselineProcessor` needs this to avoid re-spending, at the final-report
-     * stage, a baseline credit `AuditOrchestrator` already spent skipping a
-     * finding before it ever reached the reviewer.
+     * `BaselineProcessor` reads them so it never re-spends a credit
+     * `AuditOrchestrator` already spent.
      *
      * @throws InvalidAuditContextException
      */
@@ -1306,10 +1305,6 @@ final class AuditReportTest extends TestCase
     }
 
     /**
-     * `hasNoVerdict()` answers as it did in 1.21.0: it knows a run that
-     * analyzed none of its files and found nothing, not a scan that found no
-     * file at all.
-     *
      * @throws InvalidAuditContextException
      */
     public function test_has_no_verdict_means_a_run_that_analyzed_none_of_its_files_not_a_scan_that_found_none(): void
@@ -1404,9 +1399,8 @@ final class AuditReportTest extends TestCase
     }
 
     /**
-     * A response cut short keeps the findings it recorded while its chunk is
-     * recorded as errored, so a run can hold a finding without having fully
-     * analyzed any file: that is a partial run, never one without a verdict.
+     * A response cut short keeps its findings while its chunk is recorded as
+     * errored: a partial run, never one without a verdict.
      *
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException

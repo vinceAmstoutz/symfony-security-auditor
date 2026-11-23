@@ -37,14 +37,9 @@ final readonly class XdgConfigPathResolver
     ) {}
 
     /**
-     * `SYMFONY_SECURITY_AUDITOR_HOME` is a tool-specific home that outranks the
-     * XDG variables and `$HOME`, so a container whose base image hijacks
-     * `XDG_CONFIG_HOME` to a root-owned directory (e.g. Caddy/FrankenPHP's
-     * `/config`) can still redirect the config, cache and bridge dirs to a
-     * writable location. XDG variables win over the OS home; on Windows the
-     * base directories fall back to the native `%APPDATA%` (config) and
-     * `%LOCALAPPDATA%` (cache/data) locations, with `%USERPROFILE%` as the
-     * home, since Windows has no `$HOME`/XDG dirs.
+     * `SYMFONY_SECURITY_AUDITOR_HOME` outranks the XDG variables, which outrank
+     * `$HOME`. On Windows, `%APPDATA%` and `%LOCALAPPDATA%` stand in for the
+     * XDG variables and `%USERPROFILE%` for `$HOME`.
      *
      * @param array<string, string> $environment
      */
@@ -94,12 +89,8 @@ final readonly class XdgConfigPathResolver
     }
 
     /**
-     * The XDG Base Directory Specification requires every one of these
-     * variables to hold an absolute path and says implementations "may
-     * consider" a relative value invalid. This treats it as unset (falling
-     * back to `$home`) rather than resolving paths relative to whatever the
-     * process's current working directory happens to be, e.g. an audited
-     * project directory the standalone binary is invoked from.
+     * Treats a relative XDG variable as unset, never resolving it against the
+     * working directory, which may be the audited project.
      *
      * @throws UnresolvableConfigPathException
      */
@@ -112,9 +103,8 @@ final readonly class XdgConfigPathResolver
     }
 
     /**
-     * Why the `SYMFONY_SECURITY_AUDITOR_HOME` override cannot be used, or null
-     * when it can or is not set, for a caller that would otherwise read the
-     * refusal as no directory at all.
+     * Returns why the `SYMFONY_SECURITY_AUDITOR_HOME` override cannot be used,
+     * or null when it can or is not set.
      */
     public function applicationHomeRefusal(): ?string
     {
@@ -128,10 +118,8 @@ final readonly class XdgConfigPathResolver
     }
 
     /**
-     * Unlike `$HOME` or an XDG variable, the override is only ever set on
-     * purpose, so a relative one is refused rather than skipped: falling back
-     * would quietly put the config back in the root-owned directory it was set
-     * to escape.
+     * Refuses a relative override rather than skipping it, unlike a relative
+     * `$HOME` or XDG variable.
      *
      * @throws UnresolvableConfigPathException
      */
@@ -149,9 +137,8 @@ final readonly class XdgConfigPathResolver
     }
 
     /**
-     * A relative `$HOME` gets the same treatment as a relative XDG variable:
-     * resolving it against the audited project's directory would put the
-     * config, the credentials and the cache inside the repository.
+     * Ignores a relative `$HOME`, which would put the config, the credentials
+     * and the cache inside the audited project.
      */
     private function osHomeBase(string $homeRelativeFallback): ?string
     {
@@ -166,14 +153,8 @@ final readonly class XdgConfigPathResolver
     }
 
     /**
-     * `Symfony\Component\Filesystem\Path::isAbsolute()` only recognizes a
-     * Windows drive-letter path (`C:\...`/`C:/...`) as absolute when the
-     * *current* runtime's `DIRECTORY_SEPARATOR` is itself `\`, but
-     * {@see self::fromEnvironment()} deliberately builds a Windows-shaped
-     * instance from a `Windows` `$osFamily` argument regardless of the OS
-     * actually running the process (see the Windows-environment test suite),
-     * so an OS-runtime-dependent check would wrongly reject a genuine
-     * absolute `%APPDATA%`-derived path on a non-Windows CI runner.
+     * Recognizes a Windows drive path on every OS, unlike `Path::isAbsolute()`:
+     * {@see self::fromEnvironment()} builds a Windows instance anywhere.
      */
     private function isAbsolutePath(string $path): bool
     {

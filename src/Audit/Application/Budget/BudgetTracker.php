@@ -18,13 +18,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 
 /**
- * Tracks cumulative token and cost usage against an `AuditBudget`.
- *
- * The LLM client calls `recordCall()` after every successful platform call,
- * then `assertWithinBudget()` to abort the run if the configured cap is now
- * exceeded. The call that exceeds the cap still completes (its tokens are
- * recorded); the next call is what gets refused (predictable for users
- * reasoning about partial reports).
+ * Tracks cumulative token and cost usage against an `AuditBudget`. The call
+ * that crosses the cap is still recorded; `assertWithinBudget()` then refuses
+ * the next one.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -81,12 +77,8 @@ final class BudgetTracker
     }
 
     /**
-     * Per-model totals for the run, so a report can tell a model that priced
-     * to zero because it is unlisted from one that simply went unused. The
-     * aggregate cannot: a priced attacker paired with an unpriced reviewer
-     * still sums to a nonzero total. Each configured model also names the
-     * models its calls were billed as, in first-billed order, since a gateway
-     * or an alias can answer under another id.
+     * Returns the run's totals per configured model, each naming the models
+     * its calls were billed as, in first-billed order.
      *
      * @return array<string, array{model: string, input_tokens: int, output_tokens: int, cache_read_tokens: int, cache_creation_tokens: int, estimated_cost_usd: float, billed_models: list<string>}>
      */
@@ -123,8 +115,8 @@ final class BudgetTracker
     }
 
     /**
-     * A call cut before its answer ended, which the provider may bill beyond
-     * the usage it reported: the cost booked is then a minimum.
+     * Marks the booked cost as a minimum after a call cut before its answer
+     * ended, which the provider may bill beyond the usage it reported.
      */
     public function recordInterruptedCall(): void
     {

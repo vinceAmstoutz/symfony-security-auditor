@@ -16,12 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
 /**
- * The one sentence every human-facing renderer shows in place of its "no
- * vulnerabilities found" line when some file could not be fully analyzed, so no format
- * can present an aborted or partly failed run as a clean result. A dry run
- * makes no LLM call and names no failed file, so it says that none was
- * analyzed. A scan that found no file has nothing to analyze and no verdict
- * and says so rather than let an empty report read as a clean one.
+ * The sentence every human-facing renderer shows in place of its "no
+ * vulnerabilities found" line when some file was not fully analyzed, so no
+ * format presents a failed run as clean. It also names a dry run (which
+ * analyzes no file) and a scan that found none.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

@@ -155,10 +155,7 @@ final class ReviewerMessageRendererTest extends TestCase
     }
 
     /**
-     * `\n` is stripped by {@see ReviewerMessageRenderer::sanitizeFilePath()},
-     * but a bare `\r` is a raw newline PHP source and a terminal alike honor:
-     * left unstripped it can forge the same fake standalone instruction
-     * paragraph as an unstripped `\n`.
+     * A bare `\r` could forge a fake instruction paragraph as `\n` can.
      *
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException

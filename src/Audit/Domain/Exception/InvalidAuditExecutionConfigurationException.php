@@ -23,11 +23,8 @@ final class InvalidAuditExecutionConfigurationException extends InvalidArgumentE
     }
 
     /**
-     * PHP 8.5 emits a warning when a NAN/INF float is coerced to string (e.g.
-     * through `sprintf('%s', ...)`), which the test suite's `failOnWarning`
-     * turns into a failure. Rendering each non-finite case as an explicit
-     * literal keeps the `(string)` cast on finite values only, so the message
-     * stays identical without ever triggering the coercion.
+     * Writes NAN and INF as literals: PHP 8.5 warns when it casts a non-finite
+     * float to string.
      */
     private static function render(float $minConfidence): string
     {

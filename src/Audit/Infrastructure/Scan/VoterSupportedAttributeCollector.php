@@ -62,13 +62,9 @@ final readonly class VoterSupportedAttributeCollector
     }
 
     /**
-     * Resolves `self::EDIT`/`static::EDIT` fetches in `$body` against the
-     * voter's own class constants: the canonical Symfony voter pattern
-     * (`const EDIT = 'edit'; ... in_array($attribute, [self::EDIT, ...])`)
-     * has no bare string literal for `collectStringLiterals()` to find. A
-     * constant naming an array of strings (`const SUPPORTED = ['edit', ...];
-     * ... in_array($attribute, self::SUPPORTED, true)`) resolves to every
-     * string element it holds.
+     * Resolves the `self::EDIT` and `static::EDIT` fetches of `$body` against
+     * the voter's own constants. A constant holding an array of strings
+     * resolves to each of them.
      *
      * @param array<Node>                 $body
      * @param array<string, list<string>> $constantValues
@@ -87,8 +83,7 @@ final readonly class VoterSupportedAttributeCollector
 
     /**
      * The names of the own constants `$body` fetches, each once, in the order
-     * they are first fetched, so a constant fetched thousands of times is
-     * expanded once, not once per fetch.
+     * they are first fetched.
      *
      * @param array<Node> $body
      *

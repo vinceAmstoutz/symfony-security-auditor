@@ -37,15 +37,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPacka
 use function Symfony\Component\String\b;
 
 /**
- * Preflight for the standalone binary: confirms the configuration resolves
- * (file present, valid, provider selected, API-key variable set), the provider
- * bridge is installed *and actually boots the audit for the configured
- * provider* (a leftover bridge from a previously configured provider passes a
- * file-existence check but not a boot; a tree built for another
- * `symfony/ai-platform` is not even loaded) and `composer` is reachable: the
- * prerequisites for a successful audit run. The boot probe is skipped while
- * the configuration check fails, so a config problem is reported once, by the
- * check that owns it.
+ * Preflight for the standalone binary: the configuration resolves, the
+ * provider bridge is installed and boots the audit for the configured
+ * provider, `composer` is reachable and the pricing catalog is found. The boot
+ * probe is skipped while the configuration check fails.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -106,9 +101,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
     }
 
     /**
-     * Naming the key that resolved is what turns "it works" into an answer:
-     * a machine with a stale export and a freshly stored key looks identical
-     * otherwise, right up to the provider rejecting the run.
+     * Names the API key that resolved by its masked preview and fingerprint.
      */
     private function resolvedConfigurationDetail(StandaloneConfig $standaloneConfig): string
     {
@@ -135,8 +128,8 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
     }
 
     /**
-     * Reported whether or not the configuration resolves: the binary leaves
-     * such a tree unloaded, so no configuration fix would make it boot.
+     * Runs whether or not the configuration resolves: the binary never loads a
+     * stale tree.
      */
     private function staleBridgeTreeCheck(BridgeTree $bridgeTree): ?DoctorCheckResult
     {
@@ -163,9 +156,8 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
     }
 
     /**
-     * The reason is an arbitrary `Throwable` message from the boot probe and
-     * may contain non-UTF-8 bytes (paths, quoted file contents), so it is
-     * handled byte-safely: `u()` would throw on it and mask the diagnosis.
+     * Reads the reason as bytes: it may hold invalid UTF-8, on which `u()`
+     * throws.
      */
     private function bootFailureDetail(string $failureReason): string
     {
@@ -186,10 +178,8 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
     }
 
     /**
-     * Names the catalog file actually in use rather than only the packaged
-     * version: once `self-update` has refreshed the catalog, the run reads an
-     * override and reporting the package version alone would describe a file
-     * the audit is not pricing from.
+     * Names the catalog file in use, the refreshed one once `self-update` has
+     * written it.
      */
     private function pricingCatalogCheck(): DoctorCheckResult
     {
@@ -203,10 +193,8 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
     }
 
     /**
-     * The package version describes the packaged catalog and nothing else. A
-     * `self-update` refresh writes an override whose contents come from
-     * upstream `main` at refresh time, so stamping the bundled version onto it
-     * would assert a version that file does not have.
+     * Gives a refreshed catalog no package version, which describes only the
+     * packaged one.
      */
     private function pricingCatalogDetail(string $catalogPath): string
     {

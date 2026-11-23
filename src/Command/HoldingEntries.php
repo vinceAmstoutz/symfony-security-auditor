@@ -15,9 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 /**
  * The baseline entries that hold a finding under one of its former names
- * ({@see FormerFindingNames}), looked up by name instead of by matching the
- * finding against every entry. Of the entries sharing a fingerprint, only the
- * first one is kept: a finding spends a fingerprint's credit, not one entry.
+ * ({@see FormerFindingNames}). Of the entries sharing a fingerprint, only the
+ * first counts: a finding spends a fingerprint's credit, not one entry.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

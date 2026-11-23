@@ -16,18 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 
 /**
- * A project value is echoed back (a model name in the pricing warning, a
- * rejected value in a validation error) and handed to the container, so a
- * value that is not plain text (an escape sequence, a line a CI runner would
- * read as a workflow command, a spoofed line direction) is refused and so is
- * a value or key the container would resolve (`%env(VAR)%`), which would read
- * the user's environment into a setting the repository chose. A double colon
- * is refused too, since the console wraps a long message wherever it likes
- * and a runner reads a line that starts with one as a workflow command. A
- * model name must be a model id alone: request options after `?` and path
- * segments reach the provider as written, so `tool_choice` or `server_tools`
- * would silence or widen the audit on the user's key. No setting a project
- * file may set needs any of them.
+ * Refuses a project value or key that is not plain text, that a CI runner
+ * could read as a workflow command (`::`, `##[`) or that the container would
+ * resolve (`%env(VAR)%`). Refuses a model name that is not a bare model id:
+ * request options after `?` and path segments reach the provider as written.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -42,7 +34,7 @@ final readonly class ProjectConfigValueGuard
     private const string MODEL_ID = '/^(?!.*(?:\.\.|\/\/))[A-Za-z0-9._:\/@+-]*$/';
 
     /**
-     * Run before any other guard, since each of them may quote a key back.
+     * Runs before any other guard, since each may quote a key back.
      *
      * @param array<array-key, mixed> $projectConfig
      * @param list<array-key>         $parentPath
@@ -84,8 +76,8 @@ final readonly class ProjectConfigValueGuard
     }
 
     /**
-     * A list node handed a map keeps its keys and the container resolves
-     * keys as it does values; `symfony/config` quotes an unknown key back.
+     * Keys are checked like values: the container resolves them too and
+     * `symfony/config` quotes an unknown one back.
      *
      * @param list<array-key> $parentPath
      *

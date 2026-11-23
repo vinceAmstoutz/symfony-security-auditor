@@ -21,9 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
 
 /**
- * Builds a fresh ToolRegistry pre-loaded with the project's scanned files, so
- * tools like read_file / grep / list_files can answer the LLM's questions
- * without re-walking the filesystem.
+ * Builds a ToolRegistry whose file tools answer from the scanned files.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

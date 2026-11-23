@@ -136,10 +136,7 @@ final class FilesystemReviewerCacheTest extends TestCase
     }
 
     /**
-     * The feedback section of the reviewer prompt changed in 1.21, so a verdict
-     * cached under feedback is keyed under a new feedback version: those runs
-     * review their findings once more, while a run without feedback (whose
-     * prompt did not change) keeps its cache.
+     * A run without feedback keeps its cached verdicts.
      *
      * @throws InvalidCacheConfigurationException
      * @throws InvalidCodeLocationException
@@ -208,9 +205,6 @@ final class FilesystemReviewerCacheTest extends TestCase
      */
     public function test_get_hits_for_a_distinct_finding_object_with_identical_content(): void
     {
-        // Two separately-created findings with identical content reuse the same
-        // verdict: the key is derived from content, not object identity. (The
-        // key-format test pins that the non-deterministic `id` is excluded.)
         $vulnerability = $this->makeVulnerability('src/A.php', title: 'same');
         $twin = $this->makeVulnerability('src/A.php', title: 'same');
         $review = ['accepted' => false, 'reviewer_notes' => 'mitigated'];
@@ -502,12 +496,8 @@ final class FilesystemReviewerCacheTest extends TestCase
     }
 
     /**
-     * A cache path is derived entirely from the finding's own content
-     * (attacker-influenced file paths/descriptions), so a malicious
-     * contributor can pre-plant a symlink at the exact path this cache will
-     * ever read from (with no `store()` ever called), turning a routine
-     * cached-run into an arbitrary-file read whose content is trusted as a
-     * real, previously-computed verdict.
+     * A contributor can predict the cache path, so a pre-planted symlink would
+     * turn a cached run into an arbitrary-file read trusted as a verdict.
      *
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException

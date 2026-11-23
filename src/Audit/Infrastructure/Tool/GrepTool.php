@@ -135,9 +135,8 @@ final readonly class GrepTool implements ToolInterface
     }
 
     /**
-     * Matches on bytes: a file that is not valid UTF-8 (a Latin-1 comment, an
-     * embedded blob) must not fail the whole search and its matched line is
-     * scrubbed so the tool result stays valid JSON for the provider.
+     * Matches on bytes and scrubs each matched line to valid UTF-8, so a file
+     * that is not UTF-8 neither fails the search nor breaks the tool result.
      *
      * @return iterable<string>
      */
@@ -153,12 +152,6 @@ final readonly class GrepTool implements ToolInterface
         }
     }
 
-    /**
-     * A single matched line's length is otherwise unbounded: audited-project
-     * content fully controls it (e.g. a long inline base64/SVG blob or config
-     * value). Unlike {@see MAX_MATCHES}, capping the match count alone
-     * does nothing to bound a single oversized line sent to the LLM.
-     */
     private function truncateLine(string $line): string
     {
         if (\strlen($line) <= self::MAX_LINE_LENGTH) {

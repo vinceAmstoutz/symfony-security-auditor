@@ -20,21 +20,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 /**
  * @internal not part of the BC promise, see docs/versioning.md
  *
- * Tells whether a file's brackets nest shallowly enough for nikic/php-parser
- * to build and walk its AST. A file a few tens of kilobytes long whose
- * brackets nest about ten thousand levels deep (`f(f(f(…)))`, `[[[…]]]`) is
- * inside the file-size cap yet crashes the process when the AST is destroyed
- * (from 10,041 nested arrays, calls or closures with an 8 MiB stack), which a
- * `catch (Throwable)` does not intercept. The bar keeps half that depth for a
- * smaller stack; PHP's own compiler refuses calls and blocks nested about
- * 4,990 deep and real code stays far below either.
- * The depth is read from PHP's own token stream, so brackets inside string
- * literals, comments and inline HTML are not counted. Operator chains such as
- * `1+1+1+…` and `$a->b->c->…` nest the AST without nesting any bracket and
- * are not measured here. A file {@see UnmatchedClosers} says would stall PHP's
- * lexer is refused before it is tokenized at all, since that lexer takes
- * seconds on a few thousand stray closers and minutes on a few tens of
- * thousands.
+ * Tells whether a file's brackets nest shallowly enough for nikic/php-parser:
+ * freeing the AST of brackets nested about 10,000 deep crashes PHP, past any
+ * `catch`. Brackets in strings, comments and inline HTML do not count. Refuses
+ * a file {@see UnmatchedClosers} says would stall PHP's lexer before
+ * tokenizing it.
  */
 final readonly class NestingDepthGuard
 {

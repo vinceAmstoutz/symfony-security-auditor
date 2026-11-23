@@ -27,10 +27,8 @@ use WeakMap;
 final readonly class AttackerPromptBuilder implements ProfileAwareAttackerPromptBuilderInterface
 {
     /**
-     * Wire-format version of the prompt this builder emits. Folded into the
-     * attacker cache key so that a wording change automatically invalidates
-     * previously-cached LLM responses. Bump whenever the prompt structure or
-     * skill blocks change in a way the LLM is expected to react to.
+     * Part of the attacker cache key: bump it when a prompt change should
+     * invalidate the cached answers.
      */
     public const int PROMPT_VERSION = 20;
 
@@ -57,10 +55,7 @@ final readonly class AttackerPromptBuilder implements ProfileAwareAttackerPrompt
     public const bool DEFAULT_EMIT_ALL_SKILLS = false;
 
     /**
-     * The route access-control map of every mapping this builder has seen,
-     * dropped with it: matching each route against the repository's
-     * `access_control` patterns is the costly part of a user message and
-     * every chunk of a run shares the run's mapping.
+     * The rendered route access-control map of each mapping, dropped with it.
      *
      * @var WeakMap<SymfonyMapping, string>
      */
@@ -177,11 +172,8 @@ final readonly class AttackerPromptBuilder implements ProfileAwareAttackerPrompt
     }
 
     /**
-     * A scanned file's path comes from the audited project's filesystem, not
-     * from us: a POSIX filename may contain a raw newline, which would
-     * otherwise let a crafted filename forge a fake `##`-prefixed section
-     * (e.g. the literal `## Source Code` heading further down this prompt)
-     * as unguarded top-level prompt text.
+     * Folds line breaks, so a crafted file name cannot forge a `##` section of
+     * the prompt.
      */
     private static function sanitizePathLine(string $path): string
     {

@@ -16,11 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditBudgetException;
 
 /**
- * Immutable budget constraint for an audit run.
- *
- * `null` for either limit means "no cap" on that dimension. Use named factories
- * to express intent at the construction site (`unlimited()`, `forTokens()`,
- * `forCost()`, `forBoth()`) instead of remembering positional arguments.
+ * The token and cost caps of an audit run. A null cap is no cap.
  */
 final readonly class AuditBudget
 {

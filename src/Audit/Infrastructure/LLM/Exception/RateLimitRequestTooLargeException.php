@@ -16,10 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exceptio
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 
 /**
- * Thrown when a single request's estimated input tokens exceed the entire
- * rate-limit window: the request can never fit, no amount of waiting helps.
- * Extends `LLMRequestTooLargeException` so the chunk analyzers split the
- * chunk the same way they do for a prompt the model itself refuses.
+ * Thrown when one request's estimated input tokens exceed the whole
+ * rate-limit window, which no wait fixes. The chunk analyzers split its chunk
+ * as for any `LLMRequestTooLargeException`.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

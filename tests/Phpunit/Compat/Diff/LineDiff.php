@@ -42,9 +42,9 @@ final readonly class LineDiff
     }
 
     /**
-     * Walks both sequences along their longest common subsequence: a pair of
-     * indexes for an item both hold, the recorded index alone for an item the
-     * replay lost, the replayed index alone for one it gained.
+     * Returns, along the longest common subsequence, a pair of indexes for an
+     * item both hold, the recorded index alone for an item the replay lost and
+     * the replayed index alone for one it gained.
      *
      * @param list<string> $recorded
      * @param list<string> $replayed

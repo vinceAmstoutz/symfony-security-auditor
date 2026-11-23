@@ -557,7 +557,6 @@ final class StagesTest extends TestCase
         $mappingStage = new MappingStage(new NullLogger(), new NullControllerAccessControlParser(), new NullVoterCapabilityParser(), new NullFormBindingParser(), new NullSecurityConfigParser());
 
         $auditContext = AuditContext::forProject($this->tmpDir);
-        // No files set
 
         $mappingStage->process($auditContext);
 
@@ -1046,7 +1045,6 @@ final class StagesTest extends TestCase
     {
         $dependencyExpansionStage = new DependencyExpansionStage(new NullLogger(), 'direct');
         $auditContext = AuditContext::forProject($this->tmpDir, [], false, 'main');
-        // No mapping set
 
         $dependencyExpansionStage->process($auditContext);
 
@@ -1124,7 +1122,6 @@ final class StagesTest extends TestCase
 
         $auditStage = new AuditStage($this->makeOrchestrator($attackerLlm, $reviewerLlm), new NullLogger());
         $auditContext = AuditContext::forProject($this->tmpDir);
-        // No files, no mapping
 
         $auditStage->process($auditContext);
 
@@ -1148,7 +1145,6 @@ final class StagesTest extends TestCase
         $auditContext->setProjectFiles([
             ProjectFile::create('src/A.php', '/app/src/A.php', '<?php'),
         ]);
-        // Mapping NOT set
 
         $auditStage->process($auditContext);
 
@@ -1713,7 +1709,6 @@ final class StagesTest extends TestCase
         $auditContext->setProjectFiles([
             ProjectFile::create('src/A.php', '/app/src/A.php', '<?php'),
         ]);
-        // No mapping set
 
         $auditStage->process($auditContext);
     }

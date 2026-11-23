@@ -85,8 +85,8 @@ final readonly class IngestionStage implements StageInterface
     }
 
     /**
-     * What the scrubber redacted and the static pre-scan matched is queued as
-     * candidate findings for the reviewer and announced right away.
+     * Queues and announces what the scrubber redacted and the static pre-scan
+     * matched as candidate findings for the reviewer.
      *
      * @param list<ProjectFile> $files
      */
@@ -107,10 +107,8 @@ final readonly class IngestionStage implements StageInterface
     }
 
     /**
-     * The secret scrubber hands over a file it could not vouch for as a
-     * placeholder, so nothing in it can be analyzed: the file is recorded as
-     * errored, which marks the report incomplete instead of letting the
-     * blanked-out file pass as a clean one.
+     * Records as errored each file the secret scrubber withheld behind a
+     * placeholder, so the report is incomplete instead of passing it as clean.
      *
      * @param list<ProjectFile> $files
      */
@@ -125,18 +123,14 @@ final readonly class IngestionStage implements StageInterface
     }
 
     /**
-     * A file the scan matched and still left out is recorded under the `scan`
-     * stage. One over the size limit or unreadable is `skipped`, so the report
-     * lists it without gating on it: the report stays complete, as it did when
-     * such a file was silently dropped. One whose name or content cannot be
-     * read back one way only once its invalid UTF-8 is repaired is `errored`,
-     * so the run cannot pass as complete without it.
-     * Only the files the run was asked to cover are listed: `ScopedScan`
-     * hands over those under the `--path` scope only and for a `--since` run
-     * the ones not changed since the ref are left out here.
+     * Records under the `scan` stage each file the scan matched and left out:
+     * `skipped`, which does not make the report incomplete, when over the size
+     * limit or unreadable; `errored` when its name or content reads back two
+     * ways once its invalid UTF-8 is repaired. A `--since` run lists only the
+     * files changed since the ref.
      *
      * @param list<SkippedFile> $skippedFiles
-     * @param ?list<string>     $changed      the files changed since the ref; null for a run that is not a `--since` run
+     * @param ?list<string>     $changed      the files changed since the ref, null outside a `--since` run
      */
     private function recordSkippedFiles(array $skippedFiles, AuditContext $auditContext, ?array $changed): void
     {

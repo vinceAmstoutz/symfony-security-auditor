@@ -14,14 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 /**
- * Opt-in extension of {@see ProductionAwareSecurityConfigParserInterface} for
- * parsers that know the order in which the application loads those files. An
- * application applies the first access control rule that matches a request
- * and the rules come in load order, so a file loaded later never shadows a
- * rule of a file loaded earlier. Consumers check
- * `instanceof LoadOrderAwareSecurityConfigParserInterface` and keep the order
- * the scan listed the files in when it is not implemented, so adding this
- * capability never breaks an existing parser.
+ * Optional extension of {@see ProductionAwareSecurityConfigParserInterface},
+ * checked with `instanceof`: the order the application loads its
+ * configuration files in, which decides the first access control rule that
+ * matches. Without it, files keep the order the scan listed them in.
  */
 interface LoadOrderAwareSecurityConfigParserInterface extends ProductionAwareSecurityConfigParserInterface
 {

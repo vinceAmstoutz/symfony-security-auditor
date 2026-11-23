@@ -27,7 +27,7 @@ Update the relevant section in the same commit/PR whenever the project evolves. 
 | Layer conformance | deptrac (DDD layer rules + the `SymfonyProfile` framework boundary, in `deptrac.yaml`) |
 | Complexity | tomasvotruba/cognitive-complexity (function ≤ 7, class ≤ 40) |
 | Dead code | rector/swiss-knife (`check-commented-code`, `check-conflicts`) |
-| Style | PHP CS Fixer (@PER-CS3x0, @Symfony rulesets); Prettier for Markdown, one line per paragraph and list item, never hard-wrapped (`proseWrap: never`, checked by the Prettier Check job); no em dash and no comma before "and" in Markdown prose, PHP comments and docblocks (`.claude/rules/prose-style.md`, checked by `.github/scripts/check-prose.sh` in the Lint job) |
+| Style | PHP CS Fixer (@PER-CS3x0, @Symfony rulesets); Prettier for Markdown, one line per paragraph and list item, never hard-wrapped (`proseWrap: never`, checked by the Prettier Check job); no em dash and no comma before "and" in Markdown prose, PHP comments and docblocks (`.claude/rules/prose-style.md`), no multi-line `//` block, history or first person in PHP comments (`.claude/rules/no-comments.md`), both checked by `.github/scripts/check-prose.sh` in the Lint job |
 | CI/CD security | zizmor (static analysis for GitHub Actions: scans `.github/workflows/` + `action.yml`) |
 
 ## Build, Test & Lint Commands
@@ -277,5 +277,5 @@ Rules scoped to specific paths live in `.claude/rules/`:
 - [`llm-seam.md`](.claude/rules/llm-seam.md): `LLMClientInterface` boundary between Application and `symfony/ai`.
 - [`php-classes.md`](.claude/rules/php-classes.md): `final readonly`, interfaces/SOLID, single responsibility, Symfony components in `src/**`.
 - [`testing.md`](.claude/rules/testing.md): TDD red/green/refactor, stub vs mock, suite layout, mutation score.
-- [`no-comments.md`](.claude/rules/no-comments.md): no multi-line comment blocks; comments signal poorly-written code; fix the code instead.
+- [`no-comments.md`](.claude/rules/no-comments.md): no multi-line comment blocks; comments signal poorly-written code; fix the code instead. A docblock states only the contract the signature cannot say, in the present tense; `check-prose.sh` fails on multi-line `//` blocks, history and "we" in PHP comments.
 - [`prose-style.md`](.claude/rules/prose-style.md): no em dash and no comma before `and` in any text written here (Markdown, comments, commit messages, pull requests, printed output).

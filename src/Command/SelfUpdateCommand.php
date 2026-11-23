@@ -95,10 +95,8 @@ final readonly class SelfUpdateCommand
     }
 
     /**
-     * This command always reaches the release feed, so its answer supersedes
-     * whatever the throttled passive notice last cached; otherwise the notice
-     * keeps contradicting a version the user has just been shown. The notice
-     * only ever announces a release, so a snapshot answer is never cached.
+     * Replaces what the passive update notice cached with this answer, except
+     * a snapshot answer: the notice only announces releases.
      */
     private function refreshUpdateCheckCache(SelfUpdateResult $selfUpdateResult, ReleaseChannel $releaseChannel): void
     {
@@ -116,10 +114,8 @@ final readonly class SelfUpdateCommand
     }
 
     /**
-     * An update is only staged here: the binary is swapped as the process
-     * exits, once nothing more can be loaded from the archive being replaced,
-     * so the message says what has happened so far and the entry point
-     * reports a swap that then fails.
+     * An update is only staged: the binary is swapped as the process exits and
+     * the entry point reports a swap that fails.
      */
     private function report(SymfonyStyle $symfonyStyle, SelfUpdateResult $selfUpdateResult, ReleaseChannel $releaseChannel): int
     {

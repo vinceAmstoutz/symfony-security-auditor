@@ -14,13 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 /**
- * Whether the platform of one client still streams its answers: once a
- * stream ended without reporting its usage, the bill of a streamed answer is
- * unknown, so that client calls the platform without streaming for the rest
- * of the run.
+ * Whether one client still streams: once a stream ends without reporting its
+ * usage, the client stops streaming for the rest of the run.
  *
- * Not `readonly` because it remembers that verdict; see
- * `.claude/rules/php-classes.md` (stateful collaborator carve-out).
+ * Not `readonly`: it remembers that verdict (`.claude/rules/php-classes.md`).
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

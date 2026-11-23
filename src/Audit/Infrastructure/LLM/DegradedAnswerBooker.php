@@ -25,16 +25,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 
 /**
- * Books a failed call where it failed. A provider that answered, with
- * nothing usable (cut off by the output limit, withheld by a content filter,
- * or empty) or with a tool call whose arguments are not valid JSON, bills the
- * request it accepted, yet the run goes on past such an answer or retries it.
- * So it is booked against the budget, the report's token totals and the
- * rate-limit window: at the usage its raw answer reports, or at its estimated
- * input tokens when it reports none, the output it produced then unknown and
- * counted as none. A usage that reports no prompt tokens books the estimated
- * input tokens as its input, beside the output it reports. A call the
- * provider never answered only releases its rate-limit reservation.
+ * Books a failed call the provider answered (and billed) on the budget, the
+ * token totals and the rate-limit window: at the usage its raw answer
+ * reports, else at its estimated input tokens and no output. A call the
+ * provider never answered only releases its rate-limit reservation; one cut
+ * mid-answer is counted as interrupted.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -76,10 +71,6 @@ final readonly class DegradedAnswerBooker
         $this->logBooking($stopReason, $reportedUsage, $estimatedInputTokens);
     }
 
-    /**
-     * The share of the booked cache writes the provider keeps for an hour, as
-     * the raw answer reports it: none when no answer came back.
-     */
     private function oneHourCacheCreationTokens(?DeferredResult $deferredResult, TokenUsageSnapshot $tokenUsageSnapshot): int
     {
         return $deferredResult instanceof DeferredResult

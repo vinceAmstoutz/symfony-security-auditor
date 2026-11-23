@@ -19,9 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 interface ReportRendererInterface
 {
     /**
-     * Wire-format identifier matching the `OutputFormat` enum value
-     * (`console`, `json`, `sarif`, `html`, `markdown`, `junit`, `github`); the
-     * Command layer selects the renderer by this key.
+     * Returns the `OutputFormat` value that selects this renderer.
      */
     public function format(): string;
 

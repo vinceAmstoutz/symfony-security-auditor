@@ -219,8 +219,6 @@ final class AuditPipelineTest extends TestCase
         self::assertContains('pipeline.started', $eventNames);
         self::assertContains('pipeline.completed', $eventNames);
 
-        // Pins the `'audit_id' => $auditContext->auditId()` array entry against
-        // ArrayItemRemoval on both pipeline.started and pipeline.completed.
         $startedContext = array_values(array_filter(
             $recordingProgressReporter->events,
             static fn (array $e): bool => 'pipeline.started' === $e[0],
@@ -250,13 +248,10 @@ final class AuditPipelineTest extends TestCase
 
         self::assertCount(1, $stageStarts);
         self::assertSame('mapping', $stageStarts[0][1]['stage']);
-        // Pins `'audit_id' => $auditContext->auditId()` against ArrayItemRemoval
-        // on stage.started.
         self::assertSame($auditContext->auditId(), $stageStarts[0][1]['audit_id']);
 
         self::assertCount(1, $stageCompletes);
         self::assertSame('mapping', $stageCompletes[0][1]['stage']);
-        // Pins `'audit_id'` against ArrayItemRemoval on stage.completed.
         self::assertSame($auditContext->auditId(), $stageCompletes[0][1]['audit_id']);
     }
 

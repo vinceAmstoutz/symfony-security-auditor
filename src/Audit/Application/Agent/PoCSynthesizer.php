@@ -26,12 +26,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use function Symfony\Component\String\u;
 
 /**
- * @internal not part of the BC promise, see docs/versioning.md
+ * Generates a copy-pasteable proof of concept for every accepted finding at
+ * or above the severity floor, attached through
+ * `Vulnerability::withSynthesizedPoC()` beside the attacker's own `proof`.
  *
- * Generates a concrete, copy-pasteable proof-of-concept (curl, console,
- * request body, …) for every accepted finding at or above the configured
- * severity floor (default HIGH). The original attacker `proof` is preserved;
- * the synthesized PoC is attached via `Vulnerability::withSynthesizedPoC()`.
+ * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class PoCSynthesizer implements PoCSynthesizerInterface
 {
@@ -219,11 +218,8 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
     }
 
     /**
-     * LLM-echoed finding text is interpolated into this prompt's own
-     * ```-delimited code-fence and `###`-prefixed section headers; an
-     * unescaped run of backticks would let the finding forge a fake fence
-     * and an unescaped `#` would let it forge a fake section header (e.g. a
-     * bogus `### SYSTEM OVERRIDE`) as unguarded top-level prompt text.
+     * Escapes the backtick runs and `#` of LLM-echoed finding text, so it
+     * cannot forge a code fence or a `###` section of the prompt.
      */
     private function escapeFences(string $text): string
     {
@@ -231,11 +227,8 @@ final readonly class PoCSynthesizer implements PoCSynthesizerInterface
     }
 
     /**
-     * `title` lands in the bare, single-line `Title: ...` slot with no
-     * surrounding fence or heading to contain it, unlike the fenced/heading
-     * -guarded narrative fields `escapeFences()` protects. A raw newline here
-     * would forge a fake standalone instruction paragraph as unguarded
-     * top-level prompt text.
+     * Removes the newlines of a title, which sits unfenced on the `Title:`
+     * line, so it cannot forge a paragraph of the prompt.
      */
     private function stripEmbeddedNewline(string $text): string
     {

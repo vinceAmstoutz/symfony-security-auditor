@@ -37,9 +37,9 @@ final readonly class Utf8Normalizer
     }
 
     /**
-     * Whether the repaired text could read two different byte sequences as
-     * one: the bytes are not valid UTF-8 and already hold, as valid UTF-8, a
-     * character an invalid byte is repaired into.
+     * Whether the bytes are not valid UTF-8 yet hold a character an invalid
+     * byte is repaired into, so the repaired text could read two byte
+     * sequences as one.
      */
     public static function isAmbiguous(string $bytes): bool
     {

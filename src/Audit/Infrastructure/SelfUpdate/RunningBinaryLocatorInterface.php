@@ -19,7 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\Excepti
 interface RunningBinaryLocatorInterface
 {
     /**
-     * Absolute path to the currently-running executable: the file self-update
+     * Returns the absolute path of the running executable, which self-update
      * replaces.
      *
      * @throws SelfUpdateFailedException

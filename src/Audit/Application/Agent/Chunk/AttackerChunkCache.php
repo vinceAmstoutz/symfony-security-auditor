@@ -24,13 +24,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ContextAwareAttackerCacheInterface;
 
 /**
- * Adapts {@see AttackerCacheInterface} for chunk analysis: transparently uses
- * the context-aware key when the wired cache supports it (so iterations 2+ are
- * cacheable), falling back to the context-free key otherwise. It turns a cache
- * hit into a hydrated result with coverage + logging. A store failure is
- * caught and logged rather than left to propagate: the caller already has
- * the chunk's findings in hand by the time it stores them, so losing the
- * cache write must never cost the caller the findings themselves.
+ * Wraps {@see AttackerCacheInterface} for chunk analysis, keyed by context
+ * when the cache supports it. Logs a store failure instead of propagating it.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

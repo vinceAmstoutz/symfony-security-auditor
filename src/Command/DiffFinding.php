@@ -14,8 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 /**
- * A single finding surfaced by {@see ReportDifferInterface}, carrying only the
- * fields a diff needs to identify and display it.
+ * A finding as {@see ReportDifferInterface} identifies and shows it.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

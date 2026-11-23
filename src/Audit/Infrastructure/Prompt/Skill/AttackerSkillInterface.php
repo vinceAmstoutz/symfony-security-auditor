@@ -16,10 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 
 /**
- * One implementation per attack surface. Each strategy owns the expert skill
- * block injected into the attacker system prompt when a file of its
- * {@see fileType()} appears in the chunk. The `AttackerSkillRegistry` collects
- * every implementation and emits them ordered by {@see priority()}.
+ * The skill block of one attack surface, added to the attacker system prompt
+ * when a file of its {@see fileType()} is in the chunk.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -28,15 +26,14 @@ interface AttackerSkillInterface
     public function fileType(): ProjectFileType;
 
     /**
-     * Emission rank: lower is emitted earlier. The LLM weights
-     * earlier-in-context instructions more heavily (primacy), so higher-risk
-     * surfaces declare a lower priority.
+     * Lower is emitted earlier: a higher-risk surface declares a lower
+     * priority.
      */
     public function priority(): int;
 
     /**
-     * The `<skills role="…">…</skills>` block, listing both patterns to hunt
-     * and patterns explicitly NOT to flag.
+     * The `<skills role="…">…</skills>` block: the patterns to hunt and those
+     * not to flag.
      */
     public function block(): string;
 }

@@ -68,12 +68,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\UnauthorizedAudi
 
 /**
  * Boots the real bundle through a Symfony kernel and drives `audit:run` from
- * the compiled container (the exact object graph `config/services.php` wires
- * for users) with only the `symfony/ai` platform replaced by the deterministic
- * {@see ScriptedAuditPlatform}. Unlike the hand-wired {@see FullAuditEndToEndTest},
- * this exercises `SymfonyAiLLMClient`, its retry/tool-loop/structured-collection
- * collaborators and the DI defaults end to end, so production wiring drift and
- * report-schema drift both surface here.
+ * the compiled container, with only the `symfony/ai` platform replaced by the
+ * deterministic {@see ScriptedAuditPlatform}, so `SymfonyAiLLMClient`, its
+ * collaborators and the DI defaults run end to end.
  */
 final class ContainerBackedAuditEndToEndTest extends TestCase
 {
@@ -175,10 +172,7 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
     }
 
     /**
-     * Golden-masters every remaining `--format` renderer (console, executive,
-     * html, markdown, junit, github, github-comment) written via `--output` (the clean
-     * renderer output, free of presenter chrome and streamed progress), so a
-     * change to any output format surfaces as a snapshot diff.
+     * Golden-masters each remaining `--format` renderer, written through `--output`.
      */
     #[DataProvider('textReportFormatCases')]
     #[RunInSeparateProcess]
@@ -235,10 +229,8 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
     }
 
     /**
-     * Each row swaps a different implementation behind the same public surface:
-     * lean pre-scan + concurrency (`fast`), PoC synthesis (`thorough`), the
-     * JSON-array collection fallback (attacker and reviewer) and batched
-     * reviews. All must still surface (and validate) the seeded finding.
+     * Each row swaps an implementation behind the same public surface; every one
+     * must surface and validate the seeded finding.
      *
      * @return iterable<string, array{array<string, mixed>}>
      */
@@ -910,9 +902,8 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
     }
 
     /**
-     * A price comes from the model catalog the run resolves, which moves with
-     * every release of it, so the golden master pins the token counts and
-     * leaves the amounts out.
+     * Drops the priced amounts, which move with the model catalog, keeping the
+     * token counts.
      *
      * @param array<array-key, mixed> $node
      *
@@ -958,10 +949,8 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
     }
 
     /**
-     * Compares against the decoded snapshot rather than raw bytes, so the
-     * committed file stays free to be Prettier-formatted without breaking the
-     * assertion: the report's structure and values are what the golden master
-     * pins.
+     * Returns the decoded snapshot, so the committed file may be
+     * Prettier-formatted.
      *
      * @return array<array-key, mixed>
      */
@@ -1007,8 +996,7 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
     }
 
     /**
-     * Renders through `--output` so the returned string is the renderer's file
-     * output alone, with no presenter header or streamed progress to strip.
+     * Returns the renderer's file output alone, written through `--output`.
      *
      * @param array<string, mixed> $config
      */

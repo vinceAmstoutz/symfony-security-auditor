@@ -34,10 +34,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Unfi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnmeteredStreamException;
 
 /**
- * Reads a streamed answer to its end the first time it is asked for and
- * gives it back as the result a buffered call would have produced, with the
- * finish reason the stream reported; its usage comes once, through
- * {@see StreamedTokenUsageExtractor}.
+ * Returns a streamed answer, read to its end, as the result a buffered call
+ * gives, with the stream's finish reason; its usage comes once, through
+ * StreamedTokenUsageExtractor. An answer sent unstreamed goes through the
+ * bridge's own converter.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
