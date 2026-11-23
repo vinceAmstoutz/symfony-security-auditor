@@ -526,15 +526,15 @@ _Since 1.23_ the standalone binary can also run on a ChatGPT subscription, throu
 provider: codex
 platform:
     codex: { effort: medium }
-model: gpt-6.2-astra
+model: gpt-6.2-sol
 reviewer_model: gpt-6-luna
 ```
 
 - **Requirements.** The `codex` CLI is installed and logged in to the subscription. When `codex` is not on the `PATH`, name it with `cli_binary:` under `codex:`.
-- **Models.** _Since 1.23_ `init` offers GPT-6.2 Astra (`gpt-6.2-astra`) to find the issues and GPT-6 Luna (`gpt-6-luna`) to review them, GPT-6.2 Sol (`gpt-6.2-sol`) among the choices; `--model` and `--reviewer-model` set them without asking. Afterwards, edit `model` and `reviewer_model`: any model id your Codex CLI runs works, not only the ones the bundled bridge lists.
+- **Models.** _Since 1.23_ `init` offers GPT-6.2 Sol (`gpt-6.2-sol`) to find the issues and GPT-6 Luna (`gpt-6-luna`) to review them, GPT-6.2 Astra (`gpt-6.2-astra`) among the choices for the hardest projects; `--model` and `--reviewer-model` set them without asking. Afterwards, edit `model` and `reviewer_model`: any model id your Codex CLI runs works, not only the ones the bundled bridge lists.
 - **Effort.** _Since 1.23_ `init` asks the reasoning effort, `medium` by default: `low`, `medium`, `high`, `xhigh` or `max`, passed to Codex as `model_reasoning_effort`. `--effort` sets it without asking. Afterwards, edit `effort:` under `codex:`; without it, Codex keeps its own default.
 - **How each call runs.** The auditor runs `codex exec` read-only and outside the audited project, with its shell and web search off, the user's Codex configuration and rules ignored and nothing kept of the session. As with Claude Code, the attacker and the reviewer answer in JSON.
-- **In a Symfony application.** Require `symfony/ai-codex-platform` and set `cli_agent: { platform: codex, effort: medium }` with `model: gpt-6.2-astra` and `reviewer_model: gpt-6-luna` under `symfony_security_auditor:`.
+- **In a Symfony application.** Require `symfony/ai-codex-platform` and set `cli_agent: { platform: codex, effort: medium }` with `model: gpt-6.2-sol` and `reviewer_model: gpt-6-luna` under `symfony_security_auditor:`.
 - **Limits.** The same as for a [Claude subscription](#running-on-a-claude-subscription), except that Codex joins the system and user prompts into one command-line argument, so the 128 KiB limit applies to both together.
 
 ## Providing the API key
