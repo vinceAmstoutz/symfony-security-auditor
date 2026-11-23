@@ -47,10 +47,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedT
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingConverter;
 
 /**
- * Vertex AI takes its API key as the `?key=` query parameter, so a transport
- * failure quotes it inside the URL it names. Whatever form a provider failure
- * takes on its way out, the credential stays out of the exception message the
- * console and an MCP client read, as well as out of every log record.
+ * The Vertex AI `?key=` credential a transport failure quotes stays out of the
+ * exception message and of every log record, whatever form the failure takes.
  */
 final class SymfonyAiLLMClientCredentialRedactionTest extends TestCase
 {

@@ -20,13 +20,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
 
 /**
- * Hands the agents a client whose usage is booked once: the bundled client
- * books its own as it goes and a client this factory already wrapped books
- * through its wrapper (one client id wired to the other), so both are handed
- * over as they are; any other (one an application wired in place of the
- * bundled client) is wrapped so the usage its answers
- * report reaches the token totals and the audit budget, keeping the batch
- * capabilities it has.
+ * Hands the agents a client whose usage is booked once. Returns the bundled
+ * client and one already wrapped as they are; wraps any other so its usage
+ * reaches the token totals and the budget, keeping its batch capabilities.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

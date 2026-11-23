@@ -47,8 +47,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\Inges
 
 /**
  * A file the scan leaves out for its size is listed in the report's coverage
- * and gates nothing: the run is as complete and exits as it did when such a
- * file was dropped without a trace.
+ * and gates nothing.
  */
 final class AuditCommandSkippedFilesTest extends TestCase
 {

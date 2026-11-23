@@ -18,8 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 
 /**
- * No-op reviewer cache: every lookup misses and stores are discarded. Wired
- * when `cache.enabled` is false so the reviewer always calls the LLM.
+ * Every lookup misses and every store is discarded.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

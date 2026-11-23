@@ -23,9 +23,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\InstalledPackagesReaderInterface;
 
 /**
- * Profiles the audited project once its mapping is built: the packages its
- * lockfile installs and the architecture its files are laid out in, which
- * decide the hunting instructions the attacker is given.
+ * Profiles the audited project after mapping: the packages its lockfile
+ * installs and its file layout, which decide the attacker's hunting
+ * instructions.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

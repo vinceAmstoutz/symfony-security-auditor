@@ -16,18 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 
 /**
- * The `symfony/ai` platforms whose `api_key` node is not `->isRequired()`, as
- * listed by `symfony/ai-bundle`'s `config/platform/*.php`. Only these can be
- * written without a credential: every other platform fails container
- * validation the moment the key is missing, so `--no-api-key` is refused for
- * them rather than producing a file the next run cannot build.
- *
- * Optional is not the same as unnecessary. A gateway behind `generic` still
- * wants its token, which is why the key is omitted only when asked for, never
- * by default. Nor is an optional node the whole story: `vertexai` leaves its
- * `api_key` node optional but insists on it in a `validate()` closure unless
- * `location` and `project_id` are set, which `init` never writes, so a keyless
- * block of it can never boot and it is not among these.
+ * The `symfony/ai` platforms `init --no-api-key` can write: those whose
+ * `api_key` is optional in `symfony/ai-bundle`'s `config/platform/*.php`,
+ * except `vertexai`, which requires it unless `location` and `project_id`
+ * are set.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

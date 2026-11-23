@@ -18,16 +18,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsag
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 
 /**
- * Accumulates LLM token usage across all calls within a single audit run.
+ * Accumulates the token usage of every LLM call of an audit run, shared by
+ * the attacker and reviewer clients. `reset()` clears it between runs that
+ * share an instance.
  *
- * The recorder is the single source of truth for cumulative usage. Both the
- * attacker and reviewer LLM clients share one instance so the audit budget
- * can be enforced globally and the final report can attribute total cost.
- *
- * Mutable by design: `LLMClientInterface` callers report each call's deltas
- * via {@see record()}; the orchestrator and budget tracker read totals via
- * {@see snapshot()}. {@see reset()} clears state between independent audit
- * runs sharing a recorder instance.
+ * Not readonly: a per-run accumulator (.claude/rules/php-classes.md).
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

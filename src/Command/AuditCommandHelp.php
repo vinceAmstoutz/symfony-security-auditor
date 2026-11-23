@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 /**
- * The `audit:run` console help text, kept out of the command class itself.
+ * The `audit:run` console help text.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -75,8 +75,7 @@ final readonly class AuditCommandHelp
         TEXT;
 
     /**
-     * The binary reads no `config/packages/` file, so its help names the
-     * files it reads instead.
+     * Names the files the binary reads in place of `config/packages/`.
      */
     public static function standalone(): string
     {

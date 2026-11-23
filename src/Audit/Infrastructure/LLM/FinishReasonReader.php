@@ -65,10 +65,8 @@ final readonly class FinishReasonReader
     }
 
     /**
-     * Gemini and Vertex AI end an answer the model did not finish with one of
-     * `ABNORMAL_GEMINI_FINISH_REASONS`, which their bridges map to no
-     * normalized case and hand back as an empty text: with no text in it, it
-     * is nothing the model said. Any other word is read as the provider's own.
+     * Returns true for an answer Gemini or Vertex AI left unfinished, which
+     * their bridges hand back as an empty text.
      */
     private function endedAbnormallyWithNothingInIt(FinishReason $finishReason, string $text): bool
     {
@@ -77,10 +75,9 @@ final readonly class FinishReasonReader
     }
 
     /**
-     * Truncation and content filtering come back as symfony/ai's case values
-     * whatever the provider calls them (`max_tokens`, `MAX_TOKENS`, `length`,
-     * …), so `LLMResponse::isDegraded()` recognizes them; every other reason
-     * keeps the provider's own word.
+     * Returns truncation and content filtering as the symfony/ai case values
+     * `LLMResponse::isDegraded()` recognizes; any other reason keeps the
+     * provider's own word.
      */
     private function normalizedStopReason(FinishReason $finishReason): string
     {

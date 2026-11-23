@@ -24,16 +24,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception
 use function Symfony\Component\String\u;
 
 /**
- * Runs `composer audit --format=json --locked` via symfony/process. Composer's
- * exit code is non-zero whenever advisories are found, so we only treat a failure
- * as fatal when stdout is empty (the JSON is the contract).
+ * Runs `composer audit --format=json --locked`. Fails only on an empty stdout:
+ * composer exits non-zero whenever it finds an advisory.
  *
- * `--no-scripts` and `--no-plugins` are mandatory, not tidiness: composer runs
- * inside the audited project, which is untrusted and would otherwise dispatch
- * that project's `pre-command-run` script and activate the plugins in its
- * `vendor/`. Either is arbitrary command execution on the audit host. Neither
- * flag changes what `audit --locked` reports, since the advisory check reads
- * `composer.lock`.
+ * `--no-scripts` and `--no-plugins` keep the untrusted project's scripts and
+ * `vendor/` plugins from running on the audit host.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -42,7 +37,7 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
     public const int DEFAULT_TIMEOUT_SECONDS = 60;
 
     /**
-     * @param ?Closure(string): Process $processBuilder defaults to the standard composer-audit command; tests inject a stub
+     * @param ?Closure(string): Process $processBuilder defaults to {@see self::defaultProcessBuilder()}
      */
     public function __construct(
         private float $timeoutSeconds = self::DEFAULT_TIMEOUT_SECONDS,

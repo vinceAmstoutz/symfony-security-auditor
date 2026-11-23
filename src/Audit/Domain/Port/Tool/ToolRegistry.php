@@ -18,9 +18,8 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 
 /**
- * Holds the catalog of tools available to the attacker agent and dispatches
- * invocation by name. Tool errors are caught and surfaced to the LLM as text
- * results rather than propagating: a misbehaving tool should not kill the audit.
+ * The tools an agent may call, dispatched by name. A tool error reaches the LLM
+ * as a text result, never as an exception.
  */
 final readonly class ToolRegistry
 {

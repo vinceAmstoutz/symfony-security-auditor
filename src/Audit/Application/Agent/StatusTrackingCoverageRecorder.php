@@ -22,14 +22,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\FailureReasonReco
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\InconclusiveAnalysisRecorderInterface;
 
 /**
- * Forwards everything to the recorder it wraps and remembers the attacker's
- * last status per file, so the escalating agent can tell which files the
- * expensive pass actually judged once that pass returns, why a file that
- * ended errored did and which analyzed files were judged on a partial look.
+ * Forwards to the recorder it wraps and remembers the attacker's last status
+ * per file, so the escalating agent knows which files the expensive pass
+ * judged, why a file ended errored and which files it judged on a partial
+ * look.
  *
- * Mutable by design: it accumulates the pass's coverage while the pass runs,
- * so it opts out of the final readonly rule as a per-run accumulator (see
- * .claude/rules/php-classes.md: documented context carriers).
+ * Not readonly: a per-run accumulator (.claude/rules/php-classes.md).
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -111,9 +109,8 @@ final class StatusTrackingCoverageRecorder implements CoverageRecorderInterface,
     }
 
     /**
-     * How the attacker left a chunk: `analyzed` when its last word on every
-     * file is that it analyzed the file or served it from its cache, `errored`
-     * otherwise.
+     * Returns `analyzed` when the attacker's last status on every file of the
+     * chunk is analyzed or cached, `errored` otherwise.
      *
      * @param list<ProjectFile> $chunk
      */
@@ -129,9 +126,8 @@ final class StatusTrackingCoverageRecorder implements CoverageRecorderInterface,
     }
 
     /**
-     * Why the chunk ended errored, as the first of its files left unanalyzed
-     * that has a recorded reason says; null for a chunk that was analyzed or
-     * whose failure named no reason.
+     * Returns the reason recorded for the first unanalyzed file of the chunk
+     * that has one, null otherwise.
      *
      * @param list<ProjectFile> $chunk
      */
@@ -155,8 +151,7 @@ final class StatusTrackingCoverageRecorder implements CoverageRecorderInterface,
     }
 
     /**
-     * The analyzed files whose answer is a verdict: every file in
-     * {@see analyzedFiles()} but those the model judged on a partial look.
+     * Returns the analyzed files but those the model judged on a partial look.
      *
      * @return list<string>
      */

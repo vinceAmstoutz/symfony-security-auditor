@@ -26,10 +26,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
 /**
- * `config/services.php` always aliases `ProgressReporterInterface` to
- * `ProgressReporterHolder`, so it is required here rather than falling back to
- * `NullProgressReporter`.
- *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class AuditOrchestrator implements AuditOrchestratorInterface
@@ -192,7 +188,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
      * @param list<Vulnerability> $rejectedFindings
      * @param list<ProjectFile>   $files
      *
-     * @return list<Vulnerability> the findings at or above the confidence floor, one per id: a copy below the floor is dropped before the copies collapse, so it cannot hide a confident one
+     * @return list<Vulnerability> the findings at or above the confidence floor, one per id, copies below it dropped before collapsing
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
@@ -224,16 +220,9 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
-     * Shared by both the attacker and reviewer recovery paths. A chunk/finding
-     * whose own conversation swallowed a generic (non-abort) `Throwable` after
-     * a partial `record_vulnerability`/`record_review` success records that
-     * finding via the coverage recorder, but the agent's own return value can
-     * still come back missing it: draining and merging by id here recovers
-     * it. Draining unconditionally (not only on an abort) also keeps the
-     * coverage recorder's buffer from accumulating findings across iterations
-     * that a later abort would otherwise re-review as if they were never
-     * persisted. Findings sharing an id collapse to the one
-     * {@see FindingPrecedence} keeps.
+     * Merges by id the findings drained from the coverage recorder, which a
+     * swallowed failure may have kept out of the agent's return value.
+     * Findings sharing an id collapse to the one `FindingPrecedence` keeps.
      *
      * @param list<Vulnerability> $rawFindings
      * @param list<Vulnerability> $recoveredFindings
@@ -246,13 +235,9 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
-     * Gives raw attacker candidates found before a mid-run abort a chance to
-     * reach the report: filters and reviews them exactly like a completed
-     * iteration would. After a budget abort the reviewer refuses to call the
-     * provider, so only cached verdicts can still be served; a provider abort
-     * leaves it free to try. A further abort from this review attempt is
-     * swallowed after persisting whatever verdicts it managed to reach, so the
-     * caller-visible exception is always the original attacker abort.
+     * Filters and reviews the attacker candidates found before a mid-run abort
+     * as a completed iteration would. Persists the verdicts reached before a
+     * further abort and swallows it, so the caller sees the original abort.
      *
      * @param list<Vulnerability> $rawFindings
      * @param list<ProjectFile>   $files
@@ -283,11 +268,8 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
-     * Findings the reviewer has already rejected in earlier iterations. Fed back
-     * to the attacker so it stops re-reporting them: that would otherwise burn
-     * tool-call and reviewer budget on findings the deduplication step discards.
-     * A finding whose review failed reached no verdict, so it is left out: the
-     * attacker may report it again and the reviewer get another chance at it.
+     * Returns the findings the reviewer rejected in earlier iterations, for the
+     * attacker to stop re-reporting. A finding whose review failed is left out.
      *
      * @return list<Vulnerability>
      */
@@ -300,8 +282,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
-     * A finding the reviewer rejected: a verdict it reached, unlike a review
-     * that failed and reached none.
+     * Returns false for a failed review, which reached no verdict.
      */
     private static function wasRejected(Vulnerability $vulnerability, AuditContext $auditContext): bool
     {
@@ -309,19 +290,10 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
-     * Consumes at most as many findings per fingerprint as
-     * `$auditContext->acceptedFingerprints()` contains that value: a plain
-     * membership test would let one baseline-accepted occurrence of a shared
-     * fingerprint (`Vulnerability::fingerprint()` is line-independent by
-     * design) suppress every current finding sharing it, including ones that
-     * were never actually reviewed. The budget itself lives on
-     * `$auditContext` (via `consumeBaselineCredit()`) rather than being
-     * recomputed here, so it is shared (and spent at most once) across
-     * every iteration of this method's own attacker/reviewer loop, not just
-     * within a single call. A finding the attacker re-reports after its
-     * credit was spent (the same fingerprint at overlapping lines) is the
-     * skipped finding itself, not a second occurrence, so it stays skipped
-     * without a credit rather than being reviewed and reported.
+     * Skips at most as many findings per fingerprint as the baseline accepts
+     * occurrences of it, from credits spent once across all iterations. A
+     * re-report of a skipped finding (same fingerprint, overlapping lines)
+     * stays skipped without a credit.
      *
      * @param list<Vulnerability> $findings
      *
@@ -443,18 +415,12 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
-     * A same-id repeat is a duplicate unless it corrects an earlier verdict:
-     * an already-validated entry is sticky against a later spurious rejection
-     * (that never displaces it), a corrected accept must be allowed to replace
-     * a stale reject and a later iteration's validated verdict replaces an
-     * earlier validated verdict when it raises the severity or reclassifies the
-     * type (e.g. a reviewer's `adjusted_severity`/`corrected_type` applied on
-     * re-discovery). A verdict never lowers the severity already reported.
-     *
-     * A finding that overlaps other validated findings of the same file and
-     * type, whether it sits at a new id or replaces the finding of its own id,
-     * collapses with them: it is admitted only when it outranks every one of
-     * them and then takes their place.
+     * Admits a same-id repeat only when it corrects the earlier verdict: an
+     * accept replaces a reject and a validated verdict replaces a validated one
+     * when it raises the severity or changes the type. A rejection never
+     * displaces a validated entry and no verdict lowers a reported severity.
+     * A finding overlapping validated findings of the same file and type is
+     * admitted only when it outranks them all. It then replaces them.
      *
      * @return list<Vulnerability>|null the validated findings the admitted one replaces, null when it is a duplicate
      */

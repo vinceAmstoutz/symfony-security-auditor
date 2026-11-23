@@ -14,11 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 /**
- * Resolves per-million-token USD pricing for a given LLM model identifier.
- *
- * Implementations may consult a hardcoded table, a configuration file, or an
- * external pricing service. Unknown models should return `0.0` rather than
- * throw: the audit pipeline keeps running with cost tracking disabled.
+ * USD per million tokens of an LLM model. Implementations SHOULD return `0.0`
+ * for an unknown model rather than throw.
  */
 interface PricingProviderInterface
 {

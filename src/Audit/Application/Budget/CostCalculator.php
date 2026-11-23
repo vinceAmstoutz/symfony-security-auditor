@@ -20,17 +20,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ServingPlatformPricin
 use function Symfony\Component\String\u;
 
 /**
- * Converts token counts to USD cost using a pricing provider.
- *
- * Prompt-cache traffic is priced from the provider's real per-model cache
- * rates when it implements {@see CacheAwarePricingProviderInterface};
- * otherwise Claude models keep the Anthropic 0.1x-read / 1.25x-write
- * heuristic and other models fall back to the base input rate.
- *
- * Returns the raw fractional cost: callers that present the value to a
- * user (`AuditCost`, `BudgetTracker::costUsdUsed()`) round to 6 decimals
- * at the surface. Keeping a single rounding site lets BudgetTracker test
- * its accessor against unrounded accumulated state.
+ * Converts token counts to an unrounded USD cost. Prices prompt-cache traffic
+ * at the provider's cache rates when it implements
+ * {@see CacheAwarePricingProviderInterface}; otherwise at 0.1x read and 1.25x
+ * write for Claude models and at the base input rate for others.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -64,9 +57,8 @@ final readonly class CostCalculator
     }
 
     /**
-     * Anthropic bills a prompt-cache write it keeps for an hour
-     * (`cache_retention: long`) at twice the base input rate; a pricing
-     * source lists only the five-minute write rate.
+     * Prices one-hour prompt-cache writes at twice the base input rate, as
+     * Anthropic bills them; pricing sources list only the five-minute rate.
      */
     public function costForOneHourCacheWrites(int $oneHourCacheCreationTokens, string $model): float
     {
@@ -74,11 +66,9 @@ final readonly class CostCalculator
     }
 
     /**
-     * The model a call is billed as: the one the provider reports serving it
-     * when the pricing source prices it at the serving platform's own rate,
-     * the configured one otherwise, so a gateway answering under an id no
-     * catalog lists still prices the call and another provider's listing of
-     * the reported id never sets its price.
+     * Returns the model the provider reports serving the call when the pricing
+     * source prices it at the serving platform's own rate, the configured one
+     * otherwise.
      */
     public function billedModel(string $configuredModel, ?string $reportedModel): string
     {

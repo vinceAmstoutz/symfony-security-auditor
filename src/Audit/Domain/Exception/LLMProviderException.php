@@ -16,19 +16,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception;
 use RuntimeException;
 
 /**
- * Base exception for LLM provider failures that must abort the audit.
+ * An LLM provider failure that aborts the audit, never swallowed: a
+ * non-transient one (missing platform configuration, auth failure, unknown
+ * model) or a transient one (429, 5xx) whose retries are spent. Going on would
+ * report a false SAFE.
  *
- * Covers two cases:
- * - **Non-transient**: missing platform configuration, auth failure, retired/unknown
- *   model. These repeat on every subsequent call and must never be swallowed.
- * - **Exhausted transient**: a retriable error (rate-limit 429, 5xx) where every
- *   retry has been exhausted. Continuing to the next chunk would produce the same
- *   failure, so the audit must also abort rather than returning a false-negative SAFE.
- *
- * Not final: Infrastructure-layer subclasses (`NonTransientLLMFailureException`,
- * `TransientLLMFailureException`) extend this exception so agents can catch it at
- * the Domain/Application boundary without importing Infrastructure types. The
- * one subclass an agent recovers from is `LLMRequestTooLargeException`: a prompt
- * the model cannot take in fails only that chunk, which is split and retried.
+ * Not final: Infrastructure subclasses extend it. The one subclass an agent
+ * recovers from is `LLMRequestTooLargeException`.
  */
 class LLMProviderException extends RuntimeException {}

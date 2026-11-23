@@ -14,11 +14,10 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 /**
- * Opt-in companion of {@see SecretScrubberInterface} for a scrubber that also
- * reads the name of the file it scrubs: a file whose name says it holds a
- * secret, such as the decryption key of a Symfony secrets vault, is redacted
- * whatever its content looks like. The scanner checks for it with
- * `instanceof`, so a scrubber without it keeps working through `scrub()`.
+ * Optional companion of {@see SecretScrubberInterface}, checked with
+ * `instanceof`: also reads the file's name, so a file whose name says it holds
+ * a secret, such as a Symfony secrets-vault decryption key, is redacted
+ * whatever its content.
  *
  * Implementations must be idempotent: scrubFile($path, scrubFile($path, x)) === scrubFile($path, x).
  *

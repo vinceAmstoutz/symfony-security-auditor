@@ -20,20 +20,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
 /**
- * Mutable delegate that wires the ProgressReporterInterface seam between
- * DI container construction time and command invocation time.
+ * Delegates to the reporter `AuditCommand` sets, a NullProgressReporter until
+ * then. A delegate's exception never aborts the audit.
  *
- * AuditPipeline (and the DI container) receive this holder as the
- * ProgressReporterInterface implementation. AuditCommand calls setDelegate()
- * at the start of __invoke() to swap in a ConsoleProgressReporter built
- * from the live SymfonyStyle. Prior to that call the holder behaves as a
- * NullProgressReporter.
- *
- * Reporter exceptions are swallowed so a misbehaving delegate cannot abort
- * the audit (contract guarantee from ProgressReporterInterface).
- *
- * Mutable by design: non-readonly because the delegate is set after
- * construction. See .claude/rules/php-classes.md for the opt-out policy.
+ * Not readonly: the delegate is set after construction (see
+ * .claude/rules/php-classes.md).
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

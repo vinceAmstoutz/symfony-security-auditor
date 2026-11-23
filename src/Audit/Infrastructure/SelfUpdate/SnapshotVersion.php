@@ -15,10 +15,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate;
 
 /**
  * The version a snapshot binary is stamped with: the last release, the number
- * of commits since and the commit it was built from, as SemVer build metadata
- * (`1.21.0+14.g4531440`): the one suffix Composer accepts as a root version
- * that can carry a commit hash. It is printed to the terminal, so anything
- * else is refused.
+ * of commits after it and the commit, as SemVer build metadata
+ * (`1.21.0+14.g4531440`). Anything else is refused: it is printed to the
+ * terminal.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

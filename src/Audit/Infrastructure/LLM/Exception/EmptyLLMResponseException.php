@@ -18,10 +18,8 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\ProviderMessageRedactor;
 
 /**
- * The model answered with nothing usable. `$stopReason` names the outcome the
- * way `LLMResponse` does when a provider reports it as a response instead
- * (`empty_content`, `length` or `content-filter`), so the caller can hand back
- * the same degraded response either way.
+ * The model answered with nothing usable; `$stopReason` names the outcome as
+ * `LLMResponse` does (`empty_content`, `length` or `content-filter`).
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

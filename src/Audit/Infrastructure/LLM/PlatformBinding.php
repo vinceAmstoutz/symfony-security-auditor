@@ -18,9 +18,8 @@ use Symfony\AI\Platform\PlatformInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 
 /**
- * The per-client symfony/ai binding: the platform handle, the model that
- * selects it, the logger and the model's max-output-token cap. These are the
- * values that vary between the attacker / reviewer / cheap clients.
+ * The symfony/ai binding of one client, the part that differs between the
+ * attacker, reviewer and cheap clients.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

@@ -50,13 +50,8 @@ final class AuditExecutionConfigurationTest extends TestCase
     }
 
     /**
-     * A computed `min_confidence` (e.g. `fdiv($x, $y)` with `$y = 0`, a
-     * common "safe division" idiom in a PHP-format config file) can produce
-     * `NAN`, which is never `>=` any real confidence value:
-     * `AuditOrchestrator::passesConfidenceFloor()`'s `$confidence >=
-     * $minConfidence` check would then silently drop every finding on every
-     * run. `NAN` also bypasses the TreeBuilder's `min(0.0)`/`max(1.0)`
-     * bounds, since both comparisons are false against `NAN`.
+     * A computed `NAN` (`fdiv($x, 0)`) passes the TreeBuilder bounds and would
+     * drop every finding at the confidence floor.
      *
      * @throws InvalidAuditExecutionConfigurationException
      */
@@ -75,10 +70,7 @@ final class AuditExecutionConfigurationTest extends TestCase
     }
 
     /**
-     * A positive-infinite `min_confidence` (e.g. `fdiv(1, 0)` in a computed
-     * config value) is non-finite, so it is rejected the same way `NAN` is
-     * and rendered as an explicit `INF` literal rather than coerced from the
-     * raw float (which PHP 8.5 warns about).
+     * Rejected like `NAN` and rendered as an explicit `INF` literal.
      *
      * @throws InvalidAuditExecutionConfigurationException
      */

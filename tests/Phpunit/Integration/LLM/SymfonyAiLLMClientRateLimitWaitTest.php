@@ -40,12 +40,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedD
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingConverter;
 
 /**
- * A rate-limited provider may name more than one wait: OpenAI's bridge
- * hands back its request-window reset as the `Retry-After` hint, while the
- * answer to a request over the token limit says how long that limit needs
- * (`Please try again in 8.064s.`) and when the token window resets
- * (`x-ratelimit-reset-tokens`). The retry waits for the longest of them,
- * never less than it would without them, up to the rate-limit ceiling.
+ * A rate-limited retry waits for the longest wait the provider names (the
+ * `Retry-After` hint, `Please try again in 8.064s.`, `x-ratelimit-reset-tokens`),
+ * never less than without them, up to the rate-limit ceiling.
  */
 final class SymfonyAiLLMClientRateLimitWaitTest extends TestCase
 {

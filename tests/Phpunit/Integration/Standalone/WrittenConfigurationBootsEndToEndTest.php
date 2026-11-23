@@ -47,11 +47,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformPro
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneContainerFactory;
 
 /**
- * Every "init wrote a config the next run cannot build" defect on this branch
- * was caught by a person, not by the suite: each rule class is pinned by
- * hard-coded booleans and nothing fed what the writer produces back through
- * the loader and the container that has to boot it. This closes that loop, so
- * the next such defect fails here rather than on someone's machine.
+ * Feeds what `init` writes back through the loader and the container that must
+ * boot it.
  */
 final class WrittenConfigurationBootsEndToEndTest extends TestCase
 {

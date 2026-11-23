@@ -14,9 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 /**
- * The run settings the configuration gives the command-line flags that have a
- * key of their own (`audit.min_score`, `audit.fail_on_incomplete`,
- * `audit.format`, `audit.output`). A flag always wins over them.
+ * The `audit.min_score`, `audit.fail_on_incomplete`, `audit.format` and
+ * `audit.output` settings. The matching flag always wins over them.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

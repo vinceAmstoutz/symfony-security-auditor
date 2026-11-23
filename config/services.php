@@ -260,8 +260,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(CostCalculator::class)
         ->args([service(PricingProviderInterface::class)]);
 
-    // `AuditBudget` is built in SymfonySecurityAuditorBundle::loadExtension() so the
-    // factory selection (unlimited/forTokens/forCost/forBoth) is explicit per config.
+    // `AuditBudget` is defined in SymfonySecurityAuditorBundle::loadExtension().
     $defaultsConfigurator->set(BudgetTracker::class)
         ->args([
             service(AuditBudget::class),
@@ -297,8 +296,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(NullSecretScrubber::class);
 
-    // `SecretScrubberInterface` alias is set in SymfonySecurityAuditorBundle::loadExtension()
-    // based on `scan.secret_scrubbing.enabled`.
+    // SymfonySecurityAuditorBundle::loadExtension() aliases `SecretScrubberInterface` from `scan.secret_scrubbing.enabled`.
     $defaultsConfigurator->set(RegexSecretScrubber::class)
         ->args([
             param('symfony_security_auditor.scan.secret_scrubbing.additional_patterns'),

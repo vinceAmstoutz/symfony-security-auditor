@@ -267,8 +267,6 @@ final class AttackerAgentTest extends TestCase
             new NullCoverageRecorder(),
         );
 
-        // Pins both the rejected-findings preamble AND the "\n\n" separator
-        // before the rest of the message (no other preamble is present).
         self::assertStringStartsWith((new AttackerContextPromptRenderer())->renderRejectedFindings($rejectedFindings)."\n\n", $captured);
         self::assertStringContainsString('## Source Code', $captured);
     }
@@ -637,8 +635,6 @@ final class AttackerAgentTest extends TestCase
     /** @return iterable<string, array{string, string}> */
     public static function chunkPriorityCases(): iterable
     {
-        // Each pair shares a feature name (User*) so the feature chunker keeps them in
-        // the same chunk where attack-surface priority orders the files.
         yield 'controllers before voters' => ['src/Controller/UserController.php', 'src/Security/UserVoter.php'];
         yield 'voters before entities' => ['src/Security/UserVoter.php', 'src/Entity/User.php'];
         yield 'entities before repositories' => ['src/Entity/User.php', 'src/Repository/UserRepository.php'];

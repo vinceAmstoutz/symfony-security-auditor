@@ -22,10 +22,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneP
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 
 /**
- * Whether the standalone binary lets the `.symfony-security-auditor.yaml` of
- * the folder it runs in set one path of the configuration, over a user
- * configuration that names a platform and a model: the keys only the user may
- * set are refused there.
+ * Whether the `.symfony-security-auditor.yaml` of the folder the standalone
+ * binary runs in may set one path, over a user configuration that names a
+ * platform and a model.
  */
 final readonly class ProjectConfigProbe
 {

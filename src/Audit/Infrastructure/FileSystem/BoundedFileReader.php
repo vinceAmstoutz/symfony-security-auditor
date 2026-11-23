@@ -16,12 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\UnreadableInputFileException;
 
 /**
- * Reads a file the run takes as input, a baseline or an imported SARIF
- * report, whose path may lead into the audited repository: a `--baseline`
- * in the checkout, a relative `scan.import_sarif` entry. At most
- * {@see self::MAX_BYTES} are read, so a symlink to `/dev/zero` or to a file
- * of the audit host that never ends is refused instead of being read until
- * memory runs out; a pipe the user names (`--baseline=<(…)`) still reads.
+ * Reads a run input (a baseline or an imported SARIF report), which may lie in
+ * the audited repository. Refuses a file over {@see self::MAX_BYTES}, so a
+ * symlink to `/dev/zero` cannot exhaust memory. A pipe still reads.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

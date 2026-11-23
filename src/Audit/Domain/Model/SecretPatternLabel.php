@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
-/** @internal not part of the BC promise: the enum *values* are the stable labels embedded in the `***REDACTED:<label>***` placeholder emitted by `RegexSecretScrubber`. Custom patterns registered through the scrubber constructor use synthetic `custom_<index>` labels and are intentionally outside this enum. */
+/** @internal not part of the BC promise; its values are the stable labels of the `***REDACTED:<label>***` placeholder, custom patterns using `custom_<index>`. */
 enum SecretPatternLabel: string
 {
     case AwsAccessKey = 'aws_access_key';

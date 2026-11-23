@@ -14,10 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
- * One `access_control` rule as the application declares it: the path pattern
- * or route it targets, the HTTP methods it is limited to and whether it
- * checks anything, which it does only with roles or an expression. The
- * application applies the first rule that matches a request.
+ * One declared `access_control` rule. The application applies the first rule
+ * that matches a request.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

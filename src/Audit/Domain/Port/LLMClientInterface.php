@@ -20,11 +20,9 @@ interface LLMClientInterface
     public function complete(string $systemPrompt, string $userMessage): LLMResponse;
 
     /**
-     * Drives an autonomous tool-using conversation. Sends the initial prompts
-     * and, as long as the model emits tool calls (and the iteration cap is not
-     * reached), executes those tool calls via the supplied registry and feeds
-     * the results back. Returns the model's final textual response once it
-     * stops calling tools.
+     * Runs the model's tool calls through the registry and feeds the results
+     * back until it stops calling tools or reaches the iteration cap, then
+     * returns its final answer.
      */
     public function completeWithTools(
         string $systemPrompt,

@@ -282,10 +282,6 @@ final class AuditOrchestratorAbortRecoveryTest extends TestCase
             'c',
         );
 
-        // Simulates a chunk whose conversation swallowed a generic (non-abort)
-        // Throwable after a partial record_vulnerability success: the finding
-        // reached the coverage recorder, but AttackerAgent::analyze() still
-        // returns normally with it missing from the aggregate list.
         $recordingAttackerAgent = new RecordingAttackerAgent([], null, [$vulnerability]);
 
         $reviewerLlm = self::createStub(LLMClientInterface::class);

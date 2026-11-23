@@ -130,9 +130,7 @@ final class ConsoleBannerTest extends TestCase
     }
 
     /**
-     * Every locale variable is pinned individually and any not named is
-     * cleared: setting all three to one value hides which of them the banner
-     * actually read.
+     * Sets each locale variable individually and clears any not named.
      *
      * @param array<string, string> $locale
      */

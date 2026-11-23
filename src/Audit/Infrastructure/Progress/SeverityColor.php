@@ -16,10 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 
 /**
- * Maps a vulnerability severity to a Symfony Console foreground color, so the
- * decorated findings feed is colored by risk. Lives in Infrastructure because
- * the color scheme is a presentation concern: the Domain enum stays free of
- * rendering details.
+ * The Symfony Console foreground color of a severity.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

@@ -17,9 +17,8 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
 
 /**
- * Stands in where no per-user storage is wired: the bundle running inside an
- * application, whose credentials come from the framework's own environment
- * handling. Nothing is stored, so nothing can be read back.
+ * Stores nothing: the bundle reads credentials from the application's own
+ * environment.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

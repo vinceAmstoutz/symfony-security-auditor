@@ -20,11 +20,9 @@ use Symfony\Component\Filesystem\Filesystem;
 use function Symfony\Component\String\b;
 
 /**
- * SHA-256 of the audited project's `composer.lock`, or `null` when there is
- * no lockfile to key an advisory snapshot on. The project is untrusted, so a
- * lockfile that is a symlink not leading to a regular file inside the project
- * (`composer.lock -> /dev/zero`, see `LockfileSymlinkResolver`) or larger than
- * `MAX_LOCKFILE_BYTES` is refused before it is read.
+ * SHA-256 of the audited project's `composer.lock`, null without one. Refuses
+ * a lockfile larger than `MAX_LOCKFILE_BYTES` and a symlink that does not lead
+ * to a regular file inside the project.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

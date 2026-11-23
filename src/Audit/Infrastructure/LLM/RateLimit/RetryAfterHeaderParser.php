@@ -17,13 +17,9 @@ use Symfony\AI\Platform\Exception\RateLimitExceededException;
 use Throwable;
 
 /**
- * Extracts the server-suggested wait (in seconds) from a 429 throwable chain.
- *
- * Prefers `Symfony\AI\Platform\Exception\RateLimitExceededException::getRetryAfter()`
- * which the platform's `HttpStatusErrorHandlingTrait` populates from the
- * `retry-after` response header. Falls back to a `retry-after: <int>` substring
- * scan over the chained messages when no typed exception is present, covering
- * custom providers that surface the header through a plain `RuntimeException`.
+ * Returns the wait in seconds a 429 asks for, read from symfony/ai's
+ * `RateLimitExceededException`, else from a `retry-after: <int>` in the
+ * chained messages.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -62,8 +58,8 @@ final readonly class RetryAfterHeaderParser
     }
 
     /**
-     * Accepts both RFC 7231 `Retry-After` forms: a delta-seconds integer, or
-     * an HTTP-date, converted to a delta relative to now.
+     * Accepts both RFC 7231 `Retry-After` forms: delta-seconds or an
+     * HTTP-date, read as the delay until then.
      */
     private function secondsFromMessage(string $message): ?int
     {

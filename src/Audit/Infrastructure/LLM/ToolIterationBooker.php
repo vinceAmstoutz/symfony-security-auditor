@@ -22,9 +22,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
 
 /**
- * Books the usage one answered round of a tool-using conversation reported:
- * on the rate-limit window first, then against the budget, checking it right
- * after, since that round may have spent it.
+ * Books the usage of one answered tool round on the rate-limit window and the
+ * budget, then checks the budget.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

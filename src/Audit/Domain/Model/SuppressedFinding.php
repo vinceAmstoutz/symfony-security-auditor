@@ -14,11 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
- * One occurrence of a finding a run found and its report leaves out: the
- * fingerprint a report lists the finding under and the one that left it out
- * (the baseline fingerprint whose credit it spent, which a baseline may hold
- * under another type or path spelling than the finding's own, or its own
- * fingerprint when its type is muted).
+ * One occurrence of a finding its report leaves out: the fingerprint a report
+ * lists it under and the one that left it out, the baseline fingerprint whose
+ * credit it spent or its own when its type is muted.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

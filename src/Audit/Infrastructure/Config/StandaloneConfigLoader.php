@@ -73,9 +73,8 @@ final readonly class StandaloneConfigLoader
     }
 
     /**
-     * The `provider:` the user config selects, read without resolving
-     * anything, for a message that has to name it whether or not the
-     * configuration loads. Only the user config may select one.
+     * Returns the `provider:` of the user config, read without resolving
+     * anything, or null when it sets none or cannot be read.
      */
     public function configuredProvider(): ?string
     {
@@ -104,10 +103,7 @@ final readonly class StandaloneConfigLoader
     }
 
     /**
-     * Unlike `array_replace_recursive`, list values are replaced wholesale: a
-     * project config declaring `included_paths: [app]` fully overrides a user
-     * config's `[src, config, templates]` instead of index-merging into
-     * `[app, config, templates]`.
+     * Merges maps key by key and replaces a list whole.
      *
      * @param array<array-key, mixed> $base
      * @param array<array-key, mixed> $override
@@ -150,11 +146,8 @@ final readonly class StandaloneConfigLoader
     }
 
     /**
-     * The audited project's own file is layered over the other two, but the
-     * run never asked for it: a file this loader would refuse, or cannot read,
-     * is skipped as a whole and says why, instead of stopping a run that does
-     * not need it. The file of the working directory, read first, is the
-     * user's own and stays strict.
+     * Skips the audited project's file as a whole, with the reason, when it is
+     * refused or unreadable, instead of stopping the run.
      *
      * @param array<array-key, mixed> $workingDirectoryConfig
      */

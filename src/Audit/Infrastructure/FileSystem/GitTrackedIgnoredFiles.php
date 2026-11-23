@@ -20,15 +20,14 @@ use Symfony\Component\Process\Exception\ExceptionInterface;
 use Symfony\Component\Process\Process;
 
 /**
- * The files git tracks although a `.gitignore` pattern matches them: a rule
- * keeps only untracked files out of a repository.
+ * The files git tracks although a `.gitignore` pattern matches them.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class GitTrackedIgnoredFiles
 {
     /**
-     * @param ?Closure(string): Process $processFactory defaults to the `git ls-files` listing run in the project; tests inject a stub to make git unavailable or slow
+     * @param ?Closure(string): Process $processFactory defaults to `git ls-files` run in the project
      */
     public function __construct(
         private LoggerInterface $logger,

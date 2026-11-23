@@ -27,29 +27,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Symlink
 use function Symfony\Component\String\u;
 
 /**
- * Decorator over `ComposerAuditRunnerInterface` that persists the JSON payload
- * across audit runs, keyed by a SHA-256 hash of the project's `composer.lock`.
- *
- * Hit: the cached JSON is returned without ever spawning composer, provided
- * the entry is younger than `TTL_SECONDS`: the lockfile hash alone cannot
- * detect newly-disclosed advisories against an unchanged dependency set.
- * Miss / stale / no lockfile: delegates to the inner runner, caches the
- * result on success (only when a lockfile exists) and either way returns
- * the raw JSON.
- *
- * Cache I/O failures degrade gracefully: they are logged and swallowed so the
- * audit never aborts because of a stale or unreadable advisory cache entry.
+ * Caches the decorated runner's advisory JSON for `TTL_SECONDS`, keyed by the
+ * SHA-256 of the project's `composer.lock`. Caches nothing without a lockfile.
+ * A cache I/O failure is logged and never fails the audit.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerInterface
 {
-    /**
-     * Advisory feeds gain new CVEs over time for an unchanged dependency set,
-     * so even a lockfile-hash hit must expire. 24 hours balances staying
-     * useful within a single working day against missing newly-disclosed
-     * advisories for longer than necessary.
-     */
     public const int TTL_SECONDS = 86_400;
 
     private LockfileHasher $lockfileHasher;
@@ -137,12 +122,6 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
         }
     }
 
-    /**
-     * `filemtime()` only fails for a path that does not exist and every
-     * caller has already confirmed existence via `Filesystem::exists()`
-     * immediately before calling this: asserted rather than branched on,
-     * since the only way to fail it is a TOCTOU race no test can force.
-     */
     private function isExpired(string $path): bool
     {
         $modifiedAt = filemtime($path);
@@ -158,7 +137,6 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
         try {
             $this->assertSafeToWrite($path);
             PrivateFileWriter::write($this->filesystem, $path, $json);
-            // Stamped via $this->clock, not left to the OS, so isExpired()'s subtraction never mixes two different time sources.
             $this->filesystem->touch($path, $this->clock->now()->getTimestamp());
             $this->logger->debug('Advisory cache stored', ['lockfile_hash' => $hash]);
         } catch (Throwable $throwable) {
@@ -170,12 +148,8 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
     }
 
     /**
-     * `Filesystem::dumpFile()` transparently writes through a symlink at its
-     * destination and `Filesystem::mkdir()` treats a symlinked directory as
-     * already existing: a cache path derived entirely from the project's own
-     * `composer.lock` content lets a malicious contributor pre-plant a symlink
-     * at the exact path this cache will write to, turning a routine audit run
-     * into an arbitrary-file overwrite.
+     * Refuses a path through a symlink: the path derives from the untrusted
+     * project's `composer.lock`, so a planted link would redirect the write.
      *
      * @throws UnsafeAdvisoryCacheWriteException
      */
@@ -187,9 +161,7 @@ final readonly class LockfileHashedAdvisoryCache implements ComposerAuditRunnerI
     }
 
     /**
-     * The configured `cache.dir`, this cache's parent, is the trusted root:
-     * it and the directories above it are taken as configured, while a
-     * symlinked `advisory/` or anything planted below it is refused.
+     * Trusts the parent of the cache directory and every directory above it.
      */
     private function isUnsafePath(string $path): bool
     {

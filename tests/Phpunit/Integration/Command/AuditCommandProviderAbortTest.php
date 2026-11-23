@@ -52,11 +52,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\ProviderAbortingPipeline;
 
 /**
- * Drives {@see AuditCommand} with a pipeline that adds one already-validated
- * finding and then throws a non-transient LLM provider failure, to verify the
- * partial report is still written (rather than discarded via the generic
- * `catch (Throwable)` branch) and the exit code stays the generic failure
- * code: this is not a budget abort, so it must not reuse that exit code.
+ * Checks that {@see AuditCommand} still writes the partial report when a
+ * non-transient provider failure follows a validated finding and exits with
+ * the generic failure code, not the budget abort's.
  */
 final class AuditCommandProviderAbortTest extends TestCase
 {

@@ -14,16 +14,12 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool;
 
 /**
- * Checks a tool call against the `required` list of the tool's own input
- * schema, for the providers that do not enforce that schema before invoking
- * the tool. A violation comes back as the `Error: …` text the model reads
- * inside the tool loop and retries from, so a call that cannot be used is
- * never acknowledged as recorded.
+ * Checks a tool call against the `required` list of the tool's input schema,
+ * for the providers that do not enforce it. Returns the `Error: …` text the
+ * model retries from, null for a usable call.
  *
- * Only a missing (absent or `null`) argument and a non-string value for a
- * string argument are refused: numbers and booleans a provider stringified
- * are normalised downstream (`VulnerabilityFactory`, `VerdictApplier`) and
- * must keep being accepted.
+ * Refuses only a missing (absent or `null`) argument and a non-string value
+ * for a string argument: numbers and booleans are normalized downstream.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

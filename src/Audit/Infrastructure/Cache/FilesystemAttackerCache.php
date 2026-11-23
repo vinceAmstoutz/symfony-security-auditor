@@ -119,13 +119,8 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
     }
 
     /**
-     * `Filesystem::dumpFile()` transparently writes through a symlink at its
-     * destination and `Filesystem::mkdir()` treats a symlinked directory as
-     * already existing: a cache path derived entirely from attacker-visible
-     * content (a project file's own path/content, folded through a key salt
-     * built from the target's own bundle config) lets a malicious contributor
-     * pre-plant a symlink at the exact path this cache will write to, turning
-     * a routine audit run into an arbitrary-file overwrite.
+     * Refuses a path through a symlink: the path derives from the audited
+     * project's files, so a planted link would redirect the write.
      *
      * @throws UnsafeCacheWriteException
      */
@@ -137,14 +132,8 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
     }
 
     /**
-     * Mirrors {@see self::assertSafeToWrite()}'s check for the read side:
-     * `Filesystem::readFile()` also transparently follows a symlink, so the
-     * same pre-planted symlink that would otherwise corrupt a write turns an
-     * ordinary cache read into an arbitrary-file read whose content is
-     * trusted as a real, previously-computed finding. The cache directory is
-     * the trusted root: it and the directories above it are taken as
-     * configured, so a symlinked `var/` or `~/.cache` does not turn the cache
-     * off, while a symlink planted below it is still refused.
+     * Trusts the cache directory and every directory above it, on read and on
+     * write.
      */
     private function isSymlinkedPath(string $path): bool
     {
@@ -186,14 +175,8 @@ final readonly class FilesystemAttackerCache implements ContextAwareAttackerCach
     }
 
     /**
-     * A scanned file's path comes from the audited project's filesystem, not
-     * from us: a crafted relative path embedding another file's own
-     * `path=hash` signature plus a newline can make a single-file chunk's
-     * raw signature string byte-identical to a real multi-file chunk's
-     * joined signatures. Hashing each file's signature individually first
-     * fixes every field to 64 hex characters, which can never contain the
-     * `=`/newline separators, so no crafted path can bleed into another
-     * file's field or forge an extra one.
+     * Hashes each file's signature on its own, so a crafted path holding the
+     * separators cannot give one chunk another chunk's key.
      *
      * @param list<ProjectFile> $chunk
      */

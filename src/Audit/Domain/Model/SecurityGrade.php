@@ -14,11 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
- * The letter grade of an {@see AuditReport}, derived from its normalized
- * 0-100 score. The boundaries mirror the {@see RiskLevel} thresholds in
- * {@see AuditReport::riskLevelEnum()}, so a report never reads as a healthy
- * grade while its risk level says otherwise: `A` is `safe`, `B` is `low`,
- * `C` is `medium`, `D` is `high` and `F` is `critical`.
+ * The letter grade of an {@see AuditReport}'s normalized score, on the
+ * {@see RiskLevel} thresholds of {@see AuditReport::riskLevelEnum()}: `A` is
+ * `safe`, `B` is `low`, `C` is `medium`, `D` is `high` and `F` is `critical`.
  */
 enum SecurityGrade: string
 {

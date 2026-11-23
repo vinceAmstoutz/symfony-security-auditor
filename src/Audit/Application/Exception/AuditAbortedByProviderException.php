@@ -19,10 +19,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderExcep
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
 /**
- * Signals that an audit was halted by a non-transient LLM provider failure
- * (misconfiguration, auth error, retired model). Carries the partial
- * `AuditReport` collected up to the abort point so the command layer can
- * still render whatever findings were validated before the provider failed.
+ * Halts an audit on a non-transient LLM provider failure (misconfiguration,
+ * auth error, retired model), carrying the partial `AuditReport`.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

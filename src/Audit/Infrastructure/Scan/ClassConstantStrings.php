@@ -17,10 +17,8 @@ use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\Class_;
 
 /**
- * The string each of a class's own constants holds, by constant name: what a
- * `self::ADMIN_PATH` route path or a `PostVoter::EDIT` guard stands for. A
- * constant declared elsewhere, or holding anything but a string literal, is
- * left out rather than guessed at.
+ * The string each of a class's own constants holds, by constant name. Leaves
+ * out a constant declared elsewhere or holding anything but a string literal.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

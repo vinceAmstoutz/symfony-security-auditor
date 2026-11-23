@@ -23,9 +23,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 
 /**
  * Keeps provider API keys in an owner-only JSON file under the per-user
- * configuration directory. Reading refuses a file other users on the machine
- * can open, on the reasoning that a credential exposed once is a credential to
- * rotate rather than one to keep using.
+ * configuration directory.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -123,10 +121,8 @@ final readonly class FilesystemCredentialStore implements CredentialStoreInterfa
     }
 
     /**
-     * A file that no longer parses is the one a write is there to replace
-     * (the read refusing it says to run `auth:set`), whereas a file that cannot
-     * be read at all may still hold every key intact, so that failure stays
-     * fatal for a write too.
+     * With `$replaceMalformed`, returns no credential for content that does
+     * not parse instead of throwing.
      *
      * @return array<string, string>
      *
@@ -173,14 +169,9 @@ final readonly class FilesystemCredentialStore implements CredentialStoreInterfa
     }
 
     /**
-     * Only reading refuses a file other users on the machine can open: a
-     * credential exposed once is one to rotate rather than keep using, but
-     * refusing to *write* would leave the key that most needs replacing
-     * replaceable only by hand. A write restores the mode instead.
-     *
-     * Windows has no POSIX permission bits (`fileperms()` reports the same
-     * mode for every file on an NTFS volume), so the file there is protected
-     * by the user-profile ACL it inherits from `%APPDATA%` instead.
+     * Refuses a file other users can open; a write restores the mode instead.
+     * Checks nothing on Windows, where the file inherits the user-profile ACL
+     * of `%APPDATA%`.
      *
      * @throws UnreadableCredentialStoreException
      */
@@ -200,9 +191,7 @@ final readonly class FilesystemCredentialStore implements CredentialStoreInterfa
     }
 
     /**
-     * A name no `%env()%` placeholder can spell would be stored and never read
-     * back and, as a non-string array key, would break the JSON the whole
-     * file is kept in.
+     * Refuses a name no `%env()%` placeholder can read back.
      *
      * @throws CredentialStoreWriteException
      */
@@ -251,11 +240,8 @@ final readonly class FilesystemCredentialStore implements CredentialStoreInterfa
     }
 
     /**
-     * `dumpFile()` gives a file it creates the process umask, so the file is
-     * created empty and tightened before the credential is written into it:
-     * the secret only ever reaches a path that is already owner-only. The
-     * directory is tightened first, so one whose mode cannot be changed stops
-     * the write before an empty file is left behind in it.
+     * Makes the directory and then the file owner-only before any credential
+     * is written: `dumpFile()` would create the file with the umask.
      *
      * @throws IOException
      */

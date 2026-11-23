@@ -28,11 +28,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnresolvableMcpSer
 final readonly class StandaloneConsoleCommandFactory
 {
     /**
-     * Describes an invokable command from its class alone (the name, aliases,
-     * description and help of its `#[AsCommand]` and the input its
-     * `__invoke()` declares) for help, a listing or shell completion, none of
-     * which runs it. The instance is only reflected, never invoked, so it needs
-     * none of the services the container would inject.
+     * Describes an invokable command from its `#[AsCommand]` and the input its
+     * `__invoke()` declares, without the services the container would inject.
+     * The returned command only describes; it never runs.
      *
      * @param class-string<AuditCommand|McpServeCommand> $invokableClass
      */

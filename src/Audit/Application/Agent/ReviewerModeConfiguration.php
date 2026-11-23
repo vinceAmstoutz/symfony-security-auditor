@@ -14,8 +14,6 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
 /**
- * The reviewer-pass tuning knobs that select and parameterize a review strategy.
- *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ReviewerModeConfiguration

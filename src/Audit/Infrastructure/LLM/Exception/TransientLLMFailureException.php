@@ -18,10 +18,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderExcep
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\ProviderMessageRedactor;
 
 /**
- * Thrown when every retry attempt for a transient LLM error is exhausted
- * (e.g. repeated 429 rate-limit responses or 5xx failures). Extends
- * `LLMProviderException` so agents can catch it at the Domain boundary and
- * abort the audit rather than silently producing a false-negative SAFE result.
+ * Thrown once every retry of a transient failure is spent. Agents catch it as
+ * `LLMProviderException` and abort the audit rather than report a false SAFE.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -41,8 +39,8 @@ final class TransientLLMFailureException extends LLMProviderException
     }
 
     /**
-     * The same exhausted failure, counting the attempt that failed before the
-     * retries began: the request a concurrent window dispatched first.
+     * Returns the same failure, counting the attempt that failed before the
+     * retries began.
      */
     public function afterOneMoreAttempt(): self
     {

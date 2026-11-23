@@ -56,12 +56,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedD
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingConverter;
 
 /**
- * A provider failing a request with an HTTP status that clears on its own
- * (a timeout, a rate limit, a server error) served nothing, so the request is
- * retried with the usual back-off and booked as nothing, whatever the bridge
- * made of the body that came with the status: the Ollama bridge reads any
- * error body as `Response does not contain message.` and a proxy's HTML page
- * as a JSON syntax error.
+ * A request failed with an HTTP status that clears on its own (a timeout, a
+ * rate limit, a server error) is retried with the usual back-off and booked as
+ * nothing, whatever the bridge made of the body that came with it.
  */
 final class SymfonyAiLLMClientTransientStatusTest extends TestCase
 {

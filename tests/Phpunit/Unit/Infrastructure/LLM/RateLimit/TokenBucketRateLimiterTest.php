@@ -258,8 +258,7 @@ final class TokenBucketRateLimiterTest extends TestCase
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 1);
         $tokenBucketRateLimiter->record(inputTokens: 0, outputTokens: 0);
 
-        // The stale 10_000 estimate must zero out, not credit +1: reconciled
-        // usage is 1, so a full 10_000 request still needs a fresh window.
+        // Reconciled usage is 1, so a full 10_000 request needs a fresh window.
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 10_000);
 
         self::assertSame([59_000], $sleeper->sleepsMs);
@@ -291,8 +290,7 @@ final class TokenBucketRateLimiterTest extends TestCase
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 1);
         $tokenBucketRateLimiter->record(inputTokens: 0, outputTokens: 0);
 
-        // The stale 10_000 estimate must zero out, not debit -1: reconciled
-        // usage is 1, so a 9_999 request fits exactly in the same window.
+        // Reconciled usage is 1, so a 9_999 request fits in the same window.
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 9_999);
 
         self::assertSame([], $sleeper->sleepsMs);
@@ -459,8 +457,7 @@ final class TokenBucketRateLimiterTest extends TestCase
         $tokenBucketRateLimiter->pauseUntil(new DateTimeImmutable('2026-01-01T12:01:05+00:00'));
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
 
-        // The pause sleep alone (65s) lands the clock in a fresh window, so the
-        // re-evaluated window reset frees the exhausted RPM slot: no second sleep.
+        // The 65s pause alone lands in a fresh window, so no second sleep follows.
         self::assertSame([65_000], $sleeper->sleepsMs);
     }
 
@@ -585,8 +582,7 @@ final class TokenBucketRateLimiterTest extends TestCase
             sleeper: $sleeper,
         );
 
-        // Two record calls with 50 output each must accumulate to 100 (not
-        // overwrite each other), so a third acquire is blocked by OTPM.
+        // 50 + 50 output tokens fill OTPM, so the third acquire blocks.
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
         $tokenBucketRateLimiter->record(inputTokens: 0, outputTokens: 50);
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
@@ -616,8 +612,6 @@ final class TokenBucketRateLimiterTest extends TestCase
             sleeper: $sleeper,
         );
 
-        // Recording zero output must leave outputTokensUsed at 0: the next
-        // acquire must succeed under OTPM=1 without sleeping.
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
         $tokenBucketRateLimiter->record(inputTokens: 0, outputTokens: 0);
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
@@ -649,10 +643,8 @@ final class TokenBucketRateLimiterTest extends TestCase
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
 
         $mockClock->modify('+61 seconds'); // window expires; new window starts at 12:01:00, ends at 12:02:00 → 59s remaining
-        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0); // triggers reset, requestsUsed=1
-        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0); // requestsUsed=2
-        // Third acquire in the new window must block: requestsUsed must
-        // have started at 0 post-reset (not -1), so cap is hit here.
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
 
         self::assertSame([59_000], $sleeper->sleepsMs);
@@ -681,9 +673,7 @@ final class TokenBucketRateLimiterTest extends TestCase
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 10);
 
         $mockClock->modify('+61 seconds'); // window expires; 59s remain in new window
-        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 10); // reset, inputTokensUsed becomes 10
-        // The next single-token acquire would only fit if inputTokensUsed
-        // started at exactly 0 post-reset (10 + 1 > 10 → block).
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 10);
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 1);
 
         self::assertSame([59_000], $sleeper->sleepsMs);
@@ -711,11 +701,10 @@ final class TokenBucketRateLimiterTest extends TestCase
 
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
         $tokenBucketRateLimiter->record(inputTokens: 0, outputTokens: 10);
-        // fill OTPM
+
         $mockClock->modify('+61 seconds'); // window expires; 59s remain in new window
-        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0); // reset, outputTokensUsed=0
-        $tokenBucketRateLimiter->record(inputTokens: 0, outputTokens: 10); // bucket=10 now
-        // outputTokensUsed must be exactly 10 (not 9): next acquire blocks.
+        $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
+        $tokenBucketRateLimiter->record(inputTokens: 0, outputTokens: 10);
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
 
         self::assertSame([59_000], $sleeper->sleepsMs);
@@ -795,19 +784,14 @@ final class TokenBucketRateLimiterTest extends TestCase
             sleeper: $sleeper,
         );
 
-        // A batch window acquires for every request before resolving any of
-        // them, so two reservations are pending simultaneously here.
+        // A batch window acquires for every request before resolving any.
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 40);
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 50);
-        // Reconciling in dispatch order must credit each record() against
-        // its own estimate (40, then 50), not the last-seen estimate for
-        // both, which would overcharge the bucket by the first estimate.
+        // Each record() reconciles against its own estimate: 40, then 50.
         $tokenBucketRateLimiter->record(inputTokens: 20, outputTokens: 0);
         $tokenBucketRateLimiter->record(inputTokens: 30, outputTokens: 0);
 
-        // Correctly reconciled usage is 20 + 30 = 50, leaving room for 45
-        // more within the ITPM=100 cap; the pre-fix formula left the bucket
-        // at 90, which would block this acquire.
+        // Reconciled usage is 20 + 30 = 50, leaving room for 45 under ITPM=100.
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 45);
 
         self::assertSame([], $sleeper->sleepsMs);
@@ -916,8 +900,7 @@ final class TokenBucketRateLimiterTest extends TestCase
             sleeper: $sleeper,
         );
 
-        // Sub-millisecond pause: now = 12:00:00.000500, paused = 12:00:00.000700.
-        // 200µs gap must round up to exactly 1ms (proves max(1, ...) clamp).
+        // The 200µs gap from 12:00:00.000500 rounds up to 1ms.
         $tokenBucketRateLimiter->pauseUntil(new DateTimeImmutable('2026-01-01T12:00:00.000700+00:00'));
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
 
@@ -944,8 +927,6 @@ final class TokenBucketRateLimiterTest extends TestCase
             sleeper: $sleeper,
         );
 
-        // Exact 1ms (1000µs) delta must produce exactly 1ms: verifies the
-        // ceil-equivalent integer math doesn't over-add a millisecond.
         $tokenBucketRateLimiter->pauseUntil(new DateTimeImmutable('2026-01-01T12:00:00.001000+00:00'));
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
 
@@ -972,8 +953,6 @@ final class TokenBucketRateLimiterTest extends TestCase
             sleeper: $sleeper,
         );
 
-        // 1.001ms (1001µs) delta must round up to exactly 2ms: proves the
-        // ceil-equivalent +999 offset captures the leftover microsecond.
         $tokenBucketRateLimiter->pauseUntil(new DateTimeImmutable('2026-01-01T12:00:00.001001+00:00'));
         $tokenBucketRateLimiter->acquire(estimatedInputTokens: 0);
 

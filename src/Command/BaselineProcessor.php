@@ -23,9 +23,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedEx
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 
 /**
- * Generates and applies the accepted-finding baseline: resolves the effective
- * baseline path (CLI override before the configured default), persists or loads
- * fingerprints via the {@see BaselineInterface} and filters the report.
+ * Generates and applies the accepted-finding baseline. The `--baseline` path
+ * wins over the configured one.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -120,13 +119,8 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
     }
 
     /**
-     * `AuditOrchestrator::withoutBaselineAccepted()` may already have spent
-     * some of these same credits skipping a different finding before the
-     * reviewer ever ran: reloading the baseline here grants a fresh,
-     * un-decremented budget, so each already-consumed occurrence is removed
-     * once before this stage builds its own count-aware suppression pass,
-     * rather than handing every finding still standing a second, unearned
-     * credit.
+     * Removes one credit per occurrence the run already spent before review,
+     * so no finding gets a second credit.
      *
      * @param list<string> $fingerprints
      * @param list<string> $alreadyConsumed
@@ -146,10 +140,8 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
     }
 
     /**
-     * The `fingerprint` of every entry carrying each baseline fingerprint, in
-     * the order of the entries: a reviewer-corrected entry carries its
-     * `attacker_fingerprint` too, under which the next run's attacker reports
-     * the finding the report lists under the entry's `fingerprint`.
+     * The `fingerprint` of every entry under each fingerprint it carries, its
+     * `attacker_fingerprint` included, in entry order.
      *
      * @param list<BaselineEntry> $entries
      *
@@ -168,11 +160,8 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
     }
 
     /**
-     * Deduplicates by `id()`, not `fingerprint()` (or `fingerprint()` +
-     * `attackerFingerprint()`), so two distinct findings that happen to
-     * share a fingerprint (e.g. the same title/type/file at different lines)
-     * each keep their own baseline entry instead of one silently overwriting
-     * the other's.
+     * One entry per finding `id()`, so two findings sharing a fingerprint keep
+     * an entry each.
      *
      * @return list<array<string, string>>
      */
@@ -187,9 +176,8 @@ final readonly class BaselineProcessor implements BaselineProcessorInterface
     }
 
     /**
-     * A reviewer-corrected finding carries a second, `attacker_fingerprint`
-     * key: the identity the attacker will report on the next run, so the
-     * pre-review baseline skip still matches it.
+     * Adds the `attacker_fingerprint` of a reviewer-corrected finding, which
+     * the next run's attacker reports it under.
      *
      * @return array<string, string>
      */

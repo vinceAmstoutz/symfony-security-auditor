@@ -109,24 +109,18 @@ final readonly class ReportWriter implements ReportWriterInterface
     }
 
     /**
-     * A report reaches the console when no `--output` was given and also
-     * when its file cannot be written: the audit already ran and paid for
-     * it, so it goes to the console instead of vanishing with the exception.
+     * Prints the report without `--output` or when its file cannot be written.
      */
     private function keepOnConsole(SymfonyStyle $symfonyStyle, OutputFormat $outputFormat, string $content): void
     {
-        // OUTPUT_RAW: no renderer emits real Symfony tags, so a finding's own `<...>` text must never reach the console formatter.
+        // OUTPUT_RAW keeps a finding's own `<...>` text out of the console formatter.
         $symfonyStyle->writeln($this->workflowCommandNeutralizer->report($outputFormat, $content), OutputInterface::OUTPUT_RAW);
     }
 
     /**
-     * `Filesystem::dumpFile()` transparently writes through a pre-existing
-     * symlink at its destination: a predictable, documented `--output` path
-     * (e.g. `report.sarif`, `gl-sast-report.sarif`) committed as a symlink by
-     * a malicious PR would let the audit overwrite an arbitrary file the CI
-     * runner can reach. Mirrors the guard already applied to the filesystem
-     * attacker/reviewer/advisory caches and the standalone config writer; it
-     * walks the audited project below its root as well.
+     * Refuses a path through a symlink below the working directory or the
+     * project root, which `dumpFile()` would follow to any file the runner can
+     * reach.
      *
      * @throws UnsafeReportWriteException
      */

@@ -21,11 +21,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegis
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 /**
- * One structured-collection round: a fresh collector wired into a single-tool
- * `record_review` registry and the drain step that turns whatever the LLM
- * recorded during the call back into raw verdict payloads. Shared by the
- * single-finding, concurrent and batched structured review analyzers so the
- * wiring lives in one place.
+ * Wires a fresh collector into a `record_review` registry for one
+ * structured-collection round and drains what the LLM recorded back into raw
+ * verdict payloads.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -52,9 +50,8 @@ final readonly class StructuredReviewCollectionSession
     }
 
     /**
-     * Whether the client offered the recording tool to the model or called it:
-     * a client that did neither ignored the tools and the model's answer text
-     * is all it said about the finding.
+     * Tells whether the client offered the recording tool to the model or
+     * called it. When it did neither, the answer text is all the model said.
      */
     public function recordingToolReached(): bool
     {

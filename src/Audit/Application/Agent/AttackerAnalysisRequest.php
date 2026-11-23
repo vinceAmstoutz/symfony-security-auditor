@@ -19,11 +19,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
  * @internal not part of the BC promise, see docs/versioning.md
- *
- * Immutable input bundle for a single attacker analysis pass. Collapses what
- * were five positional parameters into one value object so callers (the
- * orchestrator, the escalating agent) read clearly and new context can be
- * added without churning every call site.
  */
 final readonly class AttackerAnalysisRequest
 {
@@ -31,24 +26,17 @@ final readonly class AttackerAnalysisRequest
 
     /**
      * @param list<ProjectFile>   $files
-     * @param list<Vulnerability> $previousFindings  findings already validated by the
-     *                                               reviewer in earlier iterations, injected
-     *                                               into the prompt so the LLM generalizes
-     *                                               them to files not yet covered
+     * @param list<Vulnerability> $previousFindings  findings the reviewer validated in earlier
+     *                                               iterations, for the LLM to generalize
      * @param list<Vulnerability> $rejectedFindings  findings the reviewer rejected in earlier
-     *                                               iterations, injected so the LLM stops
-     *                                               re-reporting them (saving tool-call and
-     *                                               reviewer budget)
-     * @param list<Vulnerability> $candidateFindings findings a cheaper first-pass model reported on
-     *                                               these files, injected so the LLM confirms,
-     *                                               refines or discards each one. Unlike
-     *                                               previousFindings they are unvalidated and
-     *                                               must be re-reported when confirmed
-     * @param ?list<ProjectFile>  $toolFiles         the files the investigation tools may open when they
-     *                                               are not the files to analyze: every scanned file on a
-     *                                               run narrowed by `--since`, `--path` or the escalation
-     *                                               deep pass, with `audit.tools_scope: scanned`; null
-     *                                               means `files`, those of the deep pass included
+     *                                               iterations, for the LLM to stop re-reporting
+     * @param list<Vulnerability> $candidateFindings unvalidated findings a cheaper first pass
+     *                                               reported on these files, for the LLM to
+     *                                               confirm by re-reporting, refine or discard
+     * @param ?list<ProjectFile>  $toolFiles         the files the investigation tools may open
+     *                                               when they are not `files` (every scanned
+     *                                               file under `audit.tools_scope: scanned`);
+     *                                               null means `files`
      */
     public function __construct(
         public array $files,
@@ -71,9 +59,8 @@ final readonly class AttackerAnalysisRequest
     }
 
     /**
-     * The files a finding reported on `$chunk` is named by: the chunk's own,
-     * then every file the investigation tools may open, so a finding another
-     * chunk's file was reported under is named by that file too.
+     * Returns the files a finding on `$chunk` may be named by: the chunk's own
+     * first, then every file the investigation tools may open.
      *
      * @param list<ProjectFile> $chunk
      */

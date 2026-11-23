@@ -52,11 +52,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedD
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingConverter;
 
 /**
- * Anthropic keeps a prompt-cache write for five minutes or, with
- * `cache_retention: long`, for an hour. It bills an hour-long write at twice
- * the base input rate where a five-minute one costs 1.25 times it. The
- * bridge's usage counts every write alike; only the raw answer tells them
- * apart, so each share is priced at its own rate.
+ * Prices each share of an Anthropic prompt-cache write, read from the raw
+ * answer, at its own rate: twice the base input rate for an hour-long write
+ * (`cache_retention: long`), 1.25 times it for a five-minute one.
  */
 final class SymfonyAiLLMClientOneHourCacheWriteTest extends TestCase
 {

@@ -171,8 +171,6 @@ final class BudgetTrackerTest extends TestCase
      */
     public function test_cost_used_accumulates_across_multiple_calls(): void
     {
-        // Pins: `$this->costUsdUsed += ...`: if mutated to `=`, the second call
-        // would overwrite the first and the total would be $5 (not $15).
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited(), inputPrice: 10.0);
 
         $budgetTracker->recordCall(LLMResponse::of('a', 'gpt-4o', 'end_turn', TokenUsageSnapshot::of(1_000_000, 0)));
@@ -353,10 +351,6 @@ final class BudgetTrackerTest extends TestCase
     }
 
     /**
-     * Cached prompt traffic accumulates the same way fresh input does: two
-     * calls to one model must report the sum of both, not the last one and
-     * not their difference.
-     *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      */
@@ -430,7 +424,6 @@ final class BudgetTrackerTest extends TestCase
         self::assertSame(6.0, $budgetTracker->costUsdUsed());
     }
 
-    /** A tracker whose pricing provider knows `claude-opus-5` and prices everything else at zero, as an unlisted or self-hosted model does. */
     public function test_it_counts_the_calls_cut_before_their_answer_ended_until_reset(): void
     {
         $budgetTracker = $this->budgetTracker(AuditBudget::unlimited());
@@ -444,6 +437,7 @@ final class BudgetTrackerTest extends TestCase
         self::assertSame([2, 0], [$countedBeforeReset, $budgetTracker->interruptedCalls()]);
     }
 
+    /** A tracker whose pricing provider knows `claude-opus-5` and prices everything else at zero, as an unlisted or self-hosted model does. */
     private function splitModelBudgetTracker(): BudgetTracker
     {
         $pricingProvider = new class implements CacheAwarePricingProviderInterface {

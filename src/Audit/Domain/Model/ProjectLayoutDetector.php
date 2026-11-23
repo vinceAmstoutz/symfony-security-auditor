@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
- * Reads, from where a project's files sit and what they are, the
- * architecture styles it is laid out in.
+ * Reads the architecture styles a project is laid out in from where its files
+ * sit and what they are.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

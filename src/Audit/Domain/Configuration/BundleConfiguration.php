@@ -19,14 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 
 /**
- * Typed representation of `symfony_security_auditor:` after Symfony's
- * TreeBuilder has validated and defaulted every key.
- *
- * Constructed once in `SymfonySecurityAuditorBundle::loadExtension()` so the
- * nested array-shape PHPDoc no longer doubles as the public configuration
- * contract: the VOs do. Downstream code that needs to introspect the
- * configuration (e.g. compiler passes) depends on these immutable types
- * instead of magic array keys.
+ * The validated and defaulted `symfony_security_auditor:` configuration.
  *
  * @phpstan-type BundleConfigArray array{
  *     profile?: string,

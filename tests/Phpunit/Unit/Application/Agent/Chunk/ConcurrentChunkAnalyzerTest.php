@@ -229,11 +229,8 @@ final class ConcurrentChunkAnalyzerTest extends TestCase
     }
 
     /**
-     * A generic batch failure must be isolated to its own window: the windows
-     * after it still have to be dispatched, exactly as the sequential analyzer
-     * keeps analysing chunks after one errors. Otherwise a single odd runtime
-     * error silently drops every later file from the audit: a false-negative
-     * SAFE for a security tool.
+     * Dropping the later windows would leave their files unaudited, a false
+     * SAFE.
      *
      * @throws InvalidProjectFileException
      * @throws BudgetExceededException
@@ -444,7 +441,7 @@ final class ConcurrentChunkAnalyzerTest extends TestCase
 
     /**
      * A client whose first window succeeds (recording a finding per chunk) and
-     * whose second window throws `$failure`, so a later-window abort is
+     * whose second window throws `$throwable`, so a later-window abort is
      * reached with an earlier window already finalized.
      */
     private function clientFailingOnSecondWindowWith(Throwable $throwable): ToolBatchCapableLLMClientInterface

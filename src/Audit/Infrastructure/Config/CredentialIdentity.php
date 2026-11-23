@@ -16,10 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use function Symfony\Component\String\b;
 
 /**
- * Names a credential in output without disclosing it: a masked preview that
- * matches what a provider console shows next to the key and a truncated
- * SHA-256 fingerprint that identifies it exactly and cannot be turned back into
- * the key, though whoever already holds a candidate key can confirm it.
+ * Names a credential in output without disclosing it: a masked preview such
+ * as a provider console shows and a truncated SHA-256 fingerprint, which
+ * confirms a candidate key but cannot be turned back into one.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -36,8 +35,7 @@ final readonly class CredentialIdentity
     private const int TRAILING_CHARACTERS = 4;
 
     /**
-     * Ten characters are revealed, so anything shorter than this would expose
-     * more of the credential than it hides.
+     * A preview reveals ten characters, too many of a shorter credential.
      */
     private const int MINIMUM_PREVIEWABLE_LENGTH = 24;
 
@@ -70,9 +68,8 @@ final readonly class CredentialIdentity
     }
 
     /**
-     * A credential carrying anything outside printable ASCII is a paste
-     * accident rather than a provider key; slicing its bytes would emit
-     * a half-codepoint into the console.
+     * False for a credential holding anything but printable ASCII, whose
+     * bytes a preview could split mid-character.
      */
     private static function isPreviewable(string $credential): bool
     {

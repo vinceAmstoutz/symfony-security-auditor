@@ -21,17 +21,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\RecordingToolInt
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 /**
- * The last round a tool-using conversation is allowed. The tool result that
- * precedes it carries a notice saying so (a tool result, not a message of its
- * own, because a provider may refuse a user turn right after one) and a last
- * round that records its answer (a recording tool took the call in, rather than
- * refusing it) ends the conversation instead of asking for one more round to
- * say it is done. A last round that asks to read instead gets one closing
- * request: its reading calls are answered without being run, since nothing
- * they return could reach a later round. An answer given on either by a model
- * that called a reading tool reached the round limit, so it may rest on less
- * than the model wanted to look at; one that only ever recorded lost nothing
- * to the limit.
+ * The last round a tool conversation is allowed. The tool result before it
+ * carries the notice, since a provider may refuse a user turn right after a
+ * tool result. A last round whose recording tool takes a call in concludes
+ * the conversation; one that asks to read gets one closing request, its
+ * reading calls answered `NOT_RUN`. The answer of a model that called a
+ * reading tool is marked as reaching the tool cap; one that only recorded is
+ * not.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

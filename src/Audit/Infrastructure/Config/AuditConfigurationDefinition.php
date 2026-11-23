@@ -478,8 +478,8 @@ final readonly class AuditConfigurationDefinition
     }
 
     /**
-     * A model id falling back to another model when null, whose empty string
-     * is refused while an `%env()%` placeholder is taken, as on `model`.
+     * A model id that falls back to another model when null: refuses an empty
+     * string, takes an `%env()%` placeholder.
      */
     private function modelOverrideNode(string $name, string $emptyStringError): OptionalModelNodeDefinition
     {

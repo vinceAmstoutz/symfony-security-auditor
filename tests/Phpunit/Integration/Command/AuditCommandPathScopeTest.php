@@ -43,8 +43,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\NothingAnalyzedPipeline;
 
 /**
- * `--path` replaces `scan.included_paths` for the run: the more specific,
- * more recent instruction wins over the configuration.
+ * `--path` replaces `scan.included_paths` for the run.
  */
 final class AuditCommandPathScopeTest extends TestCase
 {

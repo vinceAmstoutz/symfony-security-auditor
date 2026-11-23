@@ -16,8 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing;
 use Override;
 
 /**
- * Reads the models to offer from the catalog the run would price from: the
- * ten newest a platform's own listing prices and lists as calling tools.
+ * Offers the ten newest models a platform's catalog listing prices and marks
+ * as calling tools.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

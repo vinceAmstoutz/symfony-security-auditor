@@ -18,13 +18,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfigKeyIn
 use function Symfony\Component\String\u;
 
 /**
- * Folds a user-supplied provider spelling back to the `symfony/ai` platform
- * config key the rest of the stack expects: trims the input, lowercases the
- * platform half, folds an instance name the way `symfony/config` will and
- * maps the hyphenated bridge package slugs (`open-ai`, `deep-seek`, …) to their
- * config keys (`openai`, `deepseek`). Without this, `init --provider=open-ai`
- * installs a real bridge package but writes a platform key no container can
- * ever boot from.
+ * Folds a provider as typed to its `symfony/ai` platform config key: a
+ * bridge slug such as `open-ai` becomes `openai`, the platform is lowercased
+ * and an instance name is folded as `symfony/config` folds it.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

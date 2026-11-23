@@ -18,8 +18,7 @@ interface UpdateAvailabilityNotifierInterface
 {
     /**
      * Returns a one-line notice when a newer release than $currentVersion is
-     * available, or null when the running version is current, cannot be
-     * compared, or the check could not be performed.
+     * known to be available, else null.
      */
     public function availableUpdateNotice(string $currentVersion): ?string;
 }

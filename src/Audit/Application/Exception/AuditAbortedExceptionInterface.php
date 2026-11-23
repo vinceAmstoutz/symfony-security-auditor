@@ -17,11 +17,8 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
 /**
- * Common shape of every exception that halts an audit mid-run while still
- * carrying a partial `AuditReport`, implemented by
- * {@see AuditAbortedByBudgetException} and {@see AuditAbortedByProviderException}
- * so the command layer can render whatever findings were validated before
- * the abort with a single catch site, regardless of the abort's cause.
+ * An exception that halts an audit mid-run and carries the partial
+ * `AuditReport` of what was validated before the abort.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

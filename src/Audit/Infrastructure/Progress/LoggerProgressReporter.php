@@ -19,13 +19,8 @@ use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
 /**
- * Forwards each progress event to a PSR-3 logger at info level under the
- * `audit.progress` message prefix. Useful for hosts that already collect
- * structured logs (e.g. monolog → ELK) and want progress visibility
- * without wiring custom infrastructure.
- *
- * Logger failures are swallowed so a misbehaving logger cannot abort the
- * audit (contract guarantee from the ProgressReporterInterface).
+ * Logs each progress event at info level under the `audit.progress` prefix. A
+ * logger failure never aborts the audit.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

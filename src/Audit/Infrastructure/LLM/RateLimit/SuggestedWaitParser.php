@@ -19,14 +19,10 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 use Throwable;
 
 /**
- * The waits a rate-limited provider names besides its `Retry-After`, in
- * milliseconds: the one its message asks for (OpenAI's `Please try again in
- * 8.064s.`, Gemini's `Please retry in 41.8s.`) and the time OpenAI says its
- * token window takes to reset (`x-ratelimit-reset-tokens: 6m0s`), whichever
- * is longest; 0 when it names none. OpenAI's bridge hands back the
- * request-window reset as the `Retry-After` hint, which a request over the
- * token limit outlasts. Messages are matched byte for byte, since a
- * provider's message is not always valid UTF-8.
+ * Returns the longest wait, in milliseconds, a rate-limited provider names
+ * besides its `Retry-After`: in its message (`Please retry in 41.8s.`) or in
+ * OpenAI's `x-ratelimit-reset-tokens` header; 0 when it names none. Reads
+ * messages byte for byte, since they are not always valid UTF-8.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

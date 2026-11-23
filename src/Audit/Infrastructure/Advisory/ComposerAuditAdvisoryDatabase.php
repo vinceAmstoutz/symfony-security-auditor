@@ -21,22 +21,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\MalformedAdvisoryPayloadException;
 
 /**
- * Advisory database backed by `composer audit --format=json --locked`. The
- * audit is executed once at construction time and the resulting per-package
- * entries are cached for the lifetime of the instance. Composer's advisories
- * stream is the same dataset that powers `composer audit` on the CLI.
+ * Advisories of `composer audit --format=json --locked`, run once at
+ * construction. Includes the advisories the audited project ignores in its own
+ * composer config, so the project cannot hide a vulnerable dependency.
  *
- * The advisories the audited project filters out in its own composer config
- * (`config.audit.ignore` and `ignore-severity` where composer has it) are read
- * from the `ignored-advisories` key composer reports them under: the repository
- * under audit must not be able to hide a vulnerable dependency from its
- * auditor.
- *
- * Failure modes (composer missing, lock file absent, malformed JSON) degrade
- * gracefully to an empty database: `lookup()` always returns a list, never
- * propagates an exception, so the orchestrator and the tool layer stay
- * resilient. {@see self::hasFailedToLoad()} tells that empty database from
- * the snapshot of a project with no advisory.
+ * Any load failure yields an empty database: `lookup()` never throws and
+ * {@see self::hasFailedToLoad()} tells it from a project with no advisory.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

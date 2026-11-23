@@ -14,10 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 
 /**
- * Opt-in companion of {@see ProjectFileScannerInterface} for a scanner that can
- * share what it read between several scans: a run scans its configured surface
- * and its `--path` values through one such scanner, so a file both reach is
- * read and scrubbed once.
+ * Optional companion of {@see ProjectFileScannerInterface}: shares what it
+ * read between several scans, so a file the configured surface and a `--path`
+ * value both reach is read and scrubbed once.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

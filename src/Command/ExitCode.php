@@ -14,8 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 /**
- * The process exit codes of `audit:run`. The integer VALUES are public API
- * (see docs/versioning.md); this enum is the internal source of truth for them.
+ * The exit codes of `audit:run`, whose integer values are public API.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

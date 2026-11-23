@@ -128,10 +128,8 @@ final readonly class Baseline implements BaselineInterface
     }
 
     /**
-     * The baseline is part of the audited repository, so a pull request
-     * controls every field of an entry and each one reaches the reviewer's
-     * system prompt: each is capped, the reason at the reviewer's own
-     * triage-memory cap.
+     * Caps every field: a pull request controls the baseline and each field
+     * reaches the reviewer's system prompt.
      */
     private function feedbackOf(mixed $entry): ?AcceptedFindingFeedback
     {
@@ -153,8 +151,8 @@ final readonly class Baseline implements BaselineInterface
     }
 
     /**
-     * Counts code points: a run of combining marks inflates a single grapheme
-     * cluster without bound, never a code point count.
+     * Caps code points, not grapheme clusters, which combining marks inflate
+     * without bound.
      */
     private function capped(string $value, int $maxCodePoints): string
     {
@@ -183,9 +181,9 @@ final readonly class Baseline implements BaselineInterface
     }
 
     /**
-     * A symlink on the way (below the working directory or below the audited
-     * project's root), a path naming a directory, a directory that cannot be
-     * created or one the file cannot be written into.
+     * Refuses a symlink below the working directory or the project root, a
+     * path naming a directory and a directory that cannot be created or
+     * written into.
      *
      * @throws UnsafeBaselineWriteException
      * @throws BaselineWriteFailedException
@@ -241,13 +239,9 @@ final readonly class Baseline implements BaselineInterface
     }
 
     /**
-     * `Filesystem::dumpFile()` transparently writes through a pre-existing
-     * symlink at its destination: a predictable, documented baseline path
-     * (e.g. `.security-baseline.json`) committed as a symlink by a malicious
-     * PR would let the audit overwrite an arbitrary file the CI runner can
-     * reach. Mirrors the guard already applied to the filesystem
-     * attacker/reviewer/advisory caches, the standalone config writer and
-     * the report writer; it walks the audited project below its root as well.
+     * Refuses a path through a symlink below the working directory or the
+     * project root, which `dumpFile()` would follow to any file the runner can
+     * reach.
      *
      * @throws UnsafeBaselineWriteException
      */

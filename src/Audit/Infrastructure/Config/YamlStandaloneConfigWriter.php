@@ -52,11 +52,8 @@ final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWrite
     }
 
     /**
-     * `Filesystem::dumpFile()` transparently writes through a pre-existing
-     * symlink at its destination and `Filesystem::mkdir()` treats a
-     * symlinked directory as already existing. Mirrors the same guard
-     * already applied to the filesystem attacker/reviewer caches and the
-     * advisory cache.
+     * Refuses a symlinked file or directory, which `dumpFile()` would write
+     * through.
      *
      * @throws UnsafeStandaloneConfigWriteException
      */

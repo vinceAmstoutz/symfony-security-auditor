@@ -22,15 +22,13 @@ interface ReviewerPromptBuilderInterface
     public function buildUserMessage(Vulnerability $vulnerability, string $codeContext): string;
 
     /**
-     * System prompt used when reviewing several findings in a single LLM call.
-     * Instructs the model to return a JSON array, one review object per input finding.
+     * The system prompt of a batch review, which asks for a JSON array of one
+     * review per finding.
      */
     public function buildBatchSystemPrompt(): string;
 
     /**
-     * Combined user message for batch review. The LLM is expected to return a JSON array of reviews
-     * with the same `id` values as the input vulnerabilities: verdicts are matched back to findings
-     * by `id`, so the response order need not match the input order.
+     * Reviews are matched back to findings by `id`, in any order.
      *
      * @param list<Vulnerability>   $vulnerabilities
      * @param array<string, string> $codeContexts    keyed by vulnerability id

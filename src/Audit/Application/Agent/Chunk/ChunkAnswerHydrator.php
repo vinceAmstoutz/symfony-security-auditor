@@ -24,10 +24,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMAnswerJsonDecoder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 
 /**
- * Turns the model's answer on a chunk into its findings and coverage: the JSON
- * array a JSON-mode answer carries (or the answer of a structured turn whose
- * client never offered the recording tool) and the payloads a structured turn
- * recorded. Shared by the sequential and concurrent chunk analyzers.
+ * Turns the model's answer on a chunk into its findings and coverage, from
+ * the JSON answer or from the payloads a structured turn recorded.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -88,12 +86,8 @@ final readonly class ChunkAnswerHydrator
     }
 
     /**
-     * A response cut short (by the output token limit, a content filter, the
-     * tool-loop cap or a call that produced no content) is not the model's
-     * complete verdict on the chunk: the findings it does carry are kept, but
-     * the chunk is recorded as errored so the report says it could not be
-     * fully analyzed and nothing is cached, so the next run retries it
-     * instead of replaying an empty result as safe.
+     * Records a degraded answer as errored and uncached, keeping its findings,
+     * so the next run retries the chunk.
      *
      * @param list<ProjectFile> $chunk
      * @param list<mixed>       $rawData
@@ -112,9 +106,8 @@ final readonly class ChunkAnswerHydrator
     }
 
     /**
-     * The findings a cut-short JSON answer still carries: `parseJson()`
-     * recovers the first balanced block of a truncated array, which is a
-     * single finding object rather than a list, so it is wrapped back into one.
+     * Returns the findings a cut-short JSON answer still carries, as a list
+     * even when `parseJson()` recovers a lone finding object.
      *
      * @return list<mixed>
      */
@@ -130,12 +123,9 @@ final readonly class ChunkAnswerHydrator
     }
 
     /**
-     * A model that found a single weakness may answer it as a bare finding
-     * object instead of a one-element array: when that object is the answer's
-     * only JSON, it is read as that one finding. Any other object (one
-     * recovered from among several findings written apart, or one keyed by
-     * finding) is read as its values, so a finding it leaves out keeps the
-     * chunk unanalyzed and out of the cache.
+     * Reads an object that is the answer's only JSON as a lone finding and any
+     * other object as its values, so a finding it leaves out keeps the chunk
+     * unanalyzed and uncached.
      *
      * @param array<array-key, mixed> $decoded
      *

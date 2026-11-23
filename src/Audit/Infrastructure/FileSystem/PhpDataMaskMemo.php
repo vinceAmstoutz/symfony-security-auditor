@@ -16,12 +16,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem;
 use Closure;
 
 /**
- * The mask of the content one scrub has reached, built the first time a redaction needs it and
- * built again only once a pass has changed that content: tokenizing a file costs more than every
- * pattern that finds nothing in it.
+ * The mask of the content a scrub has reached, built when a redaction first needs it and again
+ * only once a pass has changed that content.
  *
- * Mutable by design: it keeps a lazily built mask across the passes of one scrub, so it opts out
- * of the final readonly rule as a stateful collaborator (see .claude/rules/php-classes.md).
+ * Not readonly: keeps the mask across the passes of one scrub (stateful collaborator, see
+ * .claude/rules/php-classes.md).
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

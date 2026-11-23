@@ -198,13 +198,6 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         $this->lightConfirmation($symfonyStyle, 'Dry run complete.');
     }
 
-    /**
-     * Derived from the cost breakdown itself rather than restating
-     * `EstimateAuditCostUseCase::DEFAULT_REVIEWER_INPUT_RATIO` as a fixed
-     * string: a caller constructing the use case with a different ratio, or
-     * a future change to the default, would otherwise silently drift from
-     * this caveat.
-     */
     private function reviewerRatioPercent(AuditCost $auditCost): ?int
     {
         $byRole = $auditCost->byRole();
@@ -249,19 +242,6 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         $this->lightConfirmation($symfonyStyle, \sprintf('%d file(s) in scope.', \count($projectFiles)));
     }
 
-    /**
-     * A lighter-weight replacement for `SymfonyStyle::success()` on
-     * intermediate confirmations (no boxed `[OK]` block, just a short line)
-     * but keeping its leading marker (gated on `isDecorated()`, since a
-     * redirected/CI log has no use for an emoji) and its trailing blank line,
-     * so it doesn't abut whatever prints next.
-     */
-    /**
-     * `SymfonyStyle::note()` frames a caveat in a full-width `[NOTE]` block
-     * with a `!` gutter down every wrapped line: weight this earns only for
-     * something the reader must act on. A dimmed line reads as the footnote
-     * it is and matches the other estimate caveats printed alongside it.
-     */
     private function caveat(SymfonyStyle $symfonyStyle, string $message): void
     {
         $symfonyStyle->text(\sprintf('<fg=gray>%s</>', $message));
@@ -283,18 +263,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     }
 
     /**
-     * A scanned file's relative path comes from the audited (untrusted) project,
-     * where a filename may legally contain a newline, ANSI escape or bidi
-     * override. `OutputFormatter::escape()` neutralises `<`/`>` markup but not
-     * those characters, so the path is first collapsed to a single line and
-     * stripped of control/bidi characters (a crafted filename cannot forge a
-     * fake listing entry or spoof the terminal) and a legacy `##[command]`
-     * in it is defused for a CI runner's log.
-     */
-    /**
-     * `SymfonyStyle::warning()` escapes console markup itself, so the text is
-     * only collapsed to one line, stripped of control characters and defused
-     * for a CI runner's log.
+     * `SymfonyStyle::warning()` escapes console markup itself.
      */
     private function sanitizeForWarning(string $text): string
     {
@@ -418,9 +387,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     }
 
     /**
-     * A run with no verdict (no file found, or none analyzed and nothing
-     * found) states no risk level: a SAFE there would vouch for code nobody
-     * read.
+     * States no risk level for a run with no verdict.
      */
     private function incompleteSummary(AuditReport $auditReport): string
     {

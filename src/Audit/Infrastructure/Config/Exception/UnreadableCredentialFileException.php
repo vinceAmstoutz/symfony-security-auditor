@@ -17,9 +17,8 @@ use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 
 /**
- * The variable's value is named only by the masked preview a key gets, never
- * in full: a user who put `file:` in front of the variable that holds the key
- * itself would otherwise read their key back in an error message.
+ * Names the variable's value only by its masked preview, since it may be the
+ * key itself.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

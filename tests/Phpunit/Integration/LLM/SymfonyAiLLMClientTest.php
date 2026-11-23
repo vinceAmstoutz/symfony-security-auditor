@@ -931,9 +931,6 @@ final class SymfonyAiLLMClientTest extends TestCase
             ['system' => 's', 'user' => 'u'],
         ], 4);
 
-        // The dispatch-loop acquire() for the request whose dispatch failed
-        // must be released (0,0) before falling back to the sequential
-        // path: otherwise it sits unreconciled in the limiter forever.
         self::assertCount(2, $fakeRateLimiter->recorded);
         self::assertSame([0, 0], $fakeRateLimiter->recorded[0]);
     }
@@ -971,15 +968,8 @@ final class SymfonyAiLLMClientTest extends TestCase
     }
 
     /**
-     * The negative-token guard above only fires through
-     * `TokenUsageRecorder::record()`, reached via
-     * `PlatformResultExtractor::extractTokens()`'s optional, nullable
-     * `$tokenUsageRecorder` collaborator. `PlatformAccountingConfig` defaults
-     * that collaborator to `null` (a legitimate, supported configuration),
-     * so building the client without one (as this test does) must not let a
-     * provider-reported negative token count reach the rate limiter
-     * unvalidated: `extractTokens()` itself must reject it before any caller
-     * ever sees the value.
+     * Without a recorder, `extractTokens()` itself rejects a negative token
+     * count before the rate limiter sees it.
      *
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
@@ -1121,11 +1111,6 @@ final class SymfonyAiLLMClientTest extends TestCase
     }
 
     /**
-     * A dispatch whose token extraction fails must release its own
-     * reservation as `[0, 0]` (not the poisoned value that failed to
-     * extract) and the fallback `complete()` call's own reservation must
-     * still be recorded correctly and independently alongside it.
-     *
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
@@ -1248,8 +1233,7 @@ final class SymfonyAiLLMClientTest extends TestCase
             ['system' => 's2', 'user' => 'u2'],
         ], 1);
 
-        // window size 1 ⇒ acquire+resolve one request before the next; a larger
-        // window would acquire both before resolving either.
+        // A window of one acquires and resolves each request before the next.
         self::assertSame(['acquire', 'record', 'acquire', 'record'], $rateLimiter->events);
     }
 
@@ -2412,10 +2396,6 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $symfonyAiLLMClient->complete('sys', 'usr');
 
-        // The failed first attempt's acquire() must be released (0,0)
-        // before retrying: otherwise it sits unreconciled in the limiter
-        // for the rest of the window, since only the eventual success
-        // triggers a real record() call.
         self::assertCount(2, $fakeRateLimiter->recorded);
         self::assertSame([0, 0], $fakeRateLimiter->recorded[0]);
     }
@@ -2590,10 +2570,8 @@ final class SymfonyAiLLMClientTest extends TestCase
     }
 
     /**
-     * A peer that closes the TLS connection mid-read (a stale keep-alive socket
-     * taken from the HTTP client's pool is the common trigger) is a transport
-     * truncation, not a rejected request. It must be retried on a fresh
-     * connection instead of aborting the whole audit.
+     * A TLS connection the peer closes mid-read, such as a stale keep-alive
+     * socket, is retried on a fresh connection.
      *
      * @throws InvalidRetryConfigurationException
      * @throws BudgetExceededException

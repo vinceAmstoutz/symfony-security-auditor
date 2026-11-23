@@ -22,12 +22,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\WorkflowCom
 final class MalformedProjectConfigException extends RuntimeException
 {
     /**
-     * The parser quotes the offending line, which the audited repository
-     * wrote, so its control characters are escaped before the message reaches
-     * a terminal and its workflow commands are defused, since the console
-     * wraps the message wherever it likes. The parse error is not chained: the
-     * console renders every previous exception too and would print that line
-     * raw.
+     * Escapes the control characters and defuses the workflow commands of the
+     * line the parser quotes. Does not chain the parse error, which the
+     * console would print raw.
      */
     public static function fromParseException(string $configFile, ParseException $parseException): self
     {
@@ -60,9 +57,8 @@ final class MalformedProjectConfigException extends RuntimeException
     }
 
     /**
-     * Refused before the file is read: a link committed in the audited
-     * repository could point at any file of the user's and a parse error
-     * quotes the line it stopped on.
+     * Refused before the file is read: a parse error would quote a line of
+     * whatever user file the link points at.
      */
     public static function forSymlink(string $configFile): self
     {
@@ -80,7 +76,7 @@ final class MalformedProjectConfigException extends RuntimeException
     }
 
     /**
-     * The value is not quoted: it is what would have reached the terminal.
+     * Leaves the value out of the message.
      */
     public static function forControlCharacter(string $configFile, string $key): self
     {
@@ -88,7 +84,7 @@ final class MalformedProjectConfigException extends RuntimeException
     }
 
     /**
-     * The value is not quoted: resolved, it would be what the reference read.
+     * Leaves the value out of the message.
      */
     public static function forContainerReference(string $configFile, string $key): self
     {
@@ -106,7 +102,7 @@ final class MalformedProjectConfigException extends RuntimeException
     }
 
     /**
-     * The key is not quoted: it holds the very marker the message withholds.
+     * Leaves the key out of the message.
      */
     public static function forWorkflowCommandInKey(string $configFile, string $parentKey): self
     {
@@ -114,7 +110,7 @@ final class MalformedProjectConfigException extends RuntimeException
     }
 
     /**
-     * The key is quoted: it is the repository's text, never what it resolves to.
+     * Quotes the key as the repository wrote it, never what it resolves to.
      */
     public static function forContainerReferenceInKey(string $configFile, string $key): self
     {

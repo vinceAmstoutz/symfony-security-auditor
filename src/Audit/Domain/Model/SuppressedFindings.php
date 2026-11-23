@@ -14,11 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
- * The findings a run found but its report does not list, one entry per
- * occurrence: the ones the baseline accepted before the reviewer saw them,
- * then the ones taken out of the report afterwards, accepted by the baseline
- * or muted by type. Each is listed under the fingerprint a report gives the
- * finding, beside the baseline fingerprint that left it out.
+ * The findings a run found and its report does not list, one entry per
+ * occurrence: those the baseline accepted before review, then those removed
+ * from the report afterwards, accepted by the baseline or muted by type.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -53,13 +51,12 @@ final readonly class SuppressedFindings
     }
 
     /**
-     * Names each finding accepted before the review after the baseline entry
-     * whose credit it spent: `$entryFingerprintsByBaselineFingerprint` holds,
-     * for each baseline fingerprint, the `fingerprint` of every entry carrying
-     * it, in the order their credits are named. A finding accepted through an
-     * entry's own fingerprint keeps its own, while one accepted through an
-     * entry's `attacker_fingerprint` (a finding the reviewer had reclassified)
-     * takes the entry's fingerprint, the one a report lists it under.
+     * Names each finding accepted before review after the baseline entry whose
+     * credit it spent. `$entryFingerprintsByBaselineFingerprint` holds, per
+     * baseline fingerprint, the `fingerprint` of each entry carrying it, in
+     * credit order. A finding accepted through an entry's
+     * `attacker_fingerprint` takes the entry's fingerprint; one accepted
+     * through the entry's own fingerprint keeps its own.
      *
      * @param array<string, list<string>> $entryFingerprintsByBaselineFingerprint
      */

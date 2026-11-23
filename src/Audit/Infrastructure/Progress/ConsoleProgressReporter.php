@@ -24,24 +24,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\WorkflowCom
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\TerminalTextSanitizer;
 
 /**
- * Renders an animated Symfony ProgressBar to a decorated (TTY) console.
+ * Renders a Symfony ProgressBar on a decorated (TTY) console. Pipeline and
+ * stage events drive the bar. The audit narrative (overview, findings, chunks,
+ * review tally) prints above it. Ignores any other event.
  *
- * The pipeline events drive the bar itself: pipeline.started creates a bar
- * sized to the stage count, stage.started/audit.iteration.started/
- * attacker.chunk.started/review.started refresh its message (the chunk message
- * reads "⏳ querying model …" so a slow model call reads as waiting, not hung),
- * stage.completed advances it and pipeline.completed finishes it. The audit
- * narrative is printed as lines above the bar: audit.started (attack-surface
- * overview), attacker.finding.recorded (each finding as it is flagged),
- * attacker.chunk.completed (each chunk with its elapsed time, marked as
- * failed when the attacker left it errored), review.skipped
- * (acknowledges a zero-finding pass so the reviewer step doesn't read as
- * having silently disappeared) and review.completed (the reviewer tally).
- * Unhandled events are ignored. The non-decorated counterpart is
- * PlainProgressReporter.
- *
- * Mutable because ProgressBar is stateful (tracks current step, format and
- * output position).
+ * Not readonly: the progress bar is stateful (see
+ * .claude/rules/php-classes.md).
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -59,9 +47,6 @@ final class ConsoleProgressReporter implements ProgressReporterInterface
 
     public function __construct(private readonly OutputInterface $output) {}
 
-    /**
-     * {@inheritDoc}
-     */
     #[Override]
     public function report(string $event, array $context = []): void
     {

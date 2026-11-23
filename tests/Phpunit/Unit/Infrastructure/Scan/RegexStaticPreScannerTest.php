@@ -704,9 +704,8 @@ final class RegexStaticPreScannerTest extends TestCase
     }
 
     /**
-     * The idiomatic one-method-per-line Doctrine `QueryBuilder` fluent style
-     * (taught in virtually every Symfony tutorial) puts `orderBy($sort)` on
-     * its own line, split from the `->` on the previous line.
+     * The fluent Doctrine `QueryBuilder` style puts `orderBy($sort)` on its own
+     * line.
      *
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException

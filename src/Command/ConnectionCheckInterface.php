@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 /**
- * Sends one short request to the configured provider, so `doctor
- * --check-connection` can tell whether the key, model and endpoint work.
+ * Sends one short request to the configured provider for `doctor
+ * --check-connection`.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

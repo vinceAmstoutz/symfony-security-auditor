@@ -44,24 +44,20 @@ final readonly class RunAuditUseCase
     ) {}
 
     /**
-     * @param list<string> $scanPaths            optional project-relative paths that
-     *                                           replace the configured scan surface for
-     *                                           the run: they are scanned themselves, by
-     *                                           a scanner that can be told where to look.
-     *                                           They narrow the configured files otherwise;
-     *                                           empty list (the default) audits the
-     *                                           configured scan surface
-     * @param bool         $bypassCache          when true, agents skip the attacker and
-     *                                           reviewer caches entirely (no reads, no
-     *                                           writes)
-     * @param ?string      $diffSinceRef         when set, only files changed against
-     *                                           this git ref are audited; null audits
-     *                                           every file in scope
+     * @param list<string> $scanPaths            project-relative paths that replace the
+     *                                           configured scan surface, scanned themselves
+     *                                           by a scanner that can be told where to look
+     *                                           and narrowing the configured files otherwise;
+     *                                           empty audits the configured scan surface
+     * @param bool         $bypassCache          skips the attacker and reviewer caches,
+     *                                           reads and writes alike
+     * @param ?string      $diffSinceRef         audits only the files changed against
+     *                                           this git ref; null audits every file in
+     *                                           scope
      * @param list<string> $acceptedFingerprints
      *                                           baseline fingerprints of accepted
-     *                                           findings; matching attacker findings
-     *                                           skip the reviewer and never enter the
-     *                                           report
+     *                                           findings, which skip the reviewer and
+     *                                           the report
      *
      * @throws AuditAbortedByBudgetException
      * @throws AuditAbortedByProviderException

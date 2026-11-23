@@ -18,12 +18,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 
 /**
- * Settles a chunk whose model sent a finding the recording tool refused and
- * never sent again in full: that finding is lost without a trace in the
- * answer, so the chunk is not the model's complete verdict. The findings that
- * were recorded are kept, the chunk is recorded as errored so the report says
- * it could not be fully analyzed and nothing is cached, so the next run asks
- * the model again instead of replaying the lossy answer.
+ * Records a chunk as errored and uncached, keeping its recorded findings,
+ * when the model never repeated in full a call the recording tool refused.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

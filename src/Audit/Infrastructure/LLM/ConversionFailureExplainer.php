@@ -21,27 +21,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Tran
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnconvertedAnswerException;
 
 /**
- * Reads the raw answer of a call its bridge failed to convert again, for what
- * the bridge's exception no longer says. Azure and the gateways relaying it
- * refuse a prompt the content filter caught with an HTTP 400 whose
- * `error.code` is `content_filter`; the bridges keep only its message. A tool
- * call the output token limit cut off mid-way through its arguments fails as
- * a malformed tool call, while the answer's finish reason (`length` in Chat
- * Completions, `incomplete_details.reason: max_output_tokens` in the Responses
- * API) says it was cut off, so asking again would hit the same limit. A
- * gateway refusing a request as too large answers HTTP 413, often with an
- * HTML page the bridges cannot decode (`Syntax error`), so its status is read
- * too. A status that clears on its own (408, 425, 429 or 5xx) is transient
- * whatever the bridge made of its body (the Ollama bridge reads any error
- * body as `Response does not contain message.` and a proxy's HTML page fails
- * to decode): it wraps the failure as it reads without the status, which
- * decides once the retries are spent. Any other HTTP client error is a
- * refusal as well, whatever its
- * body: nothing was served, so it is booked as nothing, while the bridge's
- * own message still decides how the run goes on (a gateway's
- * `{"detail":"Not Found"}` reads as `Response does not contain choices.`, an
- * empty answer for that chunk). Only the failure to convert that very answer
- * is read against it.
+ * Reads the raw answer of a call its bridge failed to convert for what the
+ * bridge's exception lost: Azure's HTTP 400 `content_filter`, a tool call the
+ * output limit cut off, or an HTTP 413, read as too large. A 408, 425, 429 or
+ * 5xx is wrapped as transient whatever the bridge made of its body; any other
+ * HTTP 4xx is wrapped as a refusal that books nothing yet is classified by
+ * the bridge's message. Returns any other failure unchanged, a failure that
+ * is not the conversion of that very answer included.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

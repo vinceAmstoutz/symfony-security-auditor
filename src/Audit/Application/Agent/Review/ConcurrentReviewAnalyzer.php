@@ -24,15 +24,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilderInterface;
 
 /**
- * Resolves every single-finding review in concurrency windows via the
- * batch-capable client, then applies each verdict. Findings are dispatched one
- * `maxConcurrent`-sized window at a time (never as a single oversized batch),
- * so a budget/provider failure in a later window cannot discard an earlier
- * window's already-applied verdicts; the failing window and every window not
- * yet dispatched are marked `aborted`/`errored` before the exception
- * propagates. Per-finding parse/transient failures degrade to a rejected
- * verdict exactly as the sequential path does. Cached verdicts are served
- * first; only the misses are dispatched.
+ * Reviews the cache-miss findings one by one through the batch-capable
+ * client, one `maxConcurrent`-sized window at a time. A budget or provider
+ * failure keeps the verdicts of earlier windows and marks the failing window
+ * and the ones after it `aborted` or `errored` before propagating. A parse or
+ * transient failure on one finding degrades as in the sequential path.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -105,10 +101,7 @@ final readonly class ConcurrentReviewAnalyzer
     }
 
     /**
-     * Dispatches pending findings one `maxConcurrent`-sized window at a time.
-     * Each window is finalized (verdicts applied) as soon as it completes,
-     * before the next window is attempted, so a failure partway through never
-     * discards an earlier window's completed work.
+     * Applies each window's verdicts before dispatching the next.
      *
      * @param list<array{system: string, user: string}> $requests
      * @param list<PendingReview>                       $pending
@@ -194,9 +187,8 @@ final readonly class ConcurrentReviewAnalyzer
     }
 
     /**
-     * Marks every finding in the window that just failed, plus every window
-     * not yet attempted, as failed, without touching windows that already
-     * finalized successfully.
+     * Marks the findings of the failed window and of every later window as
+     * `$status`.
      *
      * @param list<list<PendingReview>> $pendingWindows
      */

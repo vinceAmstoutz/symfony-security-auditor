@@ -473,13 +473,8 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
-     * The SARIF 2.1.0 spec lets a plain-text `message.text` field embed a
-     * CommonMark-style `[display text](target)` hyperlink and mandates that
-     * every viewer (even one with no Markdown support) render it as a
-     * clickable link. `Vulnerability::title()` is free LLM-influenced text
-     * with no character restrictions, so an unescaped title lets a crafted
-     * finding forge a live link into a security report a reviewer is
-     * trusting to triage real vulnerabilities.
+     * SARIF 2.1.0 makes every viewer render `[display text](target)` in
+     * `message.text` as a link.
      *
      * @throws InvalidAuditContextException
      * @throws InvalidCodeLocationException
@@ -504,10 +499,8 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
-     * A Unicode bidirectional override in the title survives JSON round-tripping
-     * unchanged: any consumer that decodes the SARIF (including GitHub Code
-     * Scanning) sees the literal bidi character, enabling a Trojan-Source-style
-     * visual reorder of the displayed finding title.
+     * A bidirectional override survives JSON decoding into every SARIF
+     * consumer, GitHub Code Scanning included.
      *
      * @throws InvalidAuditContextException
      * @throws InvalidCodeLocationException
@@ -529,12 +522,8 @@ final class SarifReportRendererTest extends AbstractReportRendererTestCase
     }
 
     /**
-     * `TerminalTextSanitizer::stripControlCharacters()` runs a `/u`-mode
-     * regex, which aborts (returns `null`) on an invalid subject byte:
-     * `HtmlReportRenderer::escape()` guards against exactly this by scrubbing
-     * with `mb_scrub()` first. A single stray byte anywhere in the title,
-     * alongside a genuine bidi override, must not let that override survive
-     * unstripped into the SARIF `message.text` a consumer decodes back.
+     * `TerminalTextSanitizer::stripControlCharacters()` runs a `/u` regex,
+     * which fails on an invalid byte.
      *
      * @throws InvalidAuditContextException
      * @throws InvalidCodeLocationException

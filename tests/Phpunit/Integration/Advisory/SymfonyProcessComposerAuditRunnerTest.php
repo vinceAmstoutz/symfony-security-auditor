@@ -109,11 +109,8 @@ final class SymfonyProcessComposerAuditRunnerTest extends TestCase
     }
 
     /**
-     * The audited project is untrusted and composer runs inside it. Composer
-     * dispatches that project's `pre-command-run` script and activates the
-     * plugins in its `vendor/` unless told not to: either one is arbitrary
-     * command execution on the audit host, which for the shipped GitHub Action
-     * is a runner holding a write-scoped token.
+     * The audited project's `pre-command-run` script or a plugin in its
+     * `vendor/` would run arbitrary commands on the audit host.
      */
     public function test_default_process_builder_refuses_the_audited_projects_scripts_and_plugins(): void
     {

@@ -16,16 +16,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /**
- * The files a finding's echoed path may name. `name()` names a finding by the
- * known file its path denotes, an absolute path, a leading slash, backslashes
- * or a leading `./` alike ({@see EchoedFilePath::comparable()}), so one file
- * has one spelling in every id, fingerprint and code lookup. Paths are compared
- * byte for byte: one that names a known file as written keeps naming the first
- * such file (these files before the later ones) and a folded spelling resolves
- * only when it denotes one known file alone, so a look-alike name (a
- * backslash, another Unicode form) never takes the findings of the file it
- * resembles. The paths are indexed once, so naming takes a few lookups
- * whatever the number of files.
+ * The files a finding's echoed path may name. `name()` gives a file one
+ * spelling, whether the path is absolute, starts with `/` or `./` or uses
+ * backslashes. A path naming a known file as written names the first such
+ * file, these files before the later ones. A folded spelling resolves only
+ * when it denotes one known file alone, so a look-alike name never takes the
+ * findings of the file it resembles.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -75,7 +71,7 @@ final readonly class KnownFiles
     }
 
     /**
-     * @return array<string, string> the relative paths of the known files whose paths share the comparable form `$form`, each once
+     * @return array<string, string> the relative paths of the known files with the comparable form `$form`, each once
      */
     private function denotedBy(string $form): array
     {

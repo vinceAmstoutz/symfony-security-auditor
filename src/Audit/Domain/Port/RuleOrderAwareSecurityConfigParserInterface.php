@@ -16,12 +16,10 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AccessControlRule;
 
 /**
- * Opt-in extension of {@see SecurityConfigParserInterface} for parsers that
- * also give the `access_control` rules in the order the configuration
- * declares them, those that check nothing included, since the application
- * applies the first rule that matches a request. `MappingStage` checks
- * `instanceof RuleOrderAwareSecurityConfigParserInterface`; without it, a
- * route is labelled from the access-control map alone.
+ * Optional extension of {@see SecurityConfigParserInterface}, checked with
+ * `instanceof`: the `access_control` rules in declaration order, those that
+ * check nothing included, since the first matching rule applies. Without it,
+ * a route is labelled from the access-control map alone.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

@@ -18,11 +18,10 @@ use Symfony\Component\Filesystem\Path;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 
 /**
- * The project a run audits and the paths it narrows to, as the command line
- * names them. A directory holding no `composer.json` and no file the scan
- * reaches is not a project and a scan of it would find nothing: the run
- * audits the Composer project the named paths lie in instead, narrowed to
- * them, so `audit app/src` audits what `audit app --path src` does.
+ * The project a run audits and the paths it narrows to. A directory holding
+ * no `composer.json` and no file the scan reaches is read as a folder of the
+ * Composer project its paths lie in, so `audit app/src` audits what
+ * `audit app --path src` does.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -43,7 +42,7 @@ final readonly class AuditTarget
     /**
      * @param string                 $directory      the project path the command line names, absolute
      * @param list<string>           $scanPaths      the `--path` values as given
-     * @param ?Closure(string): bool $holdsScanFiles whether the configured scan finds a file in a directory, which makes it the project an earlier release audited; none asks whether a path `scan.included_paths` lists by default exists in it
+     * @param ?Closure(string): bool $holdsScanFiles whether the configured scan finds a file in a directory, which makes it the project; defaults to whether it holds a default `scan.included_paths` entry
      */
     public static function named(string $directory, array $scanPaths, ?Closure $holdsScanFiles = null): self
     {

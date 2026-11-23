@@ -60,12 +60,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedT
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ThrowingConverter;
 
 /**
- * A prompt the model cannot take in is refused before anything is generated:
- * a single call surfaces it under its own type (without retrying) and a batch
- * answers it per request as a `request_too_large` response, so the chunk
- * analyzers can split the chunk while the other requests of the window keep
- * their answers. A conversation that only outgrows the model once tool results
- * were appended ends as an empty response instead.
+ * A prompt the model cannot take in surfaces under its own type on a single
+ * call (never retried) and as a per-request `request_too_large` response in a
+ * batch. A conversation that outgrows the model only once tool results were
+ * appended ends as an empty response.
  */
 final class SymfonyAiLLMClientRequestTooLargeTest extends TestCase
 {

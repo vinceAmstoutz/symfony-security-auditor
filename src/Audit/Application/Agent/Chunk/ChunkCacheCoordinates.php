@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 
 /**
- * Where a chunk's findings are cached and whether they may be: everything a
- * cache lookup needs of a {@see ChunkContext}, known before its prompts are.
+ * Where a chunk's findings are cached and whether they may be, known before
+ * its prompts are built.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

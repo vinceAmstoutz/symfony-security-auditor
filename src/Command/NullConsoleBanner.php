@@ -17,9 +17,8 @@ use Override;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Prints nothing. Wired in the standalone binary, where
- * `StandaloneApplication` already renders the banner for every command
- * before the audit command is even resolved.
+ * Prints nothing: in the standalone binary, `StandaloneApplication` renders
+ * the banner.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

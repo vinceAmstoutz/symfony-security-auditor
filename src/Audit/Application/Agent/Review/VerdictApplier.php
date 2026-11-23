@@ -21,8 +21,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 
 /**
  * Applies one reviewer verdict payload to a finding: acceptance, optional
- * severity elevation and optional type correction. Invalid enum values from
- * the model are logged and ignored, keeping the original finding values.
+ * severity elevation and optional type correction. Logs and ignores an
+ * invalid enum value, keeping the finding's own.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -58,10 +58,8 @@ final readonly class VerdictApplier
     }
 
     /**
-     * Whether the payload judges the finding at all: a payload with no
-     * `accepted` flag (notes only, an empty object) or one {@see AcceptedFlag}
-     * cannot read is not a rejection but a review the model never made, which
-     * a caller records as errored.
+     * Returns false, a review the model never made rather than a rejection,
+     * for a payload without an `accepted` flag `AcceptedFlag` can read.
      *
      * @param array<string, mixed>|list<array<string, mixed>> $reviewData
      */
@@ -105,8 +103,7 @@ final readonly class VerdictApplier
     }
 
     /**
-     * Normalizes the reviewer payload to the single review object: a defensive
-     * unwrap when the model returns a one-element array instead of an object.
+     * Unwraps a one-element array into the review object it holds.
      *
      * @param array<string, mixed>|list<array<string, mixed>> $reviewData
      *

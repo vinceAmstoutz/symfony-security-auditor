@@ -17,9 +17,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 
 /**
- * Extracts the attribute and subject vocabulary from a single voter file by
- * scanning the body of its `supports()` method. Implementations must degrade
- * silently (return null or no entries) when the file cannot be parsed.
+ * Extracts the attributes and subjects a voter's `supports()` accepts.
+ * Implementations MUST return null or no entries for a file they cannot
+ * parse.
  */
 interface VoterCapabilityParserInterface
 {

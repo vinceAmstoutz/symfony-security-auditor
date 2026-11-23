@@ -142,13 +142,9 @@ final class ModelsDevPricingProviderTest extends TestCase
     }
 
     /**
-     * `qualified/free-tier-collision` is priced at $0 by `302ai` (alphabetically
-     * first) and at $10/$20 by `zzz-collides-on-qualified-key` (alphabetically
-     * last): an aggregator's stray free-tier listing must never win over a
-     * genuinely paid one for the same qualified id, since that would both
-     * under-report the real cost and, via `hasModel()` returning `true`,
-     * silently bypass `UnpricedModelBudgetGuard`'s "no published pricing"
-     * safety net.
+     * An aggregator's stray free-tier listing never wins over a paid one for
+     * the same qualified id: it would under-report the cost and slip past
+     * `UnpricedModelBudgetGuard`.
      */
     public function test_it_prefers_a_nonzero_price_over_an_alphabetically_earlier_zero_price_for_a_qualified_id(): void
     {
@@ -468,8 +464,7 @@ final class ModelsDevPricingProviderTest extends TestCase
 
     /**
      * `InstalledVersions::getInstallPath()` answers relative to the Composer
-     * directory, so the raw join carries a `vendor/composer/../symfony/...`
-     * detour that `doctor` would print verbatim at the user.
+     * directory.
      */
     public function test_the_packaged_catalog_path_is_free_of_parent_directory_detours(): void
     {

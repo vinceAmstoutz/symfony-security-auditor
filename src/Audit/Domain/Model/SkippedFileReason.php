@@ -37,10 +37,9 @@ enum SkippedFileReason: string
     }
 
     /**
-     * A file left out for its size, because it could not be read or because
-     * it is a symbolic link was dropped silently before and nothing gates on it; a file that cannot be
-     * named or read back one way only could hide code, so the run cannot
-     * pass as complete.
+     * True for a file whose name or content reads back more than one way,
+     * which could hide code; false for one left out for its size, as
+     * unreadable or as a symlink.
      */
     public function leavesTheRunIncomplete(): bool
     {

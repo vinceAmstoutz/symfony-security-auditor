@@ -16,11 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
 /**
- * How a human-facing report states its risk verdict: as is for a complete run,
- * qualified as covering only the files analyzed for an incomplete one and not
- * at all for a run with no verdict, which analyzed no file and found nothing:
- * a SAFE there would vouch for code nobody read. Machine-readable formats keep
- * their fields and carry `complete`.
+ * States the risk verdict of a human-facing report: as is for a complete run,
+ * limited to the files analyzed for an incomplete one and `UNKNOWN` for a run
+ * with no verdict, where a SAFE would vouch for code nobody read.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -34,8 +32,7 @@ final readonly class RiskHeadline
     }
 
     /**
-     * What follows the risk level in parentheses, the score introduced by the
-     * format's own `$scoreLabel`.
+     * Returns what follows the risk level in parentheses.
      */
     public static function scoreDetail(AuditReport $auditReport, string $scoreLabel): string
     {

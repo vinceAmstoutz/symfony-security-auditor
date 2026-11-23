@@ -20,36 +20,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 
 /**
+ * Runs a cheap-model attacker over every chunk, then the expensive model over
+ * only the files it flagged, with the cheap findings on each chunk's files as
+ * unverified `candidateFindings` to confirm, refine or discard.
+ *
+ * Keeps every expensive finding and drops a cheap one on a file the expensive
+ * pass judged: `analyzed` or `cached`, unless answered at the tool-call limit
+ * without a finding. Passes the other cheap findings through, deduplicated by
+ * `Vulnerability::id()`.
+ *
  * @internal not part of the BC promise, see docs/versioning.md
- *
- * Two-pass attacker for cost-sensitive audits.
- *
- *   1. A cheap-model attacker (e.g. claude-haiku-4-5) sweeps every chunk.
- *      In typical Symfony projects most files are inert: the cheap sweep
- *      converges quickly with no findings.
- *
- *   2. If the cheap pass found anything, an expensive-model attacker
- *      (e.g. claude-opus-4-7) re-analyses ONLY the files the cheap pass
- *      flagged. Those re-runs receive the cheap findings as
- *      candidateFindings (leads to confirm, refine or discard, never
- *      reviewer-validated context), so the deeper model re-reports what
- *      it confirms instead of treating them as settled and still hunts
- *      for what the first pass missed.
- *
- *   3. The two result sets are merged: every expensive finding is kept; a
- *      cheap finding on a file the expensive pass analyzed (`analyzed` or
- *      `cached`) is dropped, since the deep pass re-reports what it confirms
- *      and its silence is a discard, so a refined location or type never
- *      reaches the reviewer twice; cheap findings on files it did not judge
- *      (cold files, hot files it errored on, or hot files it reached its
- *      last tool round on without a finding) pass through, deduplicated
- *      by Vulnerability::id(). A discarded cheap finding also leaves the
- *      coverage recorder's recoverable findings, so draining them after the
- *      pass cannot bring it back.
- *
- * Net effect: full-project coverage at roughly 1/3 to 1/5 of running the
- * expensive model on every chunk, with detection quality close to the
- * pure expensive baseline because hot zones still get the deep treatment.
  */
 final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
 {
@@ -103,13 +83,9 @@ final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
     }
 
     /**
-     * A cheap finding the deep pass judged and dropped was recorded for
-     * recovery while the cheap pass ran. Left there, the orchestrator's drain
-     * of recovered findings would bring it back and undo the discard, so it
-     * leaves the buffer and only a finding this pass keeps, or one a chunk
-     * recorded but could not return, stays recoverable. A deep pass a budget
-     * cap or a provider failure stopped has judged the files it finished
-     * first, so their discards hold in the partial report too.
+     * Removes the discarded cheap findings from the recoverable ones, so
+     * draining them cannot undo the discard, even after a budget cap or a
+     * provider failure stopped the deep pass.
      *
      * @param array<Vulnerability> $discarded
      */
@@ -131,12 +107,9 @@ final readonly class EscalatingAttackerAgent implements AttackerAgentInterface
     }
 
     /**
-     * `Vulnerability::filePath()` is free text echoed back by the LLM: the
-     * `record_vulnerability` schema only constrains it to a non-blank
-     * string, with no cross-check against the chunk's real file list. A
-     * cheap-model quirk like a leading `./` must not make a real cheap
-     * finding's file silently excluded from the expensive pass, so both
-     * sides are normalized before comparing.
+     * Compares normalized paths, since a finding's file path is free text the
+     * LLM echoes: a leading `./` must not keep a flagged file out of the
+     * expensive pass.
      *
      * @param ProjectFile[]   $files
      * @param Vulnerability[] $cheapFindings

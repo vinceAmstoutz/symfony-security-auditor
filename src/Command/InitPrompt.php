@@ -32,9 +32,8 @@ final readonly class InitPrompt
     }
 
     /**
-     * Asked without a default, so no misleading `[]` is offered for a value that
-     * is required. `QuestionHelper` rethrows at end of input when the default is
-     * null, which would abort with exit 1 instead of the refusal this returns to.
+     * Offers no default and returns an empty answer at end of input, on which
+     * `QuestionHelper` throws.
      */
     public static function required(SymfonyStyle $symfonyStyle, string $question): string
     {

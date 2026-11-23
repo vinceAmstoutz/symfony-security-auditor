@@ -21,10 +21,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevP
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PlatformCatalogProviders;
 
 /**
- * `PlatformCatalogProviders` pairs a `symfony/ai-bundle` platform name with a
- * `symfony/models-dev` provider key, two vocabularies that each upstream may
- * rename on its own. Reading both back keeps a renamed key from silently
- * sending every model on that platform to the catalog-wide fallback.
+ * Checks every `symfony/ai-bundle` platform name and `symfony/models-dev`
+ * provider key `PlatformCatalogProviders` pairs against both upstreams.
  */
 final class PlatformCatalogProvidersKnowledgeTest extends TestCase
 {

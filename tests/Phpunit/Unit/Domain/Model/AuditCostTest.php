@@ -91,9 +91,8 @@ final class AuditCostTest extends TestCase
     }
 
     /**
-     * A priced cloud attacker paired with an unpriced local reviewer sums to a
-     * nonzero total, so only a breakdown can catch it. A real run has no roles
-     * to attribute, but it does record the model of every call.
+     * A priced model beside an unpriced one sums to a nonzero total, so only
+     * the per-model breakdown spots the gap.
      *
      * @throws InvalidAuditCostException
      */
@@ -121,10 +120,7 @@ final class AuditCostTest extends TestCase
     }
 
     /**
-     * The per-role breakdown carries no cache-token keys, so `billableTokens()`
-     * falls back for both. That fallback must be exactly zero: an entry that
-     * spent nothing and priced to nothing is not a pricing gap and any other
-     * default would invent spend and report one.
+     * An entry that spent nothing and priced to nothing is no pricing gap.
      *
      * @throws InvalidAuditCostException
      */
@@ -138,9 +134,8 @@ final class AuditCostTest extends TestCase
     }
 
     /**
-     * Cache reads are billed, so a model whose entire spend arrived as cached
-     * prompt tokens has still been charged. Priced at zero it is still a
-     * pricing gap, even though its fresh input and output are both zero.
+     * Cache reads are billed, so a model priced at zero is a gap even when all
+     * its spend was cached.
      *
      * @throws InvalidAuditCostException
      */
@@ -154,10 +149,6 @@ final class AuditCostTest extends TestCase
     }
 
     /**
-     * "Some tokens were spent" is the sum of input and output, not their
-     * difference: an entry that happens to spend as many output tokens as
-     * input ones is still spend and must still be checked for a price.
-     *
      * @throws InvalidAuditCostException
      */
     public function test_has_published_pricing_counts_input_and_output_tokens_together(): void
@@ -262,10 +253,8 @@ final class AuditCostTest extends TestCase
     }
 
     /**
-     * The top-level cost and the dry-run's per-role costs are both rounded to
-     * six decimals, so accumulated float noise must not leave one field in the
-     * same document reading `0.10491600000000001` while another reads
-     * `0.104916`.
+     * Float noise must not leave `0.10491600000000001` beside `0.104916` in one
+     * document.
      *
      * @throws InvalidAuditCostException
      */
@@ -300,9 +289,7 @@ final class AuditCostTest extends TestCase
     }
 
     /**
-     * Rounding is for display only. A model too cheap to register at six
-     * decimals is still a priced model, so the published-pricing check must
-     * read the unrounded cost or it would call it self-hosted.
+     * Rounding is for display only: the check reads the unrounded cost.
      *
      * @throws InvalidAuditCostException
      */

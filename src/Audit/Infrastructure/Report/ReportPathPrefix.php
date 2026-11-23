@@ -16,11 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report;
 use function Symfony\Component\String\u;
 
 /**
- * The folder, relative to the repository root, the audited project lives in
- * (`audit.report_path_prefix`). A finding's path is relative to the project, but
- * the formats a repository host reads (SARIF locations, GitHub annotations)
- * are resolved from the repository root, so a project in a sub-folder needs the
- * folder put in front of every path for an alert to land on its file.
+ * The folder of the audited project relative to the repository root
+ * (`audit.report_path_prefix`), put before every path of the formats a
+ * repository host resolves from its root: SARIF and GitHub annotations.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

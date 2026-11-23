@@ -23,12 +23,9 @@ use function Symfony\Component\String\b;
 use function Symfony\Component\String\u;
 
 /**
- * Probes for a runnable `composer` by executing `composer --version` through
- * Symfony `Process`, the same subprocess-only convention the rest of the tool
- * uses (no raw shell, no argument-interpolation surface). A bare `composer`
- * argv[0] is sufficient on every platform: `Process` resolves it through its
- * own `ExecutableFinder`, which consults `PATHEXT` on Windows and so finds the
- * `composer.bat`/`composer.cmd` shims too.
+ * Probes for a runnable `composer` with `composer --version`, run through
+ * `Process` without a shell. `Process` finds the Windows `composer.bat` and
+ * `composer.cmd` shims through `PATHEXT`.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -39,7 +36,7 @@ final readonly class ProcessComposerAvailabilityChecker implements ComposerAvail
     private const int MAX_FAILURE_LENGTH = 200;
 
     /**
-     * @param Closure(): Process $processBuilder the composer probe builder (use self::defaultProcessBuilder() in production); tests inject a stub
+     * @param Closure(): Process $processBuilder the composer probe builder, self::defaultProcessBuilder() in production
      */
     public function __construct(
         private Closure $processBuilder,

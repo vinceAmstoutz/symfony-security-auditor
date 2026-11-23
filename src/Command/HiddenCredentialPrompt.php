@@ -23,12 +23,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\HiddenInputUnavailabl
 use function Symfony\Component\String\b;
 
 /**
- * Console's hidden question falls back to echoing when it cannot hide the
- * input (a terminal without `stty`), which would print the key under a
- * prompt promising the opposite, so that fallback is off and the situation
- * is reported instead. A pasted key routinely carries the newline or the
- * stray space that came with it and the provider rejects those without
- * saying why, so the answer is trimmed.
+ * Never echoes the key: Console's echo fallback for a terminal that cannot
+ * hide input (no `stty`) is off, so that case throws.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

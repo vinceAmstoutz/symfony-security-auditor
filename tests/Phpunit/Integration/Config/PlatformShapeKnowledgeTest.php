@@ -26,13 +26,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\InstanceKey
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OptionalApiKeyPlatforms;
 
 /**
- * `BaseUrlPlatforms`, `CompoundPlatforms`, `DeclaredPlatforms`, `EndpointPlatforms`, `HandWrittenPlatforms`, `InstanceKeyedPlatforms` and
- * `OptionalApiKeyPlatforms` restate what `symfony/ai-bundle`
- * declares about each platform's connection block. A bundle upgrade that adds a
- * platform, or gives an existing one a `base_url`, would otherwise leave them
- * quietly wrong: `init` would stop asking for a key it now needs, or keep
- * refusing a platform it could write. Reading the bundle's own definitions back
- * turns that into a failing test.
+ * Checks `BaseUrlPlatforms`, `CompoundPlatforms`, `DeclaredPlatforms`,
+ * `EndpointPlatforms`, `HandWrittenPlatforms`, `InstanceKeyedPlatforms` and
+ * `OptionalApiKeyPlatforms` against the connection blocks `symfony/ai-bundle`
+ * declares.
  */
 final class PlatformShapeKnowledgeTest extends TestCase
 {
@@ -92,20 +89,14 @@ final class PlatformShapeKnowledgeTest extends TestCase
         self::assertSame([], array_values(array_diff(self::ENDPOINTS_DEFAULTED_BY_THE_BRIDGE, $this->platformsDeclaringANodeWithoutADefault('endpoint'))));
     }
 
-    /**
-     * A platform names its connection URL `base_url` or `endpoint`, never both,
-     * which is what lets `--base-url` and `--endpoint` stay separate options
-     * that each refuse what the other accepts.
-     */
     public function test_no_platform_declares_both_an_endpoint_and_a_base_url(): void
     {
         self::assertSame([], array_values(array_intersect(EndpointPlatforms::NAMES, BaseUrlPlatforms::NAMES)));
     }
 
     /**
-     * The `--endpoint` refusal names `EndpointPlatforms::NAMES` verbatim, so a
-     * platform that became hand-written or instance-keyed would be advertised
-     * as an answer and then refused for a second reason.
+     * The `--endpoint` refusal offers every `EndpointPlatforms::NAMES` entry as
+     * an answer.
      */
     public function test_every_endpoint_platform_is_flat_and_writable(): void
     {
@@ -287,9 +278,7 @@ final class PlatformShapeKnowledgeTest extends TestCase
 
     /**
      * Platforms with a required child beyond the `api_key` and `base_url` that
-     * `init` writes. Each node owns the chain from its own declaration up to
-     * its `->end()`, so a later sibling's `->isRequired()` is not attributed to
-     * a node that merely carries a default.
+     * `init` writes.
      *
      * @return list<string>
      */
@@ -354,10 +343,9 @@ final class PlatformShapeKnowledgeTest extends TestCase
     }
 
     /**
-     * A node left optional in its own declaration can still be demanded by
-     * the platform's `->validate()` closure: `vertexai` insists on `api_key`
-     * unless a project-scoped endpoint is configured instead, which `init`
-     * never writes.
+     * True when the platform's `->validate()` closure demands an `api_key` its
+     * node leaves optional, as `vertexai` does without a project-scoped
+     * endpoint.
      */
     private function validationInsistsOnApiKey(string $contents): bool
     {
@@ -365,9 +353,7 @@ final class PlatformShapeKnowledgeTest extends TestCase
     }
 
     /**
-     * The chain a node owns, from its own declaration up to its `->end()`, so a
-     * later sibling's `->defaultValue()` or `->isRequired()` is never read as
-     * belonging to it.
+     * The chain a node owns, from its own declaration up to its `->end()`.
      */
     private function nodeDeclaration(string $contents, string $node): ?string
     {

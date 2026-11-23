@@ -21,10 +21,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterf
 
 /**
  * Warns once per model that `audit.budget.max_cost_usd` cannot stop a run
- * whose client answers under a model the pricing catalog has no price for:
- * its calls count as $0, while `audit.budget.max_tokens` still applies.
- * Mutable by design: opted out of the final readonly rule as a per-run
- * accumulator (see .claude/rules/php-classes.md).
+ * answered by a model the catalog does not price, whose calls count as $0;
+ * `audit.budget.max_tokens` still applies.
+ *
+ * Not `readonly`: a per-run accumulator (`.claude/rules/php-classes.md`).
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

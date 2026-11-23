@@ -19,9 +19,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 interface PoCSynthesizerInterface
 {
     /**
-     * Returns the validated findings with a `synthesizedPoC` populated for the
-     * ones that warranted enrichment. Findings that did not (low severity,
-     * synthesizer failure, etc.) are returned unchanged.
+     * Returns the findings with a `synthesizedPoC` on those that warranted
+     * one, the others unchanged.
      *
      * @param list<Vulnerability> $vulnerabilities
      *

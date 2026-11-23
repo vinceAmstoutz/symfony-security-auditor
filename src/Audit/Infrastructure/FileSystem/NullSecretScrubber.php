@@ -17,8 +17,6 @@ use Override;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\SecretScrubberInterface;
 
 /**
- * Passthrough implementation used when secret scrubbing is disabled.
- *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class NullSecretScrubber implements SecretScrubberInterface

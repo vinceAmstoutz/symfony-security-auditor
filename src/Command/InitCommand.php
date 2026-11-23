@@ -139,11 +139,6 @@ final readonly class InitCommand
         return Command::SUCCESS;
     }
 
-    /**
-     * Asking here is what makes a guided install end with a working setup:
-     * the configuration alone only names a variable and a user who has to go
-     * and export it separately is a user whose first audit fails.
-     */
     private function offerToStoreCredential(SymfonyStyle $symfonyStyle, string $envVar): void
     {
         try {
@@ -177,12 +172,10 @@ final readonly class InitCommand
     }
 
     /**
-     * A platform whose block `init` cannot write still gets its bridge and
-     * the block to complete; either way the provider is not taken further.
-     * What that path is given is checked before the bridge is installed, the
-     * way the written path checks it, so a refused instance name never reaches
-     * the printed block and a key pasted into `--env-var` never reaches the
-     * command line echoed under an install failure.
+     * True when `init` takes the provider no further. A platform whose block
+     * `init` cannot write still gets its bridge and the block to complete,
+     * once its instance, model and `--env-var` pass the written path's checks,
+     * so a key pasted into `--env-var` never reaches an echoed command line.
      *
      * @throws UnresolvableConfigPathException
      * @throws BridgeInstallationFailedException
@@ -267,11 +260,10 @@ final readonly class InitCommand
     }
 
     /**
-     * Null means the connection is written without an `api_key`. Only the
-     * platforms whose key the bundle leaves optional may reach that, so an
-     * empty answer elsewhere still falls through to the refusal. A platform
-     * that makes you supply its endpoint is one you host yourself, so no
-     * credential is asked for unless `--env-var` names one.
+     * Null writes the connection without an `api_key`: under `--no-api-key`,
+     * for a coding-agent CLI or a platform whose endpoint must be given
+     * (unless `--env-var` names a key) and for an empty answer where the
+     * bundle leaves the key optional.
      */
     private function resolveApiKeyVariable(InitCommandInput $initCommandInput, ProviderKey $providerKey): ?string
     {

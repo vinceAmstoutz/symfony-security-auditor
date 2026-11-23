@@ -36,10 +36,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInter
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 
 /**
- * Analyzes chunks one at a time. The default structured-collection mode records
- * findings through a per-chunk `record_vulnerability` tool; the opt-out JSON
- * mode parses the model's array response, as does a structured turn whose
- * client never offered the tool. Cache hits short-circuit the LLM.
+ * Analyzes chunks one at a time, serving cache hits without calling the LLM.
+ * Reads the findings from per-chunk `record_vulnerability` calls, or from the
+ * JSON answer in JSON mode or when the client never offered the tool.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -121,9 +120,7 @@ final readonly class SequentialChunkAnalyzer
     }
 
     /**
-     * Marks every chunk from `$fromIndex` onward (the ones the loop never
-     * reached because an earlier chunk aborted the run) under the same
-     * status, mirroring `ConcurrentChunkAnalyzer::failRemainingWindows()`.
+     * Marks every chunk from `$fromIndex` on as `$status`.
      *
      * @param list<list<ProjectFile>> $chunks
      */
@@ -157,8 +154,6 @@ final readonly class SequentialChunkAnalyzer
         try {
             return $this->recordedFindings($this->analyzeChunkThroughLlm($chunk, $chunkContext, $coverageRecorder, $toolRegistry), $coverageRecorder);
         } catch (BudgetExceededException $budgetExceededException) {
-            // Budget exhaustion is a deliberate abort, not an LLM failure;
-            // let it bubble up so RunAuditUseCase can wrap it with a partial report.
             ChunkCoverageRecorder::record($chunk, 'aborted', $coverageRecorder);
 
             throw $budgetExceededException;
@@ -263,11 +258,8 @@ final readonly class SequentialChunkAnalyzer
     }
 
     /**
-     * Recovers findings the LLM already recorded via `record_vulnerability`
-     * tool calls in an earlier round of this chunk's own conversation before
-     * a later round aborted it. Otherwise they vanish with the exception
-     * even though `drainFoundVulnerabilities()` exists precisely to let a
-     * caller recover candidates found before a mid-run abort.
+     * Keeps the findings recorded through `record_vulnerability` before a
+     * later round of the chunk's conversation aborted.
      */
     private function recordDrainedFindings(StructuredVulnerabilityCollectionSession $structuredVulnerabilityCollectionSession, KnownFiles $knownFiles, CoverageRecorderInterface $coverageRecorder): void
     {
@@ -275,9 +267,8 @@ final readonly class SequentialChunkAnalyzer
     }
 
     /**
-     * A chunk split in two reaches this once per half, as each half is
-     * analyzed (not once for the merged chunk), so the findings of a first
-     * half are already in the recorder's buffer when an abort ends the second.
+     * Runs once per half of a split chunk, so the findings of a first half are
+     * in the recorder's buffer when an abort ends the second.
      */
     private function recordedFindings(VulnerabilityHydrationResult $vulnerabilityHydrationResult, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
     {

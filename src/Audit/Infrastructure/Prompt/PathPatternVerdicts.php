@@ -14,15 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt;
 
 /**
- * Whether an `access_control` path pattern matches each of several route
- * paths, the paths matched one after the other so the pattern is compiled
- * once for all of them: PCRE keeps only the last 4,096 patterns it compiled,
- * so a list of rules longer than that, walked a route at a time, compiles
- * every pattern again for each route.
- *
- * Symfony treats the `access_control` `path` as a regular expression, so it
- * is matched as one; a malformed pattern, or one containing every delimiter
- * candidate, simply fails to match rather than throwing.
+ * Whether an `access_control` path pattern, a regular expression, matches
+ * each of several route paths, compiled once for all of them. A malformed
+ * pattern, or one holding every delimiter candidate, matches nothing.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -45,17 +39,9 @@ final readonly class PathPatternVerdicts
     }
 
     /**
-     * `preg_match()` raises a warning for a pattern that does not compile
-     * (`^/(admin`) and returns false; a warning-throwing error handler
-     * (Symfony debug, `mcp:serve`) would abort the prompt build on a pattern
-     * taken from the audited repository, so the warning is captured here and
-     * the pattern simply matches nothing.
-     *
-     * A pattern from the repository may also backtrack catastrophically
-     * (`^/(a+)+z$` against a long route path) and each route meets each
-     * rule, so a match gets {@see self::PATTERN_BACKTRACK_LIMIT} steps rather
-     * than `pcre.backtrack_limit`'s million. One it cannot decide within them
-     * is null: the pattern may match the route, so it cannot be told.
+     * Captures the warning of a pattern that does not compile, which then
+     * matches nothing. A match gets {@see self::PATTERN_BACKTRACK_LIMIT} steps
+     * and is null when it cannot be decided within them.
      *
      * @param array<int, string> $routePaths
      *
@@ -93,10 +79,8 @@ final readonly class PathPatternVerdicts
     }
 
     /**
-     * Picks a PCRE delimiter guaranteed absent from the pattern, so the pattern
-     * can never prematurely close or corrupt the delimited expression, unlike
-     * a fixed delimiter (`#`, `{}`, …), which a sufficiently adversarial pattern
-     * can always collide with.
+     * A PCRE delimiter absent from the pattern, null when it holds every
+     * candidate.
      */
     private static function delimiterAvoiding(string $pattern): ?string
     {

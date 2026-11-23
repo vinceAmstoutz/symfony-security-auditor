@@ -31,34 +31,22 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Symlink
 use function Symfony\Component\String\u;
 
 /**
- * Filesystem-backed cross-run memory of the reviewer's own rejections: every
- * finding the reviewer rejects with a non-empty `reviewer_notes` is persisted
- * here, keyed by type+file+title and surfaced back as
- * {@see ReviewerFeedbackProviderInterface} feedback on later runs, so a
- * recurring false positive teaches the reviewer once instead of every run,
- * without a maintainer hand-curating a baseline entry for it.
- *
- * Memory is scoped to the audited project: each project gets its own file
- * under the configured directory, keyed by a hash of its path. A user-global
- * cache directory (the standalone binary's default) is therefore not a
- * cross-project channel: project A's rejections never surface in, or
- * overwrite, project B's feedback.
+ * The reviewer's rejections with a reason, kept across runs and given back to
+ * the reviewer as feedback. Each audited project has its own file, keyed by a
+ * hash of its path, so one project's rejections never reach another's review.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProviderInterface, TriageMemoryRecorderInterface
 {
     /**
-     * Bounds unbounded growth across months of runs; oldest entries are
-     * dropped first.
+     * The oldest entries are dropped first.
      */
     public const int DEFAULT_MAX_ENTRIES = 500;
 
     /**
-     * Upper bound on a persisted rejection reason. A reason is
-     * reviewer-authored free text replayed into a later run's system prompt;
-     * capping it bounds the injected feedback the JSON review path would
-     * otherwise persist unbounded.
+     * Caps a stored reason, which a later run replays into the reviewer's
+     * system prompt.
      */
     public const int MAX_REASON_LENGTH = 5_000;
 
@@ -78,9 +66,8 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
     }
 
     /**
-     * Read lazily (never at construction) so the audited project path set on
-     * {@see AuditedProjectPathHolder} once the command resolves its argument is
-     * the one that scopes the file (mirrors {@see DeferredAdvisoryDatabase}).
+     * Reads the holder on each call, never at construction, so the path the
+     * command sets scopes the file.
      */
     private function path(): string
     {
@@ -100,8 +87,6 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
             }
         }
 
-        // Newest first: entries are appended oldest-to-newest on disk, but the
-        // prompt keeps only the first N, so the most recent rejections must lead.
         return new ReviewerFeedback(array_reverse($entries));
     }
 
@@ -174,13 +159,8 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
     }
 
     /**
-     * Keeps the first-recorded reason for a given finding: a recurring
-     * rejection re-recorded on a later cache-miss run leaves the stored reason
-     * untouched, so the {@see ReviewerFeedback::digest()} the reviewer cache
-     * keys on stops changing and the finding is re-reviewed once after the
-     * feedback set grows, then served from cache, instead of the reviewer's
-     * freshly-worded notes churning the digest and forcing a full re-review
-     * every run.
+     * Keeps the first recorded reason of a finding, so the
+     * {@see ReviewerFeedback::digest()} the reviewer cache keys on stays stable.
      *
      * @param list<array<array-key, mixed>> $entries
      * @param array<array-key, mixed>       $newEntry
@@ -202,15 +182,8 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
     }
 
     /**
-     * The line is part of the key so two distinct findings that share a
-     * type/file/title (a generic title reused at different locations) do not
-     * collide: the second rejection would otherwise overwrite the first.
-     *
-     * `file`/`title` are LLM-sourced and never NUL-sanitized, so each field is
-     * hashed individually before joining (mirroring
-     * `ChunkContextKeyDeriver::derive()`), so a NUL byte cannot shift a value
-     * across the `file`/`title` boundary and collide two distinct findings
-     * onto the same key.
+     * Hashes each field on its own, so a separator in the model-written `file`
+     * or `title` cannot make two findings share a key.
      *
      * @param array<array-key, mixed> $entry
      */
@@ -268,12 +241,8 @@ final readonly class FilesystemTriageMemoryStore implements ReviewerFeedbackProv
     }
 
     /**
-     * Mirrors {@see FilesystemReviewerCache}'s symlink guard: this path is
-     * config-fixed rather than content-derived, but the same defense (never
-     * read or write through a symlink) is cheap to keep as a matter of
-     * consistent practice. The configured `cache.dir`, this memory's parent,
-     * is the trusted root, as it is for the caches: a symlinked
-     * `triage-memory/` is still refused.
+     * Trusts the configured `cache.dir` (this memory's parent) and every
+     * directory above it, on read and on write.
      */
     private function isSymlinkedPath(string $path): bool
     {

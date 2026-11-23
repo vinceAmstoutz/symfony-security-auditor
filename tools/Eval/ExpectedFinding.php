@@ -14,8 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tooling\Eval;
 
 /**
- * One seeded ground-truth vulnerability the auditor is expected to find,
- * identified by the file it lives in and its vulnerability type.
+ * One seeded ground-truth vulnerability the auditor is expected to find.
  */
 final readonly class ExpectedFinding
 {

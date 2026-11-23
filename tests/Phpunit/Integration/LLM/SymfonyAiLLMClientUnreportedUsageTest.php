@@ -45,9 +45,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\ScriptedP
 /**
  * A provider that reports no token usage with its answers (Bedrock's
  * InvokeModel route, a gateway that omits `usage`) is booked at the estimated
- * input tokens of every call it answered, on every call path, so the budget
- * and the rate-limit window still see its spend. The estimator here counts
- * 100 tokens per prompt text and per tool result.
+ * input tokens of every call it answered, on every call path. The estimator
+ * here counts 100 tokens per prompt text and per tool result.
  */
 final class SymfonyAiLLMClientUnreportedUsageTest extends TestCase
 {

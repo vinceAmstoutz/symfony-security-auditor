@@ -26,9 +26,21 @@ A single `//` line is acceptable only for an **external constraint** that truly 
 
 Even then: one line, no multi-sentence prose.
 
+## Docblocks
+
+A docblock states the contract a caller cannot read from the signature, in the present tense: what it returns or refuses, under which condition and which security invariant it keeps (`Refuses a symlink that leaves the project.`). Nothing else.
+
+- Keep: types the signature cannot express (generics, array shapes, `@template`), `@internal`, `@deprecated` with its replacement, `@throws` and a short contract.
+- Cut: anything the name, the types or the code already say; how the code works step by step; why it was designed so (that goes in the commit message); history (earlier releases, issue numbers); "we", "our", "us".
+- Delete a docblock that only repeats the signature. Never leave an empty one.
+
 ## Never
 
 - Multi-line `//` blocks explaining design rationale.
 - "Mutation-pinning" comments in tests (`// Pins the X mutant — removing this assertion allows Y`). If the test name and assertion are clear, the pin is implicit.
 - Commented-out code.
 - Redundant docblocks on `final readonly` classes that just repeat the constructor parameters.
+
+## Enforcement
+
+`.github/scripts/check-prose.sh` (CI Lint job, `bin/castor lint`, `bin/castor lint:docs`) fails on a PHP comment of several `//` lines, on history (`since 1.21`, `as of 1.21`, "earlier releases", "historically", an issue number such as `#378`) and on "we", "our" or "us". Docblock tags are not checked: `@deprecated since 1.22, use X` stays valid. Restating the code and verbosity need judgment: review them.

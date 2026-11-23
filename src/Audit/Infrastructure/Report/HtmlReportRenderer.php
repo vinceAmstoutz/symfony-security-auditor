@@ -177,12 +177,8 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
     }
 
     /**
-     * Beyond markup, the escaped text carries no bidi override (a Trojan-Source
-     * spoof in a browser) and no raw ANSI escape byte (it reaches a terminal
-     * when the saved report is printed): {@see TerminalTextSanitizer} strips
-     * both and keeps the line breaks and tabs a code snippet needs, after
-     * `mb_scrub()` so an invalid UTF-8 byte cannot make its `/u` regex return
-     * `null`.
+     * Escapes markup and strips bidirectional overrides and ANSI escapes,
+     * keeping the line breaks and tabs a code snippet needs.
      */
     private function escape(string $value): string
     {

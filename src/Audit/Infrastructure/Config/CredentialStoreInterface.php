@@ -18,8 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 
 /**
  * Per-user storage for provider API keys, keyed by the environment variable
- * the configuration names, so a machine the user has set up once no longer
- * needs the key exported into every shell.
+ * the configuration names.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

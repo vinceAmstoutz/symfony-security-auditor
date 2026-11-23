@@ -14,9 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 /**
- * The `%env(VAR)%` / `%env(file:VAR)%` spelling a standalone configuration
- * uses to point at a credential, parsed once so the resolver that reads it and
- * the commands that report on it agree on what a value refers to.
+ * The `%env(VAR)%` or `%env(file:VAR)%` placeholder a standalone
+ * configuration points at a credential with.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

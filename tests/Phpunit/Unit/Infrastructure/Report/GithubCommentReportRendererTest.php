@@ -211,8 +211,7 @@ final class GithubCommentReportRendererTest extends AbstractReportRendererTestCa
     }
 
     /**
-     * One decimal place, matching every sibling renderer: a comment header is
-     * not the place for sub-100ms precision.
+     * One decimal place, as every sibling renderer.
      *
      * @throws InvalidAuditContextException
      */
@@ -336,9 +335,8 @@ final class GithubCommentReportRendererTest extends AbstractReportRendererTestCa
     }
 
     /**
-     * GitHub autolinks a bare `@handle` in a comment body into a live profile
-     * mention, notifying that account, driven purely by attacker-influenced
-     * repository content once the rendered body is posted to a pull request.
+     * GitHub turns a bare `@handle` in a posted comment into a mention that
+     * notifies the account.
      *
      * @throws InvalidAuditContextException
      * @throws InvalidCodeLocationException

@@ -20,8 +20,7 @@ use PhpParser\NodeVisitorAbstract;
 
 /**
  * Marks the outermost node of every `.` concatenation chain with the
- * `ssaConcatRoot` attribute so a rule can analyse the whole chain exactly once,
- * without depending on PHPStan's withdrawn `parent` node attribute.
+ * `ssaConcatRoot` attribute, so a rule analyses each chain exactly once.
  */
 final class ConcatRootMarkingVisitor extends NodeVisitorAbstract
 {

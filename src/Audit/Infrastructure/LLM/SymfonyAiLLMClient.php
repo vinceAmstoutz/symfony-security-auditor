@@ -37,10 +37,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonT
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
 
 /**
- * Implements the Domain LLM ports on top of the symfony/ai platform. The
- * single-call paths live here; retry, batching, the tool wavefront, the
- * sequential tool loop and platform result/option/tool mapping live in
- * dedicated collaborators built at construction time.
+ * Implements the Domain LLM ports on the symfony/ai platform.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -263,9 +260,8 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
     }
 
     /**
-     * A conversation that fails before any tool ran is restarted through
-     * `completeWithTools()`, reached as the `LLMClientInterface` port, whose
-     * failures PHPStan cannot see; the three it lets through are listed last.
+     * The last three exceptions come from restarting a failed conversation
+     * through completeWithTools().
      *
      * @throws MissingAiPlatformException
      * @throws BudgetExceededException

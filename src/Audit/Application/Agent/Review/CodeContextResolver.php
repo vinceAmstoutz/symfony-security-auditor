@@ -17,10 +17,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\EchoedFilePath;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /**
- * Resolves the source content backing a finding's file path, or an empty
- * string when the file is not part of the scanned set. The path is the one the
- * attacker echoed, so a leading `./` is dropped before the lookup. Otherwise
- * the reviewer would judge the finding without its file.
+ * Resolves the scanned content of the file a finding names, ignoring a
+ * leading `./`, or an empty string when the file was not scanned.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

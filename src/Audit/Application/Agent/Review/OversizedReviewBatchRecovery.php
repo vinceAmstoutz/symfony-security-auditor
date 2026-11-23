@@ -23,12 +23,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 
 /**
- * Recovers a review batch the model could not take in whole. A batch of
- * several findings is split in two and each half goes back through the
- * analyzer's own batch path (so a half still too large is split again); a
- * single finding the model cannot fit with its file is recorded as errored and
- * the review goes on (the batch counterpart of the attacker's
- * `OversizedChunkRecovery`).
+ * Splits a review batch the model could not take in whole into halves that go
+ * back through the analyzer's batch path. Records a single finding that does
+ * not fit with its file as errored.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -70,9 +67,7 @@ final readonly class OversizedReviewBatchRecovery
     }
 
     /**
-     * An abort while the first half is reviewed leaves the second half with a
-     * status of its own, as the analyzer does for the batches after a failing
-     * one.
+     * Gives the second half a status of its own when an abort stops the first.
      *
      * @param list<Vulnerability>                               $firstHalf
      * @param list<Vulnerability>                               $secondHalf

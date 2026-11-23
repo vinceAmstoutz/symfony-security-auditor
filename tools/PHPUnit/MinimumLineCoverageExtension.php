@@ -20,9 +20,8 @@ use PHPUnit\Runner\Extension\ParameterCollection;
 use PHPUnit\TextUI\Configuration\Configuration;
 
 /**
- * Fails the run when line coverage drops below the configured `min-coverage`
- * percentage. Reads the Clover report PHPUnit produces, so it only enforces
- * when a coverage run is requested (e.g. --coverage-clover).
+ * Fails the run when line coverage drops below the `min-coverage` percentage.
+ * Enforces only on a run that writes a Clover report (--coverage-clover).
  */
 final readonly class MinimumLineCoverageExtension implements Extension
 {

@@ -16,10 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ReviewerFeedback;
 
 /**
- * Supplies the maintainer-authored false-positive feedback for the current
- * run (accepted baseline findings annotated with a `reason`), so the
- * reviewer prompt can treat them as negative examples and the reviewer cache
- * can key verdicts on the feedback they were produced under.
+ * The maintainer's false-positive feedback for the run, the baselined findings
+ * with a `reason`: negative examples for the reviewer prompt, also part of the
+ * reviewer cache key.
  */
 interface ReviewerFeedbackProviderInterface
 {

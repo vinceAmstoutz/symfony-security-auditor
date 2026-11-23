@@ -119,7 +119,6 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
 
         $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {"foo/bar": []}}');
 
-        // Prime the cache with the default logger so the first run does not pollute the recording one.
         $this->makeCache($recordingComposerAuditRunner)->run($this->projectDir);
 
         $lockfileHashedAdvisoryCache = new LockfileHashedAdvisoryCache(
@@ -164,7 +163,6 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
      */
     public function test_falls_back_to_inner_when_no_lockfile_exists(): void
     {
-        // No composer.lock written intentionally
         $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {}}');
         $lockfileHashedAdvisoryCache = $this->makeCache($recordingComposerAuditRunner);
 
@@ -322,12 +320,9 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
     {
         $this->writeLockfile('{"lock": "v1"}');
 
-        // First run: real filesystem populates the cache.
         $recordingComposerAuditRunner = $this->recordingRunner('{"advisories": {}}');
         $this->makeCache($recordingComposerAuditRunner)->run($this->projectDir);
 
-        // Second run: replace the filesystem with one that throws on readFile of any
-        // path other than composer.lock, forcing the readCache() catch branch.
         $filesystem = self::createStub(Filesystem::class);
         $filesystem->method('exists')->willReturn(true);
         $lockfilePath = $this->projectDir.'/composer.lock';
@@ -547,7 +542,6 @@ final class LockfileHashedAdvisoryCacheTest extends TestCase
             new NativeClock(),
         );
 
-        // Must not throw despite the cache write failing.
         $json = $lockfileHashedAdvisoryCache->run($this->projectDir);
 
         self::assertSame('{"advisories": {"foo/bar": []}}', $json);

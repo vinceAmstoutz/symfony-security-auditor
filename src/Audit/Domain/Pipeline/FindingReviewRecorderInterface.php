@@ -16,12 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
- * Opt-in companion of {@see CoverageRecorderInterface} for a recorder that
- * ties each reviewer coverage entry to the finding it is about, so a verdict
- * (`validated` or `rejected`) reached for a finding in a later iteration
- * supersedes a failure (`errored`, `aborted`) recorded for that same finding
- * earlier instead of leaving the report incomplete for good. The reviewer
- * checks for it with `instanceof`, so a recorder without it keeps working.
+ * Optional companion of {@see CoverageRecorderInterface}, checked with
+ * `instanceof`: ties each reviewer entry to its finding, so a later verdict on
+ * that finding supersedes an earlier failure.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

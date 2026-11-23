@@ -33,9 +33,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Telemetry\TokenUsageR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 
 /**
- * Extracts token usage, tool calls, text and the provider finish reason from
- * symfony/ai platform results, recording usage on the optional telemetry
- * recorder and warning when a response was truncated or content-filtered.
+ * Reads the usage, tool calls, text and finish reason of a platform result,
+ * recording the usage on the telemetry recorder.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -51,13 +50,9 @@ final readonly class PlatformResultExtractor
     }
 
     /**
-     * The usage the provider reported for an answered call, or, when it
-     * reported none (Bedrock's InvokeModel route, a gateway that omits
-     * `usage`), the call's estimated input tokens, which the provider bills
-     * all the same: the output it produced is then unknown and counted as
-     * none. A usage object that reports no prompt tokens (empty, or zero with
-     * no cache count to account for the prompt) books the estimate for the
-     * input as well, beside the completion it reported.
+     * Returns the usage the provider reported, or the estimated input tokens
+     * and no output when it reported none. A usage that reports no prompt
+     * tokens takes the estimate as its input.
      *
      * @return array{0: int, 1: int, 2: int, 3: int}
      *
@@ -95,9 +90,8 @@ final readonly class PlatformResultExtractor
     }
 
     /**
-     * A request is never empty, so a prompt count that is missing, or zero
-     * with no cache read or write to stand in for it (Anthropic counts those
-     * apart from its input tokens), is a provider that did not report it.
+     * Returns false for a prompt count that is missing, or zero with no cache
+     * read or write to account for the prompt.
      */
     private function reportsPrompt(TokenUsageInterface $tokenUsage, int $inputTokens, int $cacheReadTokens, int $cacheCreationTokens): bool
     {
@@ -120,13 +114,10 @@ final readonly class PlatformResultExtractor
     }
 
     /**
-     * The usage a provider reported in the raw answer of a call its bridge
-     * failed to convert, read with that bridge's own extractor: a failed
-     * conversion attaches no `token_usage` metadata. A usage that reports no
-     * prompt tokens has the call's estimated input tokens as its input, as in
-     * `extractTokens()`. Null when the answer reports none, cannot be read, or
-     * reports a negative count. Nothing is recorded here: the caller books the
-     * failed call.
+     * Returns the usage reported in the raw answer of a call the bridge failed
+     * to convert, its input read as in `extractTokens()`; null when the answer
+     * reports none, cannot be read or reports a negative count. Records
+     * nothing: the caller books the failed call.
      */
     public function extractBilledUsage(DeferredResult $deferredResult, int $estimatedInputTokens): ?TokenUsageSnapshot
     {
@@ -140,12 +131,10 @@ final readonly class PlatformResultExtractor
     }
 
     /**
-     * The input tokens the provider counts against its input-tokens-per-minute
-     * limit for a call booked at `$tokenUsageSnapshot`: the input and the
-     * cache writes, plus the cache reads where the provider counts them
-     * inside its prompt, as OpenAI-style providers do. Anthropic leaves its
-     * cache reads out of that limit. The cost books the cache reads at the
-     * cache rate either way.
+     * Returns the input tokens the provider counts against its per-minute
+     * input limit: the input and the cache writes, plus the cache reads where
+     * the provider counts them inside its prompt (OpenAI-style providers, not
+     * Anthropic).
      */
     public function rateLimitedInputTokens(DeferredResult $deferredResult, TokenUsageSnapshot $tokenUsageSnapshot): int
     {
@@ -155,8 +144,8 @@ final readonly class PlatformResultExtractor
     }
 
     /**
-     * A usage that reports no prompt has its input booked at the estimated
-     * input tokens, which count the whole prompt, its cached share included.
+     * Returns false for a usage with no prompt count, whose input is booked at
+     * an estimate that already holds the cached share.
      */
     private function countsCacheReadsInPrompt(TokenUsageInterface $tokenUsage): bool
     {
@@ -166,8 +155,8 @@ final readonly class PlatformResultExtractor
     }
 
     /**
-     * The usage of an answered call, or of one its bridge failed to convert,
-     * which only its raw answer reports: an empty one when it reports none.
+     * Returns the usage of the call, read from its raw answer when the bridge
+     * failed to convert it; an empty usage when it reports none.
      */
     private function reportedUsage(DeferredResult $deferredResult): TokenUsageInterface
     {
@@ -211,13 +200,9 @@ final readonly class PlatformResultExtractor
     }
 
     /**
-     * Anthropic counts cache reads and writes apart from its input tokens and
-     * reports no total, or one with room for them beside the prompt;
-     * OpenAI-style providers (OpenAI, Gemini, DeepSeek, gateways) report a
-     * total and count the cache reads (and OpenAI its cache writes too) inside
-     * the prompt. Booking both as they come would bill the cached share twice
-     * at the full input rate, or never at the cache rate. Null when the cache
-     * is counted apart from the prompt.
+     * Returns the cache reads and writes an OpenAI-style provider counts
+     * inside the prompt, so the cached share is not billed twice; null when
+     * the cache is counted apart from the prompt, as Anthropic does.
      *
      * @return array{0: int, 1: int}|null the cache reads and writes inside the prompt
      */
@@ -240,12 +225,9 @@ final readonly class PlatformResultExtractor
     }
 
     /**
-     * Gemini and Vertex AI bill their thought tokens as output yet report
-     * them apart from the candidates, so the total is the sum of the three;
-     * OpenAI-style providers count their reasoning tokens inside the
-     * completion, so adding them would bill the same tokens twice. Only a
-     * total that has room for the thinking tokens next to the prompt and the
-     * completion shows they were counted apart.
+     * Returns the thinking tokens reported apart from the completion (Gemini,
+     * Vertex AI), which only a total with room for them shows; zero when the
+     * completion holds them, as OpenAI-style providers count them.
      */
     private function thinkingTokensCountedApart(TokenUsageInterface $tokenUsage, int $promptTokens, int $completionTokens): int
     {
@@ -260,11 +242,9 @@ final readonly class PlatformResultExtractor
     }
 
     /**
-     * The share of the `$cacheCreationTokens` cache writes a call is booked
-     * with that Anthropic keeps for an hour (`cache_retention: long`) and
-     * bills at its own rate. Only the raw answer reports it: the bridge's
-     * usage counts every write alike. None when the answer does not split its
-     * writes or cannot be read.
+     * Returns the share of `$cacheCreationTokens` that Anthropic keeps for an
+     * hour and bills at its own rate, read from the raw answer; zero when the
+     * answer does not split its writes or cannot be read.
      */
     public function extractOneHourCacheCreationTokens(DeferredResult $deferredResult, int $cacheCreationTokens): int
     {
@@ -281,8 +261,8 @@ final readonly class PlatformResultExtractor
     }
 
     /**
-     * The model the provider says served the call, which a gateway routing
-     * on its own, or a failover platform, can differ from the one requested.
+     * Returns the model the provider says served the call, which a gateway or
+     * a failover platform can change.
      */
     public function extractReportedModel(DeferredResult $deferredResult): ?string
     {
@@ -293,14 +273,9 @@ final readonly class PlatformResultExtractor
     }
 
     /**
-     * A negative count here is a compromised or malfunctioning provider
-     * response: every caller relies on rejecting it before it ever reaches
-     * `RateLimiterInterface::record()`, whose mutable window counters have no
-     * lower bound of their own and would stay corrupted for the rest of the
-     * rate-limit window. `$tokenUsageRecorder` is optional
-     * ({@see PlatformAccountingConfig}
-     * defaults it to `null`), so this guard cannot live behind it: it must
-     * run unconditionally.
+     * Rejects a negative count before it reaches
+     * `RateLimiterInterface::record()`, whose window counters have no lower
+     * bound, whether or not a telemetry recorder is set.
      *
      * @throws NegativeTokenCountException
      */
@@ -357,9 +332,8 @@ final readonly class PlatformResultExtractor
     }
 
     /**
-     * The model's answer as the assistant turn that goes back with the tool
-     * results: whole, so a signed thinking block and the text in between its
-     * tool calls come back the way the provider produced them.
+     * Returns the whole answer as the assistant turn sent back with the tool
+     * results, so a signed thinking block returns as the provider wrote it.
      */
     public function extractAssistantMessage(ResultInterface $result): AssistantMessage
     {

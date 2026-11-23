@@ -16,10 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * YAML that `init` hands the user, guaranteed to read back as what was dumped.
- * `Yaml::dump()` leaves a string such as `.inf`, `.nan` or `1_000.5` bare and
- * the parser then reads it as a float; only such a document is dumped again
- * with every value double-quoted, so an ordinary one keeps its plain look.
+ * YAML that `init` hands the user, read back as what was dumped: a document
+ * holding a string the parser would read as a float (`.inf`, `1_000.5`) has
+ * every value double-quoted.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

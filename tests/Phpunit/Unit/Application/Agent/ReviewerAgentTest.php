@@ -213,7 +213,6 @@ final class ReviewerAgentTest extends TestCase
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
-        // Should still accept, just keep original severity
         self::assertCount(1, $result);
         self::assertTrue($result[0]->isReviewerValidated());
         self::assertSame(VulnerabilitySeverity::HIGH, $result[0]->severity());
@@ -340,7 +339,6 @@ final class ReviewerAgentTest extends TestCase
     {
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH);
 
-        // LLM returns [[{...}]]: array wrapping an array
         $reviewResponse = (string) json_encode([[
             'accepted' => true,
             'adjusted_severity' => 'critical',
@@ -390,8 +388,6 @@ final class ReviewerAgentTest extends TestCase
 
         $reviewerAgent->review([$vulnerability], $files, new NullCoverageRecorder());
 
-        // vulnerability filePath is UserController.php, not in $files (OtherController.php)
-        // Full File Context section should be empty
         self::assertStringContainsString('## Full File Context', (string) $capturedUserMessage);
         self::assertStringNotContainsString('class OtherController', (string) $capturedUserMessage);
     }
@@ -554,8 +550,6 @@ final class ReviewerAgentTest extends TestCase
      */
     public function test_it_truncates_long_content_in_single_mode_parse_failure_log(): void
     {
-        // Pin the truncation boundary so IncrementInteger / DecrementInteger
-        // mutations on the byte-cap constant are killed.
         $errorLogs = [];
         $logger = self::createStub(LoggerInterface::class);
         $logger->method('info');
@@ -607,8 +601,6 @@ final class ReviewerAgentTest extends TestCase
      */
     public function test_it_truncates_long_content_in_batch_mode_parse_failure_log(): void
     {
-        // Same boundary pin for the batch path (separate constant on the
-        // class even though both currently equal 512).
         $errorLogs = [];
         $logger = self::createStub(LoggerInterface::class);
         $logger->method('info');
@@ -964,8 +956,6 @@ final class ReviewerAgentTest extends TestCase
      */
     public function test_it_rejects_vulnerability_when_accepted_key_is_missing(): void
     {
-        // Tests the `?? false` fallback: if 'accepted' key is absent, vulnerability must be rejected.
-        // A FalseValue mutation would remove the `?? false`, making missing key produce null (truthy cast).
         $vulnerability = $this->makeVulnerability();
 
         $llmClient = self::createStub(LLMClientInterface::class);
@@ -1043,8 +1033,6 @@ final class ReviewerAgentTest extends TestCase
      */
     public function test_it_logs_debug_review_decision_when_severity_is_elevated(): void
     {
-        // Covers MethodCallRemoval on the logReviewDecision call after severity elevation
-        // (post-elevation path, not the early-return path).
         $vulnerability = $this->makeVulnerability(VulnerabilitySeverity::HIGH);
         $debugLogs = [];
 
@@ -1101,8 +1089,6 @@ final class ReviewerAgentTest extends TestCase
      */
     public function test_it_includes_actual_file_content_in_llm_message(): void
     {
-        // Tests ReturnRemoval on getFileContext: if the return is removed, content is '' and
-        // the file's actual source code would NOT appear in the LLM user message.
         $fileContent = '<?php class UserController { public function sensitiveAction() {} }';
         $files = [
             ProjectFile::create(
@@ -1641,7 +1627,6 @@ final class ReviewerAgentTest extends TestCase
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
         $b = $this->makeVulnerabilityAt('src/B.php');
 
-        // Only second vuln is in response; first is missing
         $batchResponse = (string) json_encode([
             ['id' => $b->id(), 'accepted' => true],
         ]);
@@ -1683,8 +1668,6 @@ final class ReviewerAgentTest extends TestCase
         $vulnerability = $this->makeVulnerabilityAt('src/A.php');
         $b = $this->makeVulnerabilityAt('src/B.php');
 
-        // Response mixes a scalar entry between valid array entries.
-        // The scalar must be skipped without aborting batch processing.
         $batchResponse = (string) json_encode([
             ['id' => $vulnerability->id(), 'accepted' => true],
             'not an object',
@@ -1871,7 +1854,6 @@ final class ReviewerAgentTest extends TestCase
      */
     public function test_it_corrects_type_when_reviewer_reclassifies_accepted_finding(): void
     {
-        // Attacker labelled it SQLi but reviewer determines it's actually an SSRF.
         $vulnerability = Vulnerability::of(
             new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, 'Mislabelled finding', 0.9),
             new CodeLocation('src/Service/Webhook.php', 10, 12),
@@ -1924,7 +1906,6 @@ final class ReviewerAgentTest extends TestCase
 
         $result = $reviewerAgent->review([$vulnerability], [], new NullCoverageRecorder());
 
-        // Original type survives a bad correction; accepted state is still honored.
         self::assertSame($vulnerability->type(), $result[0]->type());
         self::assertTrue($result[0]->isReviewerValidated());
     }
@@ -2017,8 +1998,6 @@ final class ReviewerAgentTest extends TestCase
      */
     public function test_it_ignores_corrected_type_when_value_is_not_a_string(): void
     {
-        // Non-string corrected_type (e.g. integer) must be ignored (would TypeError on enum::from())
-        // if the is_string guard were removed.
         $vulnerability = $this->makeVulnerability();
 
         $llmClient = self::createStub(LLMClientInterface::class);

@@ -16,9 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 
 /**
- * The configuration `init` prints instead of writing for a platform it cannot
- * configure: every setting the platform needs, with `<placeholder>` values for
- * what only the user knows, ready to paste into `config.yaml`.
+ * The block `init` prints for a platform it cannot write, with a
+ * `<placeholder>` for each value only the user knows.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

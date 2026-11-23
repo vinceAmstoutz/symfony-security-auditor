@@ -20,11 +20,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use function Symfony\Component\String\u;
 
 /**
- * Adapts a project-configured {@see CustomAttackerSkill} to the
- * {@see AttackerSkillInterface} the registry consumes: the operator's raw
- * instructions are wrapped in a `<skills role="custom:<name>">` block so they
- * sit in the prompt exactly like a built-in skill, but tagged as custom so the
- * LLM (and a human reading the prompt) can tell project rules from shipped ones.
+ * A configured {@see CustomAttackerSkill}, its instructions wrapped in a
+ * `<skills role="custom:<name>">` block.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

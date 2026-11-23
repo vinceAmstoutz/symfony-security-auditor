@@ -226,9 +226,7 @@ final class RegexSecretScrubberTest extends TestCase
     }
 
     /**
-     * The credential is redacted but the header name and scheme are kept, so the
-     * LLM still sees that the request authenticates and how: removing them
-     * would hide the auth mechanism the audit is meant to reason about.
+     * The kept header name and scheme still show how the request authenticates.
      */
     public function test_a_basic_authorization_header_keeps_its_scheme_and_redacts_only_the_credential(): void
     {
@@ -238,9 +236,8 @@ final class RegexSecretScrubberTest extends TestCase
     }
 
     /**
-     * `basic` and `authorization` are ordinary English words; only the two
-     * together, in an assignment, followed by a credential-shaped value, are a
-     * secret. Prose that happens to use them must survive untouched.
+     * `basic` and `authorization` are a secret only together, in an assignment,
+     * before a credential-shaped value.
      */
     public function test_prose_mentioning_basic_authorization_is_not_redacted(): void
     {
@@ -1138,8 +1135,6 @@ final class RegexSecretScrubberTest extends TestCase
 
     public function test_multiple_secrets_in_same_input_are_all_redacted(): void
     {
-        // Mix free-floating tokens (caught by their specific regex) with env-style assignments
-        // (caught by env_assignment). Asserts both code paths fire in a single call.
         $input = 'Token: '.self::AWS."IOSFODNN7EXAMPLE\nGitHub: ".self::GHP."_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij\nAPI_TOKEN=should_be_redacted_too\n";
 
         $output = $this->regexSecretScrubber->scrub($input);

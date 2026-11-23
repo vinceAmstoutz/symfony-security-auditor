@@ -74,10 +74,8 @@ final readonly class AuditReport
     }
 
     /**
-     * Baseline fingerprints already spent skipping a finding before the
-     * reviewer ever saw it this run, which lets `BaselineProcessor` avoid granting
-     * the same accepted occurrence a second, unspent credit when it applies
-     * the baseline again against the final report.
+     * Baseline fingerprints spent this run skipping a finding before review,
+     * which applying the baseline to the final report must not credit again.
      *
      * @return list<string>
      */
@@ -87,12 +85,9 @@ final readonly class AuditReport
     }
 
     /**
-     * Copy of the report naming each finding the baseline accepted before the
-     * review after the entry whose credit it spent, see
-     * {@see SuppressedFindings::withAcceptedBeforeReviewNamedBy()}. Before the
-     * review, a finding the reviewer had reclassified carries the type the
-     * attacker reports, which only the entry ties to the fingerprint a report
-     * lists the finding under.
+     * Names each finding the baseline accepted before review after the entry
+     * whose credit it spent
+     * ({@see SuppressedFindings::withAcceptedBeforeReviewNamedBy()}).
      *
      * @internal not part of the BC promise, see docs/versioning.md
      *
@@ -157,9 +152,9 @@ final readonly class AuditReport
     }
 
     /**
-     * Files some stage set out to analyze and never finished, see
-     * {@see UnanalyzedFiles}. A finding can hide in any of them, so a report
-     * listing one cannot vouch for the absence of vulnerabilities.
+     * Files some stage set out to analyze and never finished
+     * ({@see UnanalyzedFiles}). A report listing one cannot vouch for the
+     * absence of vulnerabilities.
      *
      * @return list<string>
      */
@@ -169,11 +164,9 @@ final readonly class AuditReport
     }
 
     /**
-     * Whether every file in scope was analyzed: no stage left one unfinished
-     * (a run stopped before its first LLM call records its files as aborted)
-     * and the report is not a cost estimate of files it never analyzed. A
-     * `--since` run whose diff left no file to analyze has nothing left
-     * unfinished and neither has a host pipeline that records no coverage.
+     * Whether no stage left a file in scope unfinished and the report is no
+     * cost estimate. A run that had no file to analyze, or records no
+     * coverage, is complete.
      */
     public function isComplete(): bool
     {
@@ -181,12 +174,9 @@ final readonly class AuditReport
     }
 
     /**
-     * Whether the run reached no verdict: it analyzed none of the files it
-     * had to (every attacker call failed or was cut short, or none was made)
-     * and holds no finding. A SAFE there would vouch for code nobody read. A
-     * run that holds a finding is a partial run even when it analyzed no file
-     * in full: a response cut short keeps the findings it recorded, while its
-     * chunk is recorded as errored. A scan that found no file at all is
+     * Whether the run analyzed none of the files it had to and holds no
+     * finding: a SAFE there would vouch for code nobody read. A run holding a
+     * finding is partial instead. A scan that found no file is
      * {@see self::foundNoFile()}, which this does not answer.
      */
     public function hasNoVerdict(): bool
@@ -225,8 +215,8 @@ final readonly class AuditReport
     }
 
     /**
-     * Stable fingerprints of every finding in the report, de-duplicated: the
-     * payload written to a baseline file.
+     * The de-duplicated fingerprints of every finding: what a baseline file
+     * holds.
      *
      * @return list<string>
      */
@@ -239,11 +229,9 @@ final readonly class AuditReport
     }
 
     /**
-     * Copy of the report with findings removed by fingerprint, consuming at
-     * most as many findings per fingerprint as `$fingerprints` contains that
-     * value: a plain membership test would let one accepted occurrence of a
-     * shared fingerprint suppress every current finding sharing it, including
-     * ones that were never actually reviewed.
+     * Removes at most as many findings per fingerprint as `$fingerprints` holds
+     * it, so one accepted occurrence never suppresses every finding sharing its
+     * fingerprint.
      *
      * @param list<string> $fingerprints
      */
@@ -289,10 +277,8 @@ final readonly class AuditReport
     }
 
     /**
-     * Copy of the report keeping only findings whose type passes the configured
-     * filters: when `$includedTypes` is non-empty it acts as an allowlist and
-     * `$excludedTypes` always wins over it. Applied before rendering and
-     * exit-code resolution so muted types neither appear nor fail CI.
+     * Keeps the findings whose type passes the filters: a non-empty
+     * `$includedTypes` is an allowlist and `$excludedTypes` always wins over it.
      *
      * @param list<VulnerabilityType> $includedTypes
      * @param list<VulnerabilityType> $excludedTypes
@@ -354,8 +340,7 @@ final readonly class AuditReport
 
     /**
      * The bounded counterpart of {@see riskScore()}: 100 for a clean report,
-     * each finding deducting its severity's `score()` weight, floored at 0.
-     * Reusing that one weight table keeps the two scales from drifting apart.
+     * each finding deducting its severity's `score()`, floored at 0.
      */
     public function normalizedScore(): int
     {

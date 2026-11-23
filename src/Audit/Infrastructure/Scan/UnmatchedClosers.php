@@ -16,13 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan;
 use CompileError;
 
 /**
- * Tells whether a PHP source holds so many closing brackets without an opening one that PHP's own
- * tokenizer stalls on it: the lexer raises one ParseError per stray closer and chains it onto the
- * previous one, so `<?php ` followed by 16,000 `)` takes seconds and 32,000 half a minute, whatever
- * the size cap. The surplus of closers over openers, kind by kind, counted over the raw characters
- * without lexing, is cheap and real code stays far below the limit. A source past it is handed to
- * PHP's parser, which stops at the first stray closer: a source it parses holds its surplus in
- * comments, strings or inline HTML, where the lexer raises nothing, so it is tokenized safely.
+ * Tells whether a PHP source holds so many unmatched closing brackets that PHP's tokenizer stalls on
+ * it (seconds for 16,000 stray `)`). Counts the surplus without lexing. A source past the limit that
+ * PHP's parser accepts keeps its surplus in comments, strings or inline HTML and is safe to tokenize.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

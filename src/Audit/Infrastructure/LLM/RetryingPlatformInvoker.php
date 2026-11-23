@@ -36,13 +36,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\Retr
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\SuggestedWaitParser;
 
 /**
- * Invokes the platform behind the rate limiter with transient-failure retry:
- * empty-content and non-transient failures are classified into the matching
- * custom exception, rate-limit failures honor the server's Retry-After hint
- * and other transient failures back off per the retry policy. Every failed
- * attempt is booked first, so one the provider answered and billed is on the
- * books whether it is retried or not; no retry goes out once that spend
- * has run past the budget. The caller checks the budget before the first
+ * Invokes the platform behind the rate limiter, retrying transient failures
+ * and throwing the matching exception for any other. A rate limit waits at
+ * least the server's Retry-After. Books every failed attempt and sends no
+ * retry past the budget; the caller checks the budget before the first
  * attempt.
  *
  * @internal not part of the BC promise, see docs/versioning.md
@@ -130,8 +127,8 @@ final readonly class RetryingPlatformInvoker
     }
 
     /**
-     * A tool call the output cap cut off is asked again, once, with a higher
-     * cap: the same cap would cut it off again.
+     * Returns the options that ask again, once, with a higher cap for a tool
+     * call the output cap cut off.
      *
      * @param array<string, mixed> $options
      *
@@ -157,9 +154,8 @@ final readonly class RetryingPlatformInvoker
     }
 
     /**
-     * A status that clears on its own is retried; once the retries are spent,
-     * the failure is read as it reads without the status, as it was before
-     * the status was retried.
+     * Reads a status that clears on its own as the failure without that status
+     * once the retries are spent.
      */
     private function explainedFailure(Throwable $throwable, ?DeferredResult $deferredResult, bool $retriesSpent): Throwable
     {

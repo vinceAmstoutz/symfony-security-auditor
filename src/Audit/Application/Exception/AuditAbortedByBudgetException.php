@@ -19,9 +19,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\Budg
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 
 /**
- * Signals that an audit was halted because the configured token or cost budget
- * was exhausted. Carries the partial `AuditReport` collected up to the abort
- * point so the command layer can still render whatever findings were validated.
+ * Halts an audit whose token or cost budget is exhausted, carrying the
+ * partial `AuditReport`.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

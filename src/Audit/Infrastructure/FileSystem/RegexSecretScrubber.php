@@ -22,43 +22,29 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PathAwareSecretScrubb
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\Exception\SecretScrubberConfigurationException;
 
 /**
- * Replaces credential-shaped strings in file content with redacted placeholders.
- *
- * The pattern set covers common high-signal leaks: cloud provider keys, version-control
- * tokens, payment processor keys, generic credential assignments, JWT-shaped tokens,
- * PEM-encoded private keys and PGP private key blocks, the decryption key of a
- * Symfony secrets vault, env-style token assignments,
- * Symfony `env(NAME)` parameter defaults and XML `<parameter>` values, PHP `define()`
- * constants, connection-string URIs with
- * embedded credentials (e.g. `postgres://user:pass@host`), credentials in a URL query
- * (`?token=…`), `Authorization` headers of any scheme, the literal arguments of a call
- * that takes a credential (`setCredentials()`, `ldap_bind()`, `new Credentials()`),
- * OpenAI-style `sk-`/`sk-proj-` keys, Slack and Discord webhook URLs, plus GitLab, Hugging Face,
- * npm, SendGrid and PyPI tokens. Each match is replaced
- * with `***REDACTED:<label>***` so downstream prompt builders can still emit a coherent
- * file context without exposing the secret to the LLM.
+ * Replaces credential-shaped strings with `***REDACTED:<label>***`: provider keys and tokens,
+ * private keys, the key of a Symfony secrets vault, credential assignments and parameters,
+ * connection URIs holding a credential, credentials in a URL query or an `Authorization` header
+ * and the literal arguments of a call that takes a credential.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInterface
 {
     /**
-     * A credential word glued to a known qualifier (`APIKEY`, `SECRETKEY`,
-     * `DBPASS`, `PGPASSWORD`) names a credential as surely as its underscored
-     * spelling; the qualifier list keeps `MONKEY`, `TURKEY` or `COMPASS` out.
+     * A credential word glued to a known qualifier (`APIKEY`, `DBPASS`), never
+     * `MONKEY` or `COMPASS`.
      */
     private const string GLUED_ENV_CREDENTIAL_KEY = '(?:API|APP|AUTH|ACCESS|SECRET|PRIVATE|CLIENT|MASTER|ACCOUNT|SIGNING|ENCRYPTION|JWT|OAUTH|SESSION|REFRESH|BEARER|PASS|DB|DATABASE|ROOT|ADMIN|USER|MYSQL|POSTGRES|PG|MONGO|REDIS|SMTP|MAIL|FTP|SSH){1,4}(?:TOKEN|SECRET|KEY|PASSWORD|PASSWD|PASS)';
 
     /**
-     * A plain YAML scalar cannot start with `*`: a placeholder standing alone
-     * as a mapping value, a list item or a flow entry is read as an alias and
-     * fails the whole document, so it is quoted.
+     * A placeholder standing alone as a plain YAML value, which gets quoted:
+     * YAML reads a leading `*` as an alias.
      */
     private const string UNQUOTED_YAML_PLACEHOLDER = '/([:\-][ \t]++)(\*\*\*REDACTED:[a-z0-9_]++\*\*\*)(?=[ \t]*+(?:[,})\]#]|\r?$))/m';
 
     /**
-     * What a value goes on with after an operand: `?: 'x'`, `?? 'x'`, `. 'x'`, `? $a : 'x'`. Each step is
-     * an operator set off by blanks, then a quoted literal or one word.
+     * The fallbacks after an operand: `?: 'x'`, `?? 'x'`, `. 'x'`, `? $a : 'x'`.
      */
     private const string FALLBACK_TAIL = '((?:[ \t]++(?:\?\?|\?:|[?:.])[ \t]++(?:"(?:[^"\\\\\n]++|\\\\.)*+"|\'(?:[^\'\\\\\n]++|\\\\.)*+\'|[^\s"\';,)\]]++)){1,16}+)';
 
@@ -71,29 +57,26 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     private const int MINIMUM_SECRET_LENGTH = 4;
 
     /**
-     * A DSN assignment whose value is a URL with no user part and no credential-named
-     * parameter holds nothing to hide: `MAILER_DSN=null://null` or the stock
-     * `MESSENGER_TRANSPORT_DSN=doctrine://default?auto_setup=0`.
+     * A DSN assignment with no user part and no credential-named parameter
+     * (`MAILER_DSN=null://null`), left as written.
      */
     private const string CREDENTIAL_FREE_DSN_ASSIGNMENT = '(?:[A-Z][A-Z0-9]*_){0,8}DSN(?:_[A-Z0-9]+){0,8}\s*=[ \t]*["\']?[a-z][a-z0-9+.\-]{0,31}:\/\/(?![^\s"\'@?;]{0,256}+[?;][^\s"\'@]{0,256}(?i:auth|key|token|secret|pass|pwd|cred))[^@\s"\']{0,256}+(?:["\']|\s|\z)';
 
     /**
-     * A user part followed by a colon holds a password. One without a colon is a username on most schemes
-     * (`https://deploy@host`), but the password itself on a Redis or Valkey URL, on a mailer API DSN
-     * (`postmark+api://TOKEN@default`) and on any DSN whose host is `default` (`ntfy://TOKEN@default`).
+     * A user part holding a password: one followed by a colon, or one alone on a Redis, Valkey or
+     * mailer API URL or before a `default` host (`ntfy://TOKEN@default`).
      */
     private const string CONNECTION_URI = '~\b(?|([a-z][a-z0-9+.\-]{0,31}://)[^:@/\s]*:[^/\s]+|((?:rediss?|valkeys?|sendgrid|[a-z0-9.\-]{1,31}\+api)://)(?![%$])[^:@/\s]{4,}+|([a-z][a-z0-9+.\-]{0,31}://)(?![%$])[^:@/\s]{4,}+(?=@default\b))@~i';
 
     /**
-     * The credential of an `Authorization` header of any scheme (`Token …`, `Digest …`, a bearer
-     * token too short for `BearerToken`), when it ends the value as a header does: a word
-     * followed by a parenthesis or a semicolon is code (`new AuthorizationChecker($storage)`).
+     * The credential of an `Authorization` header of any scheme, when it ends the value as a
+     * header does: `new AuthorizationChecker($storage)` is code.
      */
     private const string AUTHORIZATION_HEADER = '/(?:proxy-)?authorization\b["\']?[ \t]*(?::|=>|=)[ \t]*["\']?[A-Za-z][A-Za-z0-9_-]{0,31}[ \t]++\K[A-Za-z0-9+\/=_.~:-]{8,}+(?=["\'\s]|\z)/i';
 
     /**
-     * A credential in a URL query (`?token=…`, `&key=…`, `&sig=…`, `?private_token=…`), unless the
-     * value is a placeholder filled in later (`?token=%s`, `?token={token}`).
+     * A credential in a URL query (`?token=…`, `&sig=…`), unless it is a placeholder (`?token=%s`,
+     * `?token={token}`).
      */
     private const string QUERY_CREDENTIAL = '/[?&](?:(?:access|auth|api|private|refresh|id|client|secret)_?)?(?:token|key|secret|sig|signature|password|passwd|pwd)=\K(?:[A-Za-z0-9._~+\/=-]|%[0-9A-Fa-f]{2}){8,}+(?![%{$])/i';
 
@@ -106,17 +89,9 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
 
     /**
      * The first word of an unquoted value, shaped the way only PHP code is: a
-     * variable followed by an access (`$request->`, `$_GET[`) or ending there
-     * (`$plain,`, `$plain)`), a class constant (`self::DEFAULT_SECRET`,
-     * `Foo::BAR;`, `\PDO::ATTR_KEY`), a global one (`\OPENSSL_KEYTYPE_RSA,`),
-     * an array opening on a variable, a string or a spread (`[$a, $b]`), a
-     * negation of any of them, a parenthesised variable or instance
-     * (`($a || $b)`, `(new Foo())`), a call nested in a call
-     * (`unserialize(serialize(`), or a call (static or a lower-case function)
-     * that ends the statement (`uniqid();`, `mt_rand(1000,`), closes an
-     * argument list or an array (`getenv('X')]`) or opens on a string, a
-     * variable or another call (`hash_hmac('sha256',`). `$2y$13$…`,
-     * `summer(2024)`, `abc('x')yz` or `P4ss::WORD_1` match none of them.
+     * variable access, a class or global constant, an array or parenthesized
+     * expression, or a call (`$request->`, `self::SECRET`, `[$a, $b]`,
+     * `uniqid();`). `$2y$13$…`, `summer(2024)` and `P4ss::WORD_1` match none.
      */
     private const string PHP_EXPRESSION = '/^!?(?:\$[A-Za-z_]\w*(?:[;,)\]]*$|->|\?->|::|\[)|(?:self|static|parent)::[A-Z_][A-Z0-9_]*[;,)\]]*$|[A-Z]\w*::[A-Z_][A-Z0-9_]*[;,)\]]+$|\\\\[A-Za-z_][\w\\\\]*(?:::[A-Za-z_]\w*)?[;,)\]]*$|\[(?:["\'$\]]|\.\.\.)|\((?:\$[A-Za-z_]|new$)|\\\\?[a-z_]\w*\([a-z_]\w*\(|(?:\\\\?[a-z_]\w*|(?:self|static|parent|[A-Z]\w*)::[A-Za-z_]\w*)\((?:(?:[\'"$]|[a-z_]\w*\().*[,;()\]]|.*[;,])$)/';
 
@@ -125,10 +100,9 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     private const string PURE_VALUE_FUNCTIONS = 'hex2bin|bin2hex|base64_decode|base64_encode|sodium_hex2bin|sodium_base642bin|password_hash|md5|sha1|trim|ltrim|rtrim|strtolower|strtoupper|urldecode|rawurldecode|urlencode|rawurlencode';
 
     /**
-     * A Symfony secrets vault writes its decryption key, a 64-byte sodium key
-     * pair, as `return "…";`, each byte `rawurlencode()` escapes spelled `\xHH`
-     * and recent releases put a `// SYMFONY_DECRYPTION_SECRET=` copy right above: a
-     * literal returned under that copy is the key whatever its length.
+     * The decryption key a Symfony secrets vault returns: a 64-byte literal
+     * holding `\xHH` escapes, or any literal returned under a
+     * `// SYMFONY_DECRYPTION_SECRET=` line.
      */
     private const string SECRETS_VAULT_KEY = '/(?:\bSYMFONY_DECRYPTION_SECRET=[^\n]{0,256}+\n[ \t]*+return[ \t]*+"\K(?:\\\\x[0-9A-Fa-f]{2}|[A-Za-z0-9_.~-])++|\breturn[ \t]*+"\K(?=[^"\n]{0,255}?\\\\x)(?:\\\\x[0-9A-Fa-f]{2}|[A-Za-z0-9_.~-]){64})(?=")/';
 
@@ -153,11 +127,9 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     private array $patterns;
 
     /**
-     * @param list<mixed>                   $additionalPatterns extra PCRE patterns merged with the defaults.
-     *                                                          Each pattern is given a synthetic label
-     *                                                          `custom_<index>` for redaction reporting;
-     *                                                          one that is not text is refused.
-     * @param ?Closure(string): PhpDataMask $phpDataMaskFactory defaults to PhpDataMask::of; tests inject a recording one
+     * @param list<mixed>                   $additionalPatterns extra PCRE patterns, each labeled `custom_<index>`;
+     *                                                          one that is not text is refused
+     * @param ?Closure(string): PhpDataMask $phpDataMaskFactory defaults to PhpDataMask::of
      *
      * @throws SecretScrubberConfigurationException
      */
@@ -185,24 +157,10 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     }
 
     /**
-     * The quantifiers are possessive (`*+`, `{4,}+`): `\\.` and `(?!\2)[^\n]`
-     * both match a bare backslash, so a backtracking quantifier would let an
-     * unterminated, backslash-heavy value elsewhere in the file exhaust
-     * `pcre.backtrack_limit` and silently skip redaction file-wide. A quoted
-     * value runs to `(?!\2)[^\n]` rather than excluding both quote characters,
-     * so a value quoted with one type may hold the other ("don't" inside
-     * double quotes) without the closing-quote backreference stopping there.
-     * A repeated group costs the engine a stack frame per repetition, so the
-     * segments of a key are bounded (`{0,8}`, `{1,4}`) and the further words
-     * of an unquoted value are one character run: a single line repeating
-     * `_a` would otherwise exhaust the JIT stack and withhold the whole file.
-     * A private key with no end marker after it ends the search, since no
-     * later key can have one either. A URL scheme is at most 32
-     * characters, so neither rescans the rest of the file from every header
-     * or word boundary.
+     * Quantifiers stay possessive and repetitions bounded, so a crafted file cannot exhaust
+     * `pcre.backtrack_limit` or the JIT stack and get itself withheld.
      *
-     * @return array<string, string> map of pattern label => PCRE pattern. Labels are stable
-     *                               and appear in the redaction placeholder.
+     * @return array<string, string> pattern label => PCRE pattern; the label appears in the placeholder
      */
     private function defaultPatterns(): array
     {
@@ -247,11 +205,9 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     }
 
     /**
-     * A call whose literal arguments are a credential and the account or server it opens: a
-     * setter or config builder named after one (`setPassword()`, `setCredentials()`,
-     * `setBasicAuth()`, `secret()`), a client logging in with one (`new mysqli()`,
-     * `mysqli_connect()`, `ldap_bind()`, `$ldap->bind()`, `$redis->auth()`, `ftp_login()`,
-     * `ssh2_auth_password()`, `imap_open()`) or a class holding one (`new Credentials()`).
+     * A call taking a credential as a literal argument: a setter named after one
+     * (`setPassword()`), a client logging in with one (`ldap_bind()`, `$redis->auth()`) or a class
+     * holding one (`new Credentials()`).
      */
     private function credentialCall(string $callCredentialName): string
     {
@@ -267,8 +223,7 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     }
 
     /**
-     * The items of a list, up to its closing bracket: the user and the password a Guzzle `auth`
-     * or an HttpClient `auth_basic` option takes as a list.
+     * The items of a list, up to its closing bracket, such as a Guzzle `auth` option.
      */
     private function listItems(): string
     {
@@ -317,8 +272,7 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     }
 
     /**
-     * A file named like the decryption key of a Symfony secrets vault holds nothing but the key, so
-     * every string literal in it is redacted, whatever spelling or size the key comes in.
+     * Redacts every string literal of a file named like a Symfony secrets vault's decryption key.
      */
     #[Override]
     public function scrubFile(string $relativePath, string $content): string
@@ -329,8 +283,7 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     }
 
     /**
-     * Each body becomes the placeholder, followed by the line breaks it spanned, from the last one
-     * back so the offsets of the others still hold.
+     * Keeps the line count: each body becomes the placeholder and the line breaks it spanned.
      */
     private function redactStringLiterals(string $content): string
     {
@@ -342,11 +295,8 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     }
 
     /**
-     * A pattern the PCRE engine refuses to evaluate (a file crafted to exhaust
-     * `pcre.backtrack_limit`, a `/u` custom pattern meeting invalid UTF-8) leaves
-     * the content only part-scanned and nothing downstream can tell that apart
-     * from a clean scan. Enabling secret scrubbing is a promise that no credential
-     * reaches the LLM, so the content is withheld rather than sent unverified.
+     * Withholds the whole content once a pattern cannot be evaluated: part-scanned content could
+     * still hold a credential.
      */
     private function withheldContent(string $label, string $content): string
     {
@@ -368,15 +318,9 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     }
 
     /**
-     * A credential-named key is also a common variable, column or array key
-     * and the code around it is what the audit reads: a request parameter
-     * flowing into `$pass`, or a `pass` column concatenated into a query, is a
-     * finding redaction would hide. A value shaped like PHP code (a variable
-     * access, a class constant, a call, or a quoted fragment joined to a
-     * variable or a call) is left as written; any other value is redacted,
-     * a literal holding `(`, `::` or a `$` included. A literal written in
-     * exactly one of those shapes is read as code: that is the trade-off for
-     * letting the audit see the code.
+     * Whether a value assigned to a credential-named key is PHP code (a variable access, a class
+     * constant, a call, a quoted fragment joined to a variable or a call), which stays readable
+     * for the audit. A literal written in exactly one of those shapes is read as code too.
      */
     private function isCode(string $value, bool $quoted): bool
     {
@@ -391,9 +335,8 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     }
 
     /**
-     * A shell or dotenv assignment is rewritten to `NAME=***REDACTED***`. A PHP
-     * constant declaration is no such assignment: it keeps its spacing, its
-     * quotes and its terminator. A value that is no string literal is code.
+     * Rewrites a shell or dotenv assignment to `NAME=***REDACTED***`. A PHP constant declaration
+     * keeps its spacing, quotes and terminator. A value that is no string literal stays.
      *
      * @param array<int|string, array{0: string, 1: int}> $match
      */
@@ -435,9 +378,8 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     }
 
     /**
-     * Only text is ever redacted, never code: a placeholder written over a constant, a call or a
-     * parameter default would leave a file PHP can no longer parse and none of those is a literal
-     * secret. A value reaching past the text it starts in is cut where that text ends.
+     * Redacts only text, never code, so the file still parses. A value reaching past the text it
+     * starts in is cut where that text ends.
      *
      * @param array<int|string, array{0: string, 1: int}> $match
      */
@@ -499,9 +441,8 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     }
 
     /**
-     * `null`, `true` and `false` carry no secret, nor does a number that a
-     * statement or an argument list ends right after; a bare number in YAML or
-     * a dotenv file may still be a password.
+     * `null`, `true`, `false` and a number a statement or an argument list ends right after. A
+     * bare number in YAML or a dotenv file may still be a password.
      */
     private function isNeutralLiteral(string $secret, bool $terminated): bool
     {
@@ -538,9 +479,8 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     }
 
     /**
-     * Each literal standing as a whole argument of a call that takes a credential is redacted,
-     * the user handed over beside a password included, provided PHP reads it as a string: a
-     * scrubbed file still parses.
+     * Redacts each literal standing as a whole argument of a credential call, the user beside the
+     * password included, when PHP reads it as a string.
      */
     private function redactCallArguments(string $pattern, string $content, PhpDataMaskMemo $phpDataMaskMemo): ?string
     {
@@ -588,10 +528,7 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     }
 
     /**
-     * Replaces a multi-line match (the PEM key block) with a single placeholder
-     * line followed by enough blank lines to keep the file's total line count
-     * unchanged; otherwise every subsequent line number the attacker/reviewer
-     * reports would be off by the number of lines the key spanned.
+     * Keeps the file's line count, so the line numbers of findings below the key still hold.
      *
      * @param array<int|string, string> $match
      */
@@ -614,11 +551,8 @@ final readonly class RegexSecretScrubber implements PathAwareSecretScrubberInter
     }
 
     /**
-     * Detects Symfony parameter references (`%env(FOO)%`, `%kernel.secret%`) and shell-style
-     * env expansions (`$FOO`, `${FOO}`). These are configuration indirections, not committed
-     * secrets: redacting them produces a false positive when an LLM sees the placeholder
-     * marker and reports an "inline credential" vulnerability for code that follows the
-     * recommended Symfony secrets pattern.
+     * A Symfony parameter (`%env(FOO)%`, `%kernel.secret%`) or a shell expansion (`$FOO`,
+     * `${FOO}`), which stays readable: it holds no secret.
      */
     private function isConfigPlaceholder(string $value): bool
     {

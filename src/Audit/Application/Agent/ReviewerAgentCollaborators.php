@@ -23,8 +23,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerPromptBuilder
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TriageMemoryRecorderInterface;
 
 /**
- * The injected ports the reviewer agent builds its review strategies from.
- *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class ReviewerAgentCollaborators

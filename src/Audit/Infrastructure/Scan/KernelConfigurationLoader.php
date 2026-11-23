@@ -19,16 +19,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\Exception\UnreadableYamlException;
 
 /**
- * The YAML configuration files a Symfony production kernel loads, in the
- * order it loads them: `config/packages/*.yaml`, then `config/packages/prod/`,
- * each file after the files it imports. The project's are read first; for a
- * run narrowed to folders of a monorepo, those of the application each
- * folder lies in (the folder itself, or the nearest folder above it, that
- * holds a `config/packages/`) are read apart, since they govern that
- * application's routes only. The reading is bounded, file by file and in
- * total, so a hostile repository cannot exhaust the run; a file the kernel
- * loads that the audit does not read is reported with the reason when it may
- * hold security configuration.
+ * The YAML configuration files a Symfony production kernel loads, in load
+ * order: `config/packages/*.yaml`, then `config/packages/prod/`, each file
+ * after the files it imports. The project's files come first, then apart those
+ * of the monorepo application each `--path` lies in (the nearest folder
+ * holding a `config/packages/`). Reads within per-file and total bounds and
+ * reports an unread file that may hold security configuration with the reason.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  *
@@ -50,9 +46,9 @@ final readonly class KernelConfigurationLoader
     ) {}
 
     /**
-     * The kernel reads the `.yaml` files of `config/packages/` in every
-     * environment and what sits under `config/packages/prod/` in production
-     * only; a `security.yml` is read as well, as earlier releases read it.
+     * Whether the production kernel loads the file: a `.yaml` file of
+     * `config/packages/`, `config/packages/security.yml` or a file under
+     * `config/packages/prod/`.
      *
      * @param string $pathInApplication the file's path, relative to the application's root
      */
@@ -62,8 +58,8 @@ final readonly class KernelConfigurationLoader
     }
 
     /**
-     * The kernel imports `config/packages/*.yaml` and then
-     * `config/packages/<environment>/*.yaml`.
+     * 0 for `config/packages/*.yaml`, 1 for `config/packages/prod/`, which the
+     * kernel loads after.
      *
      * @param string $pathInApplication the file's path, relative to the application's root
      */
@@ -92,8 +88,8 @@ final readonly class KernelConfigurationLoader
     }
 
     /**
-     * Each application reads its own files, those it shares with another
-     * included, while the budget is the run's.
+     * Each application reads its own files, shared ones included, within the
+     * run's budget.
      *
      * @param list<ProjectFile>                $yamlFiles
      * @param array<string, list<ProjectFile>> $yamlFilesByFolder
@@ -192,9 +188,8 @@ final readonly class KernelConfigurationLoader
     }
 
     /**
-     * A file without a top-level key that holds security configuration or
-     * pulls some in (an API documentation, a messenger setup) loses no rule
-     * by being left out, so it is not reported.
+     * Reports an unreadable file only when a top-level key of it holds or
+     * imports security configuration.
      *
      * @param Loading $loading
      *

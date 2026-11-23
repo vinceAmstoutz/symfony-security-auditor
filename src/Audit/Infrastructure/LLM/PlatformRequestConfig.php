@@ -17,9 +17,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterfa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ResolvingTokenEstimator;
 
 /**
- * How each request body is shaped: sampling temperature, provider JSON mode,
- * the token estimator used for rate-limit accounting and the `symfony/ai`
- * platform that serves the requests, when the composition root knows it.
+ * How each request is shaped. `$servingPlatform` is null when the
+ * composition root does not know it.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

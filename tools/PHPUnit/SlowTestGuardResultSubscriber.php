@@ -19,12 +19,9 @@ use PHPUnit\Event\Application\Finished;
 use PHPUnit\Event\Application\FinishedSubscriber;
 
 /**
- * Fails the run when the detector's collector holds any test that exceeded its
- * maximum duration (the guard's headroom-adjusted global bar or its own
- * `#[MaximumDuration]` override). This is the enforcement half of
- * {@see SlowTestGuardExtension}: the report-only detector never fails a run, so
- * a pathological duration (a real `sleep()`, an accidental network call)
- * would otherwise only warn.
+ * Fails the run when the detector's collector holds a test over its maximum
+ * duration, the guard's headroom-adjusted bar or its own `#[MaximumDuration]`:
+ * the enforcing half of {@see SlowTestGuardExtension}.
  */
 final readonly class SlowTestGuardResultSubscriber implements FinishedSubscriber
 {

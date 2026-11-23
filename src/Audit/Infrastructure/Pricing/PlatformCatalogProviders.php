@@ -16,11 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing;
 use function Symfony\Component\String\u;
 
 /**
- * The `symfony/models-dev` provider listing each `symfony/ai` platform bills
- * from, so a model is priced at the rate of the platform that actually serves
- * it rather than at whichever provider re-lists the same id first. Platforms
- * absent here (a self-hosted gateway, a local runtime, a wrapper around
- * another platform) have no listing of their own to prefer.
+ * Maps each `symfony/ai` platform to the `symfony/models-dev` provider it
+ * bills from. A platform absent here, such as a gateway or a local runtime,
+ * has no listing of its own.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -68,10 +66,8 @@ final readonly class PlatformCatalogProviders
     }
 
     /**
-     * The Bedrock bridge sends a short name as `amazon.<name>-v1:0` (Nova),
-     * `anthropic.<name>[-v1:0]` (Claude) or `meta.<name>-v1:0` with
-     * `llama-3` folded to `llama3` and dots turned to dashes (Llama), the
-     * keys the catalog lists it under.
+     * Returns the ids the Bedrock bridge sends a short name as, which the
+     * catalog lists it under.
      *
      * @return list<string>
      */

@@ -22,17 +22,16 @@ use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 
 /**
- * Reads one standalone configuration file (the user's or the project's)
- * into the array the loader layers and guards. A missing file reads as empty.
+ * Reads one standalone configuration file, the user's or a project's. A
+ * missing file reads as empty.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class StandaloneConfigFileReader
 {
     /**
-     * Far more than any configuration holds. A YAML alias names a node rather
-     * than repeating it, so a few hundred bytes of nested aliases parse
-     * cheaply into a billion values that only walking the tree expands.
+     * The values a file may hold once its YAML aliases are expanded: far more
+     * than any configuration holds.
      */
     public const int VALUE_LIMIT = 10_000;
 
@@ -41,9 +40,8 @@ final readonly class StandaloneConfigFileReader
     private const int MAX_DEPTH = 32;
 
     /**
-     * Eight times the largest file read, which no configuration comes near:
-     * the parser keeps a few copies of each block it opens, so this bounds
-     * what any file it is handed can take, whatever its shape.
+     * The bytes of a file's lines, each counted once per level open around
+     * it, that the parser may be handed: eight times the largest file read.
      */
     private const int MAX_NESTED_BYTES = 4_194_304;
 
@@ -106,8 +104,7 @@ final readonly class StandaloneConfigFileReader
     }
 
     /**
-     * Walks the values lazily (nested ones included) and stops at the limit,
-     * so counting an expanding tree costs no more than the limit itself.
+     * Stops counting at the limit, so an expanding tree costs no more.
      *
      * @param array<array-key, mixed> $config
      */
@@ -119,14 +116,9 @@ final readonly class StandaloneConfigFileReader
     }
 
     /**
-     * `symfony/config` reads `secret-scrubbing` as `secret_scrubbing` when it
-     * normalizes the tree, after the loader's guards ran on the raw keys;
-     * folding the same way first keeps a hyphenated spelling from slipping
-     * past them.
-     * A key is also quoted back by every refusal, so its control characters
-     * are escaped here: a repository's config cannot send escape sequences,
-     * eight-bit ones included, to the terminal through a key no valid config
-     * uses.
+     * Folds a hyphenated key to its underscore form as `symfony/config` does,
+     * so it cannot slip past the guards. Escapes a key's control characters,
+     * since every refusal quotes keys back to the terminal.
      *
      * @param array<array-key, mixed> $config
      *

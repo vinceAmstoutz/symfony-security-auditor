@@ -16,12 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidRateLimitConfigurationException;
 
 /**
- * Typed shape of the `audit.rate_limit.*` configuration tree.
- *
- * Each dimension is independently nullable so an opt-in is partial by default:
- * configure only the dimensions your provider actually enforces. When every
- * dimension is null the bundle wires `NullRateLimiter` and behavior matches
- * the pre-existing retry-only path.
+ * The `audit.rate_limit.*` configuration. A null dimension is not limited;
+ * with all three null, no rate limiter runs.
  */
 final readonly class RateLimitConfiguration
 {

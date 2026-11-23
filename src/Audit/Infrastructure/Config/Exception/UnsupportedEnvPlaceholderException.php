@@ -49,12 +49,9 @@ final class UnsupportedEnvPlaceholderException extends InvalidArgumentException
     }
 
     /**
-     * The placeholder is quoted so the line of the config to fix can be found,
-     * but never so that a key pasted into it is echoed: each processor is
-     * shown only when Symfony names it so, the variable as
-     * `EnvironmentVariableName::shown()` quotes a refused name and an
-     * expression holding anything else is masked as a key is, however short
-     * (its colons may be part of the key).
+     * Quotes the placeholder without echoing a key pasted into it: processors
+     * only when Symfony names them all, the variable through
+     * `EnvironmentVariableName::shown()`, any other expression masked.
      */
     private static function quoted(EnvPlaceholder $envPlaceholder): string
     {

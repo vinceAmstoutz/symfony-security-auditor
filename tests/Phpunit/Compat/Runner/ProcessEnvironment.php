@@ -14,10 +14,8 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Runner;
 
 /**
- * The environment a scenario runs in, the same wherever it runs: a CI runner
- * exports `GITHUB_ACTIONS` (which changes how reports are written) and its
- * `LANG`, which decides whether the banner is drawn in UTF-8; a developer's
- * shell exports a terminal width, which changes how the console wraps text.
+ * The environment a scenario runs in, the same wherever it runs: the host's CI,
+ * locale and terminal variables are replaced with fixed values.
  */
 final readonly class ProcessEnvironment
 {

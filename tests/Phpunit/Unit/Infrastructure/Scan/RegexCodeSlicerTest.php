@@ -49,8 +49,6 @@ final class RegexCodeSlicerTest extends TestCase
      */
     public function test_file_at_exactly_the_threshold_is_sliced(): void
     {
-        // Pins GreaterThanOrEqualTo (>=) against GreaterThan (>): a file whose line
-        // count equals the threshold must be sliced, so its inert line is elided.
         $lines = array_fill(0, 9, '        $inert = 1;');
         array_unshift($lines, '<?php');
         $content = implode("\n", $lines); // exactly 10 lines
@@ -186,8 +184,6 @@ final class RegexCodeSlicerTest extends TestCase
      */
     public function test_indented_structural_line_is_retained(): void
     {
-        // Pins the ltrim() call: the method signature is indented, so detection
-        // must trim leading whitespace before matching the `public ` prefix.
         $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)."        public function deeplyIndented(): void\n".str_repeat("        \$x = 1;\n", 20);
         $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
 
@@ -280,10 +276,6 @@ final class RegexCodeSlicerTest extends TestCase
     }
 
     /**
-     * A heredoc body line that merely starts with the closing identifier word
-     * (followed by more text, not by `;`/`,`/`)`) is not a real PHP closing
-     * marker, only a body line that happens to share its first word.
-     *
      * @throws InvalidProjectFileException
      */
     public function test_a_heredoc_body_line_starting_with_the_identifier_word_does_not_close_the_heredoc(): void
@@ -305,12 +297,8 @@ final class RegexCodeSlicerTest extends TestCase
     }
 
     /**
-     * When a still-open multi-line call's closing `)`/`;` sits on the same
-     * line as the heredoc's closing identifier (a common Doctrine/DBAL idiom:
-     * `->executeQuery(<<<SQL ... SQL);`), that line is consumed entirely by
-     * the heredoc branch and its trailing code must still feed continuation
-     * tracking: otherwise `openParenDepth` never returns to zero and every
-     * remaining line in the file is force-retained.
+     * A Doctrine-style `->executeQuery(<<<SQL ... SQL);` line still closes the
+     * enclosing call, or every later line is force-retained.
      *
      * @throws InvalidProjectFileException
      */
@@ -547,8 +535,6 @@ final class RegexCodeSlicerTest extends TestCase
      */
     public function test_inert_line_resembling_keyword_mid_line_is_elided(): void
     {
-        // A comment mentioning "namespace"/"class" mid-line must NOT be treated as
-        // structural: it is only structural when the keyword is at the line start.
         $content = "<?php\n".str_repeat("        \$x = 1;\n", 20)."        // the class and namespace are fine\n".str_repeat("        \$x = 1;\n", 20);
         $projectFile = ProjectFile::create('src/Big.php', '/app/src/Big.php', $content);
 

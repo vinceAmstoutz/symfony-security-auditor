@@ -21,9 +21,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFileReason;
 
 /**
- * The directories a walk does not enter because they are symbolic links: the
- * scan never follows one, so each is reported as left out, under the same
- * rules as the walk for dot directories and `.gitignore` files.
+ * The symlinked directories a walk does not enter, each reported as left out
+ * under the walk's own rules for dot directories and `.gitignore` files.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

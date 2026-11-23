@@ -29,12 +29,8 @@ use PHPStan\ShouldNotHappenException;
 
 /**
  * Bans test attributes that opt out of a quality gate instead of fixing the
- * underlying test (mirrors the no-silence policy for PHPStan/Infection).
- *
- * #[IgnoreDeprecations] is the sole conditional case: it is allowed only when it
- * scopes the ignore to this library's own deprecations and the method asserts
- * them, so a first-party deprecation can be tested without ever silencing a
- * third-party one.
+ * test. #[IgnoreDeprecations] passes only scoped to this library's own
+ * deprecations, on a method that asserts them.
  *
  * @implements Rule<ClassMethod>
  */

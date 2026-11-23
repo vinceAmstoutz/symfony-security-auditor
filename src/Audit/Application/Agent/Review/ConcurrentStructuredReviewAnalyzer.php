@@ -29,15 +29,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMClientInterface;
 
 /**
- * Resolves every single-finding review in concurrency windows via the
- * tool-batch-capable client, each verdict arriving through its own
- * schema-enforced `record_review` tool. Pending findings are dispatched one
- * `maxConcurrent`-sized window at a time (never as a single oversized batch),
- * so a budget/provider failure in a later window cannot discard an earlier
- * window's already-applied verdicts; the failing window and every window not
- * yet dispatched are marked `aborted`/`errored` before the exception
- * propagates. Cached verdicts are served first; only the misses are
- * dispatched.
+ * Reviews the cache-miss findings one by one through the tool-batch-capable
+ * client, each verdict through its own `record_review` tool, one
+ * `maxConcurrent`-sized window at a time. A budget or provider failure keeps
+ * the verdicts of earlier windows and marks the failing window and the ones
+ * after it `aborted` or `errored` before propagating.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -112,10 +108,7 @@ final readonly class ConcurrentStructuredReviewAnalyzer
     }
 
     /**
-     * Dispatches pending findings one `maxConcurrent`-sized window at a time.
-     * Each window is finalized (verdicts applied) as soon as it completes,
-     * before the next window is attempted, so a failure partway through never
-     * discards an earlier window's completed work.
+     * Applies each window's verdicts before dispatching the next.
      *
      * @param array<int, Vulnerability> $reviewed
      *
@@ -150,11 +143,9 @@ final readonly class ConcurrentStructuredReviewAnalyzer
     }
 
     /**
-     * Marks every finding in the window that just failed, plus every window
-     * not yet attempted, as failed, without touching windows that already
-     * finalized successfully. A finding whose `record_review` tool call
-     * already landed in an earlier round of the same failed window's batch
-     * call keeps its verdict instead of being marked unreached.
+     * Marks the findings of the failed window and of every later window as
+     * `$status`, except a finding whose verdict was recorded before the
+     * failure, which keeps it.
      *
      * @param list<list<int>> $indexWindows
      */
@@ -209,8 +200,8 @@ final readonly class ConcurrentStructuredReviewAnalyzer
     }
 
     /**
-     * A client that offered the recording tool for one request of the window
-     * offered it for all of them, though it may have built the schemas once.
+     * A client that offered the recording tool to one request of the window
+     * offered it to all of them, though it may have built the schemas once.
      */
     private function noteRecordingToolReach(ConcurrentReviewBatch $concurrentReviewBatch): void
     {
@@ -229,12 +220,10 @@ final readonly class ConcurrentStructuredReviewAnalyzer
     }
 
     /**
-     * A conversation cut short (tool-loop cap, token limit, content filter,
-     * no content) that recorded no verdict is an error, not a rejection: the
-     * finding is recorded as errored and left out of the cache. A verdict the
-     * model did record before the cut-off is genuine and applied as usual. A
-     * client that never offered the tool has its answer read as the JSON path
-     * reads it.
+     * Records a finding errored and uncached, never rejected, when a degraded
+     * answer holds no verdict for it. Applies a verdict recorded before the
+     * cut-off. Reads the JSON answer when the client never offered the
+     * tool.
      */
     private function recordPendingVerdict(int $index, LLMResponse $llmResponse, ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder): Vulnerability
     {
@@ -257,12 +246,8 @@ final readonly class ConcurrentStructuredReviewAnalyzer
     }
 
     /**
-     * A finding whose `record_review` tool call already landed in an earlier
-     * round of this same window's batch call keeps its verdict instead of
-     * being overwritten as errored, mirroring the recovery
-     * `failRemainingWindows()` already applies for a Budget/LLMProviderException
-     * abort, extended to every other `Throwable` this window's dispatch can
-     * throw.
+     * Marks the window's findings errored, except a finding whose verdict was
+     * recorded before the failure, which keeps it.
      *
      * @param array<int, Vulnerability> $reviewed
      *

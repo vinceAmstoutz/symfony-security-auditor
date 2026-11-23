@@ -222,11 +222,8 @@ final class AuditPresenterTest extends TestCase
     }
 
     /**
-     * `AuditExitCodeResolver` fails a run when the risk gate OR the independent
-     * `--min-score` gate trips. Only the exit code reaches the presenter,
-     * so it must not attribute the failure to one specific gate. A LOW-risk
-     * report failing under `--fail-on=critical --min-score=96` is a
-     * score-only failure the old wording described as a fail-on breach.
+     * Only the exit code reaches the presenter, which cannot tell the risk gate
+     * from the `--min-score` gate.
      *
      * @throws InvalidCodeLocationException
      * @throws InvalidVulnerabilityClassificationException

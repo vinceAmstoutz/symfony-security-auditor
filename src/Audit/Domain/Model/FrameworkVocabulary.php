@@ -14,11 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
 
 /**
- * The framework wording the synthesizer prompts need: the framework's name, the
- * name of its template language and the idiomatic remediations a fix should
- * prefer over a hand-rolled guard. Both synthesizers are otherwise portable, so
- * injecting this is what keeps them from naming Symfony in a prompt literal.
- * The defaults describe Symfony, which is what this package audits.
+ * The framework wording of the synthesizer prompts: the framework's name, its
+ * template language and the idiomatic fixes to prefer over a hand-rolled guard.
+ * Defaults to Symfony.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

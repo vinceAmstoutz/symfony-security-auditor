@@ -18,14 +18,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 
 /**
- * The names a baseline written before 1.22 may hold a finding under while the
- * report names it otherwise: the path the model echoed for it (`./src/A.php`,
- * `src\A.php`, `/src/A.php`, an absolute path inside the report's project),
- * which the finding now trades for its project file; and the types it was
- * reported as before its own type existed: the fingerprints
- * `Vulnerability::fingerprintCandidates()` lists after the finding's own.
- * Only the spellings the baseline's entries name are tried, so each finding
- * has a handful of names whatever the size of the baseline.
+ * The former names an older baseline may hold a finding under: the path the
+ * model echoed for it (`./src/A.php`, `src\A.php`, `/src/A.php`, an absolute
+ * path inside the report's project) and the former types of its type, as
+ * `Vulnerability::fingerprintCandidates()` lists them. Only the spellings the
+ * baseline's entries name are tried.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -57,12 +54,8 @@ final readonly class FormerFindingNames
 
     /**
      * Each fingerprint an entry holds `$diffFinding` under, with the file the
-     * entry has to name for it (null when the entry may name any file): the
-     * finding's own path, then each spelling of its file an entry names, with
-     * the finding's type and the types it was reported as before. A report
-     * written before 1.22 names each finding as the model did, so the finding
-     * has no such name and only its own fingerprint matches it, as it always
-     * did.
+     * entry must name for it (null for any file). None for a report without a
+     * project path, whose findings keep the paths the model echoed.
      *
      * @return list<array{string|null, string}>
      */

@@ -17,16 +17,14 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking;
 enum ChunkingStrategy: string
 {
     /**
-     * Groups files by feature: the controller, its entity, its repository,
-     * its form, its voter and related templates land in the same chunk so
-     * the LLM can follow cross-file data flow.
+     * Puts a controller with its entity, repository, form, voter and templates
+     * in one chunk.
      */
     case Feature = 'feature';
 
     /**
-     * Sorts files by attack-surface priority (controller > authenticator >
-     * voter > … > template > config > php) and chunks them in fixed-size
-     * windows. Preserves the pre-feature-chunking behaviour.
+     * Sorts files by attack-surface priority and chunks them in fixed-size
+     * windows.
      */
     case Type = 'type';
 }

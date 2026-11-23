@@ -17,10 +17,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
 
 /**
  * The `symfony/ai` platforms declared with `useAttributeAsKey`, which register
- * one service per instance as `ai.platform.<platform>.<instance>`. Their
- * connection block is a prototype nested under an instance name, so a provider
- * naming the platform alone describes no service and compiles to nothing the
- * container accepts.
+ * one service per instance as `ai.platform.<platform>.<instance>`: a provider
+ * must name an instance of them.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

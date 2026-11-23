@@ -20,12 +20,8 @@ use Symfony\Component\DependencyInjection\Exception\InvalidArgumentException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PlatformServiceId;
 
 /**
- * `PlatformServiceId` restates the id rule `ContainerBuilder::setDefinition()`
- * enforces. Asserting that restatement against hard-coded booleans would keep
- * passing if the framework tightened the rule and `init` would go back to
- * writing a config whose next run dies on `Invalid service id`. The real
- * container is asked instead, the way `PlatformShapeKnowledgeTest` asks the
- * bundle about platform shapes.
+ * Checks `PlatformServiceId` against the id rule the real
+ * `ContainerBuilder::setDefinition()` enforces.
  */
 final class PlatformServiceIdKnowledgeTest extends TestCase
 {

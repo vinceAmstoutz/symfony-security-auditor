@@ -24,15 +24,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MalformedReportFileEx
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportFileNotReadableException;
 
 /**
- * Loads the findings of a JSON audit report. A report generated before the
- * `fingerprint` key existed is still accepted: its fingerprint is recomputed
- * from `type`, `file` and `title` with the exact formula
- * {@see Vulnerability::fingerprintOf()} uses, so it never drifts from the
- * canonical identity. The report's `coverage` ledger, when it carries one,
- * names the files the run could not fully analyze the same way
- * {@see UnanalyzedFiles} reads it for the run itself and the files its
- * attacker analyzed the way {@see AnalyzedFiles} does; its `scope` says where a
- * complete run looked.
+ * Loads the findings of a JSON audit report. A finding without a `fingerprint`
+ * gets the one {@see Vulnerability::fingerprintOf()} computes from its `type`,
+ * `file` and `title`. The `coverage` ledger is read as {@see UnanalyzedFiles}
+ * and {@see AnalyzedFiles} read it for a run.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -73,12 +68,8 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
     }
 
     /**
-     * The strings of a list the report holds: the fingerprints of the findings
-     * the run found and its report leaves out (accepted by the baseline or
-     * muted by type) under `suppressed_fingerprints`, the baseline
-     * fingerprints that left them out under `suppressed_baseline_fingerprints`.
-     * A report written before that key existed lists the baseline fingerprints
-     * under `suppressed_fingerprints` and one written before both lists none.
+     * The strings of a `suppressed_fingerprints` or
+     * `suppressed_baseline_fingerprints` list, none when it is not a list.
      *
      * @return list<string>
      */
@@ -88,10 +79,9 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
     }
 
     /**
-     * The folder the run audited, from a report that names each finding by
-     * its project file: one written since it lists `suppressed_fingerprints`.
-     * Null for a report written before, whose findings keep the paths the
-     * model echoed.
+     * The folder the run audited, null for a report without
+     * `suppressed_fingerprints`, whose findings keep the paths the model
+     * echoed.
      *
      * @param array<array-key, mixed> $decoded
      */
@@ -107,12 +97,8 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
     }
 
     /**
-     * The `--path` scopes of a run that can say a file it never listed is
-     * gone: it reported itself complete, analyzed at least one file and
-     * recorded a `scope` that ran over the whole history, with no `--since`.
-     * Null otherwise, including for a report written before the scope
-     * existed and for a run whose scan found nothing to analyze, which says
-     * nothing about the files it never saw.
+     * The `--path` scopes of a complete run that analyzed a file and recorded
+     * a `scope` without `--since`, else null.
      *
      * @param array<array-key, mixed> $decoded
      * @param list<string>            $analyzedFiles
@@ -178,8 +164,8 @@ final readonly class ReportFindingsLoader implements ReportFindingsLoaderInterfa
     }
 
     /**
-     * The report's coverage ledger: null for a report written before the
-     * ledger existed. An entry without the expected shape names no file.
+     * The coverage ledger, null when the report has none. A malformed entry is
+     * left out.
      *
      * @param array<array-key, mixed> $decoded
      *

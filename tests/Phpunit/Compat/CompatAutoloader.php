@@ -17,10 +17,8 @@ use Symfony\AI\Platform\Bridge\Generic\Factory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Compat\Platform\GenericPlatformFactory;
 
 /**
- * Loads this suite on top of any checkout's Composer autoloader (the tree
- * under test when replaying, an older release when recording) and routes
- * the generic platform bridge to the scripted provider. Both loaders are
- * prepended so they win over the checkout's own classmap.
+ * Loads this suite ahead of any checkout's Composer autoloader and routes the
+ * generic platform bridge to the scripted provider.
  */
 final class CompatAutoloader
 {

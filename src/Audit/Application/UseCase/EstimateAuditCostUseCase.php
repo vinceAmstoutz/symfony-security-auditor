@@ -35,25 +35,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInt
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
 
 /**
- * Walks the ingestion stage of the audit pipeline, estimates how many tokens
- * an actual run would consume and returns an `AuditReport` carrying the
- * estimate as its `AuditCost`. Never invokes the LLM platform: `--dry-run`
- * stays free regardless of project size.
+ * Estimates the tokens and cost of an audit from its scan alone, without
+ * calling the LLM platform. Returns the estimate as the report's `AuditCost`.
  *
- * Estimation strategy: every scanned file contributes its content to a
- * synthetic "attacker prompt" (input). The attacker system prompt's skill
- * blocks are sent once per chunk (chunked the same way `FileChunker` chunks
- * a real run) and added on top. When `audit.tools_enabled` is on, the
- * attacker may take several tool-call rounds per chunk, each resending the
- * growing conversation plus the tool schemas. `toolRoundTripRatio` inflates
- * the per-round input to account for that. Output tokens are projected at
- * `outputRatio * input` because audit prompts are heavily input-skewed.
- * Multiplied by `max_iterations` to account for the attacker/reviewer loop.
- *
- * `reviewerInputRatio` is applied to the file-content sum alone, never to the
- * attacker total: the reviewer prompt carries no skill blocks, so folding the
- * attacker's own overhead into its base would inflate the reviewer estimate by
- * an overhead it never sends.
+ * The attacker input of an iteration is the scanned content, each chunk's
+ * system prompt and the project mapping, raised by `toolRoundTripRatio` when
+ * `audit.tools_enabled` is on. The reviewer input is `reviewerInputRatio` of
+ * the file content alone. Each output is `outputRatio` of its input and both
+ * inputs count `max_iterations` times.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -63,27 +52,22 @@ final readonly class EstimateAuditCostUseCase
     public const float DEFAULT_OUTPUT_RATIO = 0.15;
 
     /**
-     * Fraction of the attacker's per-iteration input that the reviewer
-     * receives. The reviewer only sees filtered findings (not the full
-     * file chunks), so its prompt is much smaller than the attacker's.
-     * Calibrated against reference audits at ~20% of attacker input.
+     * Share of the file content the reviewer prompt carries, calibrated
+     * against reference audits.
      */
     public const float DEFAULT_REVIEWER_INPUT_RATIO = 0.20;
 
     /**
-     * Conservative estimate of the extra attacker input consumed by
-     * tool-call round-trips (the re-sent conversation plus tool schemas on
-     * every round) when `audit.tools_enabled` is on. Calibrated against
-     * reference audits at ~50% on top of the base per-round input, with
-     * `audit.max_tool_iterations` left at {@see CALIBRATION_MAX_TOOL_ITERATIONS}.
+     * Extra attacker input the tool-call rounds re-send when
+     * `audit.tools_enabled` is on, calibrated against reference audits at
+     * {@see CALIBRATION_MAX_TOOL_ITERATIONS} rounds.
      */
     public const float DEFAULT_TOOL_ROUND_TRIP_RATIO = 0.50;
 
     /**
-     * The `audit.max_tool_iterations` bound the ratio above was measured
-     * against. It moves only when the calibration is redone, which is why it
-     * is not simply `AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS`: changing
-     * that default must change the estimate, not silently re-anchor it.
+     * The `audit.max_tool_iterations` bound the ratio above was measured at.
+     * It moves only when the calibration is redone, never with
+     * `AttackerAgent::DEFAULT_MAX_TOOL_ITERATIONS`.
      */
     public const int CALIBRATION_MAX_TOOL_ITERATIONS = 8;
 
@@ -110,15 +94,12 @@ final readonly class EstimateAuditCostUseCase
     ) {}
 
     /**
-     * @param list<string> $scanPaths    optional project-relative paths to scope
-     *                                   the estimate to, as a run does; empty list
-     *                                   (the default) estimates over the configured
+     * @param list<string> $scanPaths    project-relative paths to scope the
+     *                                   estimate to, empty for the configured
      *                                   scan surface
-     * @param ?string      $diffSinceRef when set, mirrors `IngestionStage` by
-     *                                   narrowing the estimate to files changed
-     *                                   against this git ref, matching what an
-     *                                   `audit:run --since` would actually scan,
-     *                                   with the files `audit.since_closure` adds
+     * @param ?string      $diffSinceRef narrows the estimate to the files
+     *                                   `audit:run --since` would audit against
+     *                                   this git ref
      *
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
@@ -196,9 +177,7 @@ final readonly class EstimateAuditCostUseCase
     }
 
     /**
-     * A count the arithmetic above carried past the largest integer, which
-     * only an iteration setting far beyond any run reaches, is held at that
-     * integer; any other count is the one it computed, rounded up.
+     * Rounds up, holding a count past the largest integer at `PHP_INT_MAX`.
      */
     private function tokenCount(int|float $tokens): int
     {
@@ -210,11 +189,8 @@ final readonly class EstimateAuditCostUseCase
     }
 
     /**
-     * `audit.max_tool_iterations` caps the tool-call rounds a chunk may take,
-     * so it caps the conversation those rounds re-send. Scaling the calibrated
-     * ratio by the configured bound keeps the estimate honest for a user who
-     * lowers it to cut cost, instead of charging every run the calibrated
-     * maximum.
+     * Scales the calibrated ratio by `audit.max_tool_iterations`, so lowering
+     * that bound lowers the estimate.
      */
     private function toolRoundTripMultiplier(): float
     {
@@ -222,10 +198,8 @@ final readonly class EstimateAuditCostUseCase
     }
 
     /**
-     * What the system prompt of each chunk adds to the files it carries. With a
-     * prompt builder, the prompt the real run sends: its base text and the
-     * skill blocks of that chunk's own file types. Without one, the skill
-     * blocks alone.
+     * Counts each chunk's system prompt as a run builds it, or its skill blocks
+     * alone without a prompt builder.
      *
      * @param list<list<ProjectFile>> $chunks
      */
@@ -242,12 +216,9 @@ final readonly class EstimateAuditCostUseCase
     }
 
     /**
-     * The project mapping every chunk's user message carries (the firewall,
-     * route access-control, voter and form sections), which grows with the
-     * routes of the project, not with the chunk. The pipeline maps every file
-     * it scanned (however a git diff then narrows the files to audit) and the
-     * configured scope besides when `--path` scopes the scan, with the
-     * `--path` values that pick the configuration of a monorepo application.
+     * Counts the project mapping every chunk's user message carries, mapped as
+     * the pipeline maps it: from every scanned file whatever `--since` keeps,
+     * plus the configured scope under `--path`.
      *
      * @param list<string>      $scanPaths
      * @param list<ProjectFile> $mappingFiles

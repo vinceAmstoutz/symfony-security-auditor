@@ -16,14 +16,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /**
- * Trims a file down to its security-relevant slices before it is sent to the
- * LLM. Returns line-numbered output where retained lines keep their original
- * 1-based numbering and elided runs collapse into a single placeholder, so the
- * attacker prompt's `line_start` / `line_end` protocol remains accurate.
+ * Trims a file to its security-relevant lines before it reaches the LLM: each
+ * retained line keeps its 1-based number and each elided run collapses into
+ * one placeholder.
  *
- * Implementations MUST be pure (no I/O, no clock) and idempotent. They MUST
- * NEVER renumber retained lines: the LLM relies on absolute line numbers to
- * report findings against the original source.
+ * Implementations MUST be pure (no I/O, no clock) and idempotent and MUST
+ * NEVER renumber a retained line: findings cite the original line numbers.
  */
 interface CodeSlicerInterface
 {

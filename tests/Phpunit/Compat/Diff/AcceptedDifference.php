@@ -18,14 +18,13 @@ use InvalidArgumentException;
 /**
  * One entry of `accepted-differences.php`: a difference the maintainer
  * accepted, the scenarios it shows in (a name, or a pattern where `*` stands
- * for any run of characters, which must show the difference in every
- * scenario it names), where (a dotted path, `*` standing for one segment and
- * `**` for any number, none included), optionally what (a regular expression matched against
- * the `-line` or `+line` of a text, or against `recorded -> replayed` of a
- * value, each as JSON), why and the pull request (`#123`) that a CHANGELOG bullet
- * announcing it links, or a list of them when several changes add up to it. A difference in what the scripted provider received
- * (`llm.*`: the tools offered, how files are grouped into requests) is
- * nothing a user sees: it is marked `internal` instead of citing a bullet.
+ * for any run of characters, which must show it in every scenario it names),
+ * where (a dotted path, `*` standing for one segment and `**` for any number,
+ * none included), optionally what (a regular expression matched against the
+ * `-line` or `+line` of a text, or `recorded -> replayed` of a value, as
+ * JSON), why and the pull requests a CHANGELOG bullet announcing it links. A
+ * difference in what the scripted provider received (`llm.*`) is marked
+ * `internal` instead of citing a bullet.
  */
 final readonly class AcceptedDifference
 {

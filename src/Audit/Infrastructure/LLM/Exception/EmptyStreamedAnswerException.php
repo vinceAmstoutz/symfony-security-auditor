@@ -16,9 +16,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exceptio
 use RuntimeException;
 
 /**
- * A stream that ran to its end without any content: worded as the bridges
- * word a buffered answer without content, so it reads as the same empty
- * answer.
+ * A stream that ended without content, worded as the bridges word an empty
+ * buffered answer.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

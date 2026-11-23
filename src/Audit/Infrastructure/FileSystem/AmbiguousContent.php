@@ -17,9 +17,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SkippedFileReason;
 
 /**
- * A file whose content mixes bytes that are not valid UTF-8 with the
- * characters {@see Utf8Normalizer} repairs them into could read two different
- * names as one once repaired, so the scan leaves it out.
+ * Leaves out a file mixing bytes that are not UTF-8 with the characters
+ * {@see Utf8Normalizer} repairs them into: once repaired, two different names
+ * could read as one.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */

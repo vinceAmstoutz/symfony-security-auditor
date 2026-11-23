@@ -18,8 +18,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 /**
- * The loop-tuning knobs of the attacker/reviewer orchestration.
- *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class AuditLoopSettings
@@ -31,7 +29,7 @@ final readonly class AuditLoopSettings
     ) {}
 
     /**
-     * @return ?list<ProjectFile> the files the investigation tools may open when they are not the files being audited; null keeps them to those
+     * @return ?list<ProjectFile> the files the investigation tools may open when not the audited files; null keeps them to those
      */
     public function toolFiles(AuditContext $auditContext): ?array
     {

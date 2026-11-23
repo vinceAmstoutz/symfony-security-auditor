@@ -21,11 +21,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProbingProjectFileSca
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 
 /**
- * Resolves the exact set of files an audit would ingest (the project scan
- * scoped to the `--path` values as the real run scopes it) without
- * invoking the LLM. Backs the `--show-scanned` console option so a user can
- * confirm their `included_paths` / `--path` configuration matches the files
- * they expect before paying for a run.
+ * Lists the files an audit would ingest, scoped to the `--path` values as a
+ * run scopes them, without calling the LLM.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -38,14 +35,11 @@ final readonly class ListScannedFilesUseCase
     ) {}
 
     /**
-     * @param list<string> $scanPaths    optional project-relative paths to scope
-     *                                   the listing to, as a run does; empty list
-     *                                   (the default) lists every scanned file
-     * @param ?string      $diffSinceRef when set, mirrors `EstimateAuditCostUseCase`/
-     *                                   `IngestionStage` by narrowing the listing to
-     *                                   files changed against this git ref, matching
-     *                                   what an `audit:run --since` would actually scan,
-     *                                   with the files `audit.since_closure` adds to it
+     * @param list<string> $scanPaths    project-relative paths to scope the
+     *                                   listing to, empty for every scanned file
+     * @param ?string      $diffSinceRef narrows the listing to the files
+     *                                   `audit:run --since` would audit against
+     *                                   this git ref
      *
      * @return list<ProjectFile>
      *
@@ -65,9 +59,8 @@ final readonly class ListScannedFilesUseCase
     }
 
     /**
-     * Whether the configured scan reaches a file in the project, as a run asks
-     * of a directory holding no `composer.json`: a scanner that can probe
-     * answers without reading a file, any other is asked through a whole scan.
+     * Tells whether the configured scan reaches a file in the project, without
+     * reading one when the scanner can probe.
      *
      * @throws InvalidAuditContextException
      */

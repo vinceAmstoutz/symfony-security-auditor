@@ -20,16 +20,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ReviewerCacheInterface;
 
 /**
- * Adapts the optional {@see ReviewerCacheInterface} for the review strategies:
- * a missing cache or a bypassed run degrades every lookup to a miss. A
- * verdict that judges nothing (none, or one with no `accepted` flag) is
- * never persisted, since a cache entry replays as the model's own judgement.
- * Neither is a verdict given at the tool-call limit: the model may have
- * judged on less than it wanted to read and a cached rejection would hide
- * the finding on every later run.
- * A store failure is caught and logged rather than left to propagate: the
- * caller already has the verdict in hand by the time it stores it, so losing
- * the cache write must never cost the caller the verdict itself.
+ * Wraps the optional {@see ReviewerCacheInterface}: a missing cache or a
+ * bypassed run misses every lookup. Never stores a verdict that judges
+ * nothing (none, or no `accepted` flag) or one given at the tool-call limit.
+ * Logs a store failure instead of propagating it.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -41,8 +35,8 @@ final readonly class ReviewerVerdictCache
     ) {}
 
     /**
-     * The code context the verdicts of an answer are cached under: none when
-     * the answer came at the tool-call limit.
+     * Returns the code context to cache the answer's verdicts under, null for
+     * an answer given at the tool-call limit.
      */
     public static function contextFor(LLMResponse $llmResponse, ?string $codeContext): ?string
     {

@@ -158,9 +158,8 @@ final readonly class AccessControlMap
     }
 
     /**
-     * The folder of the nearest application holding a controller file whose
-     * configuration was read, whose rules govern its routes; none when the
-     * project's rules govern them.
+     * The folder of the nearest application holding the controller file whose
+     * configuration was read; null when the project's rules govern its routes.
      *
      * @internal not part of the BC promise, see docs/versioning.md
      */
