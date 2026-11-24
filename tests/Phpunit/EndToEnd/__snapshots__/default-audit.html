@@ -8,13 +8,64 @@
     <style>
       :root {
         color-scheme: light dark;
+        --brand-pink: #e71c55;
+        --brand-navy: #242d5c;
+        --brand-muted: #6b7280;
+        --brand-band: #f5f6fb;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --brand-navy: #5b6fd6;
+          --brand-muted: #9ca3af;
+          --brand-band: #1b1e2b;
+        }
       }
       body {
         font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
         line-height: 1.5;
+        margin: 0;
+      }
+      a {
+        color: var(--brand-pink);
+      }
+      header.brand {
+        background: var(--brand-band);
+        border-bottom: 3px solid var(--brand-pink);
+      }
+      header.brand > div,
+      main {
         margin: 0 auto;
         max-width: 60rem;
-        padding: 2rem 1rem;
+        padding: 1.25rem 1rem;
+      }
+      .wordmark {
+        font-size: 1.35rem;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        line-height: 1.2;
+        margin: 0;
+      }
+      .wordmark-lead {
+        color: var(--brand-pink);
+        font-weight: 700;
+      }
+      .wordmark-tail {
+        color: var(--brand-navy);
+        font-weight: 700;
+      }
+      .tagline {
+        margin: 0.1rem 0 0;
+      }
+      .tagline a {
+        color: var(--brand-muted);
+        font-size: 0.85rem;
+        text-decoration: none;
+      }
+      h1,
+      h2,
+      h4,
+      dl.meta dt {
+        color: var(--brand-navy);
       }
       h1 {
         margin-bottom: 0.25rem;
@@ -64,6 +115,7 @@
         font-weight: 600;
       }
       section.charts h3 {
+        color: var(--brand-pink);
         font-size: 0.9rem;
         margin-bottom: 0.25rem;
         text-transform: uppercase;
@@ -98,7 +150,7 @@
         fill: #6b7280;
       }
       svg.chart rect.bar-type {
-        fill: #475569;
+        fill: var(--brand-navy);
       }
       article.finding {
         border: 1px solid #8884;
@@ -136,33 +188,45 @@
         white-space: pre-wrap;
         word-break: break-word;
       }
+      footer {
+        border-top: 1px solid #8884;
+        color: var(--brand-muted);
+        margin-top: 2rem;
+      }
     </style>
   </head>
   <body>
-    <h1>Security Audit Report</h1>
-    <p>
-      Risk level:
-      <span class="risk risk-low">LOW</span> (score 10)
-    </p>
-    <dl class="meta">
-      <dt>Audit ID</dt>
-      <dd>AUDIT-XXXXXXXX</dd>
-      <dt>Project</dt>
-      <dd>PROJECT_PATH</dd>
-      <dt>Started</dt>
-      <dd>TIMESTAMP</dd>
-      <dt>Duration</dt>
-      <dd>DURATIONs</dd>
-      <dt>Files scanned</dt>
-      <dd>3</dd>
-      <dt>Tokens</dt>
-      <dd>8 in / 0 out</dd>
-      <dt>Model</dt>
-      <dd>gpt-4o</dd>
-      <dt>Cost</dt>
-      <dd>$0.0000 (published rates)</dd>
-    </dl>
-     <section class="charts"><h2>Distribution</h2><h3>By severity</h3><svg class="chart" viewBox="0 0 600 24" role="img" aria-label="Findings by severity"><text class="bar-label" x="0" y="16">🔴 CRITICAL</text><rect class="bar bar-critical" x="250" y="5" width="290.0" height="14" rx="2" /><text class="bar-count" x="548.0" y="16">1</text></svg><h3>By type</h3><svg class="chart" viewBox="0 0 600 24" role="img" aria-label="Findings by vulnerability type"><text class="bar-label" x="0" y="16">broken_access_control</text><rect class="bar bar-type" x="250" y="5" width="290.0" height="14" rx="2" /><text class="bar-count" x="548.0" y="16">1</text></svg></section> <h2>Vulnerabilities (1 total)</h2><article class="finding severity-critical">
+    <header class="brand">
+      <div>
+        <p class="wordmark"><span class="wordmark-lead">◉ &gt;&gt; SECURITY</span> <span class="wordmark-tail">AUDITOR</span></p>
+        <p class="tagline">Symfony - multi-agent LLM audit<br /><a href="https://github.com/vinceamstoutz/symfony-security-auditor">https://github.com/vinceamstoutz/symfony-security-auditor</a></p>
+      </div>
+    </header>
+    <main>
+      <h1>Security Audit Report</h1>
+      <p>
+        Risk level:
+        <span class="risk risk-low">LOW</span> (score 10)
+      </p>
+      <dl class="meta">
+        <dt>Audit ID</dt>
+        <dd>AUDIT-XXXXXXXX</dd>
+        <dt>Project</dt>
+        <dd>PROJECT_PATH</dd>
+        <dt>Started</dt>
+        <dd>TIMESTAMP</dd>
+        <dt>Duration</dt>
+        <dd>DURATIONs</dd>
+        <dt>Files scanned</dt>
+        <dd>3</dd>
+        <dt>Tokens</dt>
+        <dd>8 in / 0 out</dd>
+        <dt>Model</dt>
+        <dd>gpt-4o</dd>
+        <dt>Cost</dt>
+        <dd>$0.0000 (published rates)</dd>
+      </dl>
+       <section class="charts"><h2>Distribution</h2><h3>By severity</h3><svg class="chart" viewBox="0 0 600 24" role="img" aria-label="Findings by severity"><text class="bar-label" x="0" y="16">🔴 CRITICAL</text><rect class="bar bar-critical" x="250" y="5" width="290.0" height="14" rx="2" /><text class="bar-count" x="548.0" y="16">1</text></svg><h3>By type</h3><svg class="chart" viewBox="0 0 600 24" role="img" aria-label="Findings by vulnerability type"><text class="bar-label" x="0" y="16">broken_access_control</text><rect class="bar bar-type" x="250" y="5" width="290.0" height="14" rx="2" /><text class="bar-count" x="548.0" y="16">1</text></svg></section> <h2>Vulnerabilities (1 total)</h2><article class="finding severity-critical">
   <h3>
     <span class="badge">🔴 CRITICAL</span>
     Unprotected administrative action
@@ -194,8 +258,9 @@
   <p>Guard the action with #[IsGranted(&#039;ROLE_ADMIN&#039;)].</p>
   
 </article>
-    <footer>
-      <p><small>Generated by <a href="https://github.com/vinceamstoutz/symfony-security-auditor">vinceamstoutz/symfony-security-auditor</a>.</small></p>
-    </footer>
+      <footer>
+        <p><small>Generated by <span class="wordmark-lead">SECURITY</span> <span class="wordmark-tail">AUDITOR</span> · <a href="https://github.com/vinceamstoutz/symfony-security-auditor">vinceamstoutz/symfony-security-auditor</a>.</small></p>
+      </footer>
+    </main>
   </body>
 </html>
