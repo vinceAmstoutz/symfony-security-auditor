@@ -38,6 +38,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - On a Claude or ChatGPT subscription, `audit:run` and `--dry-run` say the run is not priced per call instead of showing a cost at API rates or calling the model name a likely typo; a budgeted run asks to remove `audit.budget.max_cost_usd`
 - `audit:run` reports a folder of a project named as the project in one `Scope:` line under the header, in place of a `[NOTE]` block that repeated the project and folder paths ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
 - `audit:run` writes its long-run notice with a colon in place of a dash ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
+- The `html` report of `audit:run` and of `audit:trend` opens with the same pink and navy `SECURITY AUDITOR` banner as the console, in light and dark mode ([#720](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/720))
 
 ### Bugfixes 🐛
 

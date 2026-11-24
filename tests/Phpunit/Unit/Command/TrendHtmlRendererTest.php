@@ -46,6 +46,20 @@ final class TrendHtmlRendererTest extends TestCase
         );
     }
 
+    public function test_the_page_opens_with_the_console_banner_wordmark(): void
+    {
+        $html = $this->trendHtmlRenderer->render($this->twoPointTrend());
+
+        self::assertStringContainsString(
+            '<p class="wordmark"><span class="wordmark-lead">◉ &gt;&gt; SECURITY</span> <span class="wordmark-tail">AUDITOR</span></p>',
+            $html,
+        );
+        self::assertStringContainsString(
+            \sprintf('<p class="tagline">Symfony - multi-agent LLM audit<br /><a href="%1$s">%1$s</a></p>', ReportPackage::HOMEPAGE_URL),
+            $html,
+        );
+    }
+
     public function test_the_footer_links_to_the_project_homepage(): void
     {
         self::assertStringContainsString(
@@ -97,7 +111,7 @@ final class TrendHtmlRendererTest extends TestCase
     public function test_the_table_has_a_column_for_the_unverified_findings(): void
     {
         self::assertStringContainsString('<th>Fixed</th>
-          <th>Unverified</th>', $this->trendHtmlRenderer->render($this->twoPointTrend()));
+            <th>Unverified</th>', $this->trendHtmlRenderer->render($this->twoPointTrend()));
     }
 
     public function test_the_summary_says_how_many_findings_went_unverified_rather_than_fixed(): void
