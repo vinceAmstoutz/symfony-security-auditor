@@ -99,7 +99,7 @@
         "symfony/ai-mini-max-platform": "MiniMax platform bridge — MiniMax-M3, MiniMax-M2.7",
         "symfony/ai-mistral-platform": "Mistral platform bridge — mistral-large-latest, codestral-latest",
         "symfony/ai-ollama-platform": "Ollama local inference bridge — llama3.3, deepseek-r1, qwen3, phi4 (no API key)",
-        "symfony/ai-open-ai-platform": "OpenAI platform bridge — gpt-5.6, gpt-4.1, o4-mini",
+        "symfony/ai-open-ai-platform": "OpenAI platform bridge — gpt-5.6, gpt-4.1",
         "symfony/ai-open-responses-platform": "OpenAI Responses API platform bridge",
         "symfony/ai-together-platform": "Together AI platform bridge — hosted open-weight models",
         "symfony/ai-venice-platform": "Venice AI platform bridge — private inference",
