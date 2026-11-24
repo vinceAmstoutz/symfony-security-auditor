@@ -221,4 +221,25 @@ return [
         'reason' => 'The long-run notice is written with a colon in place of a dash.',
         'changelog' => '#711',
     ],
+    [
+        'scenarios' => ['format/html', 'format/html-no-finding', 'report-commands/trend-html', 'standalone/format-html'],
+        'path' => 'runs.0.stdout.lines',
+        'match' => '/^[-+] /',
+        'reason' => 'The html report and trend page open with the console banner and use its pink and navy colours, which rewrites their markup and stylesheet.',
+        'changelog' => '#720',
+    ],
+    [
+        'scenarios' => ['format/html-to-file'],
+        'path' => 'files.out/report.html.lines',
+        'match' => '/^[-+] /',
+        'reason' => 'The html report and trend page open with the console banner and use its pink and navy colours, which rewrites their markup and stylesheet.',
+        'changelog' => '#720',
+    ],
+    [
+        'scenarios' => ['run/scan-layout-formats'],
+        'path' => 'runs.3.stdout.lines',
+        'match' => '/^[-+] /',
+        'reason' => 'The html report and trend page open with the console banner and use its pink and navy colours, which rewrites their markup and stylesheet.',
+        'changelog' => '#720',
+    ],
 ];
