@@ -154,6 +154,47 @@ final class InitCommandTest extends TestCase
         self::assertSame('claude-sonnet-5-5', $this->configuredValue('reviewer_model'));
     }
 
+    public function test_it_trims_the_reviewer_model_from_the_command_line_as_it_trims_the_model(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'claudecode', '--model' => ' claude-opus-5-5 ', '--reviewer-model' => ' claude-sonnet-5-5 '], ['interactive' => false]);
+
+        self::assertSame(['claude-opus-5-5', 'claude-sonnet-5-5'], [$this->configuredValue('model'), $this->configuredValue('reviewer_model')]);
+    }
+
+    #[DataProvider('subscriptions')]
+    public function test_it_refuses_an_api_key_variable_for_a_subscription_that_takes_no_api_key(string $provider): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--provider' => $provider, '--env-var' => 'MY_KEY'], ['interactive' => false]);
+
+        self::assertSame(
+            [Command::INVALID, true, false],
+            [$exitCode, str_contains($this->unwrappedDisplay($commandTester), \sprintf('--env-var names the variable an API key is read from, but "%s" runs on a subscription, which takes no API key. Leave --env-var out.', $provider)), is_file($this->configFile())],
+        );
+    }
+
+    #[DataProvider('subscriptions')]
+    public function test_it_takes_no_api_key_for_a_subscription_as_already_written(string $provider): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--provider' => $provider, '--no-api-key' => true], ['interactive' => false]);
+
+        self::assertSame([Command::SUCCESS, [$provider => ['effort' => 'medium']]], [$exitCode, $this->configuredValue('platform')]);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function subscriptions(): iterable
+    {
+        yield 'Claude' => ['claudecode'];
+        yield 'ChatGPT' => ['codex'];
+    }
+
     public function test_it_refuses_a_reviewer_model_the_container_would_read_as_a_parameter(): void
     {
         $commandTester = $this->commandTester();

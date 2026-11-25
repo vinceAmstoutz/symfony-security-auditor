@@ -116,6 +116,8 @@ final readonly class InitCommand
         $model = b($initCommandInput->model ?? $initModelQuestion->ask($symfonyStyle, $providerKey, $platformConnection->endpoint))->trim()->toString();
 
         $reviewerModel = $initCommandInput->reviewerModel ?? $initModelQuestion->askReviewer($symfonyStyle, $providerKey);
+        $reviewerModel = null === $reviewerModel ? null : b($reviewerModel)->trim()->toString();
+
         $platformConnection = $platformConnection->withEffort($initCommandInput->effort ?? InitEffortQuestion::ask($symfonyStyle, $providerKey));
 
         if ($this->refused($symfonyStyle, $this->modelsRefusal($model, $reviewerModel, $providerKey) ?? InitRefusal::forEffort($platformConnection->effort, $providerKey))) {

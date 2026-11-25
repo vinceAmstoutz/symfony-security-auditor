@@ -112,6 +112,7 @@ final readonly class InitRefusal
             ?? self::forInstanceShape($providerKey, $provider)
             ?? self::forInapplicableBaseUrl($providerKey, $provider, $initCommandInput->baseUrl)
             ?? self::forInapplicableEndpoint($providerKey, $provider, $initCommandInput->endpoint)
+            ?? InitSubscriptionRefusal::forApiKeyVariable($providerKey, $provider, $initCommandInput->envVar)
             ?? self::forContradictoryCredentialOptions($initCommandInput)
             ?? self::forInapplicableApiKeyOmission($providerKey, $provider, $initCommandInput->noApiKey);
     }
@@ -245,9 +246,12 @@ final readonly class InitRefusal
             : null;
     }
 
+    /**
+     * Accepts `--no-api-key` for a subscription, written without a key anyway.
+     */
     private static function forInapplicableApiKeyOmission(ProviderKey $providerKey, string $provider, bool $noApiKey): ?string
     {
-        return $noApiKey && !OptionalApiKeyPlatforms::accept($providerKey)
+        return $noApiKey && !OptionalApiKeyPlatforms::accept($providerKey) && !CliAgentPlatforms::declares($providerKey)
             ? \sprintf('--no-api-key applies to the platforms whose key is optional (%s); "%s" requires one, and the container refuses a connection block without it.', implode(', ', OptionalApiKeyPlatforms::NAMES), $provider)
             : null;
     }
