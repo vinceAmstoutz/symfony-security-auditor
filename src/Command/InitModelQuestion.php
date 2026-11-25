@@ -40,7 +40,8 @@ final readonly class InitModelQuestion
 
     public function __construct(
         private ?PricedModelListInterface $pricedModelList,
-        private ?PulledModelListInterface $pulledModelList = null,
+        private ?PulledModelListInterface $pulledModelList,
+        private bool $interactive,
     ) {}
 
     public function ask(SymfonyStyle $symfonyStyle, ProviderKey $providerKey, ?string $endpoint = null): string
@@ -61,7 +62,7 @@ final readonly class InitModelQuestion
 
         return 'anthropic' === $providerKey->platform
             ? InitPrompt::withDefault($symfonyStyle, 'Which model should the auditor use?', self::DEFAULT_MODEL)
-            : InitPrompt::required($symfonyStyle, 'Which model should the auditor use? Type its id as your provider names it');
+            : $this->typedModel($symfonyStyle, 'Which model should the auditor use? Type its id as your provider names it');
     }
 
     public function askReviewer(SymfonyStyle $symfonyStyle, ProviderKey $providerKey): ?string
@@ -79,8 +80,23 @@ final readonly class InitModelQuestion
         $pulledModels = null === $endpoint ? [] : $this->pulledModelList?->pulledModels($endpoint) ?? [];
 
         return [] === $pulledModels
-            ? InitPrompt::required($symfonyStyle, 'Which Ollama model should the auditor use? Type the name of a model you pulled, e.g. qwen3 or llama3.3')
+            ? $this->typedModel($symfonyStyle, 'Which Ollama model should the auditor use? Type the name of a model you pulled, e.g. qwen3 or llama3.3')
             : NumberedChoice::ask($symfonyStyle, 'Which Ollama model should the auditor use? Pick a number, or type a model name', $pulledModels, $pulledModels[0]);
+    }
+
+    /**
+     * Without interaction, writes `claude-opus-5-5` as a placeholder and says
+     * how to replace it.
+     */
+    private function typedModel(SymfonyStyle $symfonyStyle, string $question): string
+    {
+        if ($this->interactive) {
+            return InitPrompt::required($symfonyStyle, $question);
+        }
+
+        $symfonyStyle->warning(\sprintf('init cannot list the models of this provider, so it writes %s as a placeholder. Set model: in the written configuration to a model the provider serves, or run init again with --model.', self::DEFAULT_MODEL));
+
+        return self::DEFAULT_MODEL;
     }
 
     /**

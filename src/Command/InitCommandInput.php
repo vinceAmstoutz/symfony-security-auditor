@@ -26,7 +26,7 @@ final class InitCommandInput
     #[Option(description: 'AI provider to configure (any symfony/ai platform — e.g. anthropic, openai, gemini); defaults to anthropic. Instance-keyed platforms take the instance too, e.g. generic.my_gateway. Skips the prompt when set.')]
     public ?string $provider = null;
 
-    #[Option(description: 'Model the auditor should use; defaults to claude-opus-5-5 for every provider, so set it for any other. Skips the prompt when set.')]
+    #[Option(description: 'Model the auditor should use; defaults to the model init offers first for the provider, or to claude-opus-5-5 as a placeholder, with a warning, where it lists none. Skips the prompt when set.')]
     public ?string $model = null;
 
     #[Option(description: 'Model that reviews the findings; defaults to claude-haiku-5-5 on a Claude subscription (claudecode), gpt-6-luna on a ChatGPT one (codex), --model elsewhere. Skips the prompt when set.')]

@@ -112,7 +112,7 @@ final readonly class InitCommand
             return Command::INVALID;
         }
 
-        $initModelQuestion = new InitModelQuestion($this->pricedModelList, $this->pulledModelList);
+        $initModelQuestion = new InitModelQuestion($this->pricedModelList, $this->pulledModelList, $interactive);
         $model = b($initCommandInput->model ?? $initModelQuestion->ask($symfonyStyle, $providerKey, $platformConnection->endpoint))->trim()->toString();
 
         $reviewerModel = $initCommandInput->reviewerModel ?? $initModelQuestion->askReviewer($symfonyStyle, $providerKey);

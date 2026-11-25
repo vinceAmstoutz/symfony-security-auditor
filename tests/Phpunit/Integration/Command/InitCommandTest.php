@@ -41,6 +41,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\Unhid
 
 final class InitCommandTest extends TestCase
 {
+    private const string PLACEHOLDER_MODEL_WARNING = 'init cannot list the models of this provider, so it writes claude-opus-5-5 as a placeholder. Set model: in the written configuration to a model the provider serves, or run init again with --model.';
+
     private string $configHome;
 
     private string $dataHome;
@@ -443,6 +445,36 @@ final class InitCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertStringContainsString('Which model should the auditor use? Type its id as your provider names it: >', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_without_interaction_it_writes_claude_opus_5_5_as_a_placeholder_for_a_gateway_and_says_how_to_replace_it(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--provider' => 'generic.gw', '--base-url' => 'https://gateway.example'], ['interactive' => false]);
+
+        self::assertSame(
+            [Command::SUCCESS, 'claude-opus-5-5', true],
+            [$exitCode, $this->configuredValue('model'), str_contains($this->unwrappedDisplay($commandTester), self::PLACEHOLDER_MODEL_WARNING)],
+        );
+    }
+
+    public function test_without_interaction_it_writes_the_model_ollama_lists_first(): void
+    {
+        $commandTester = $this->commandTester(pulledModels: ['qwen3', 'llama3.3']);
+
+        $exitCode = $commandTester->execute(['--provider' => 'ollama', '--endpoint' => 'http://localhost:11434'], ['interactive' => false]);
+
+        self::assertSame([Command::SUCCESS, 'qwen3', false], [$exitCode, $this->configuredValue('model'), str_contains($this->unwrappedDisplay($commandTester), self::PLACEHOLDER_MODEL_WARNING)]);
+    }
+
+    public function test_without_interaction_it_writes_claude_opus_5_5_as_a_placeholder_for_an_ollama_it_cannot_list_models_of(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--provider' => 'ollama', '--endpoint' => 'http://localhost:11434'], ['interactive' => false]);
+
+        self::assertSame([Command::SUCCESS, 'claude-opus-5-5', true], [$exitCode, $this->configuredValue('model'), str_contains($this->unwrappedDisplay($commandTester), self::PLACEHOLDER_MODEL_WARNING)]);
     }
 
     public function test_it_defaults_to_claude_opus_5_5_listed_under_a_vendor_prefix(): void
