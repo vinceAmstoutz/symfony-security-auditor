@@ -60,7 +60,8 @@ final readonly class PlatformApiKey
 
     /**
      * Returns the block of the platform `provider:` selects, the whole block
-     * when no provider is set, or null when the selected one is not configured.
+     * when no provider is set, or null when the selected one is not configured;
+     * a block written with no value is an empty one.
      *
      * @param array<array-key, mixed> $platform
      *
@@ -73,12 +74,23 @@ final readonly class PlatformApiKey
         }
 
         $providerKey = ProviderKey::of($provider);
-        $block = $platform[$providerKey->platform] ?? null;
+        $block = self::configuredBlock($platform, $providerKey->platform);
         if (\is_array($block) && null !== $providerKey->instance) {
-            $block = $block[$providerKey->instance] ?? null;
+            $block = self::configuredBlock($block, $providerKey->instance);
         }
 
         return \is_array($block) ? $block : null;
+    }
+
+    /**
+     * Reads a block written with no value (`claudecode:` or `claudecode: ~`)
+     * as an empty map.
+     *
+     * @param array<array-key, mixed> $map
+     */
+    private static function configuredBlock(array $map, string $key): mixed
+    {
+        return \array_key_exists($key, $map) ? $map[$key] ?? [] : null;
     }
 
     private static function valueAt(mixed $key, mixed $value): ?string

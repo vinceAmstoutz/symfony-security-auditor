@@ -276,6 +276,10 @@ final readonly class RetryingPlatformInvoker
             throw LLMRequestTooLargeException::fromProviderRejection($throwable);
         }
 
+        if ($this->transientFailureClassifier->isUnknownModel($throwable)) {
+            throw NonTransientLLMFailureException::forUnknownModel($this->model, $throwable);
+        }
+
         if (!$this->transientFailureClassifier->isTransient($throwable)) {
             throw NonTransientLLMFailureException::from($throwable);
         }

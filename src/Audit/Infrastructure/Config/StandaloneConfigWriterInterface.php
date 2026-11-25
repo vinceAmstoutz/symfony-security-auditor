@@ -19,7 +19,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 interface StandaloneConfigWriterInterface
 {
     /**
-     * @param array<string, mixed> $config
+     * @param array<string, mixed>  $config
+     * @param array<string, string> $comments a one-line comment to write above each top-level key named
      */
-    public function write(string $configFile, array $config): void;
+    public function write(string $configFile, array $config, array $comments = []): void;
 }

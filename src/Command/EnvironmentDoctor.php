@@ -63,6 +63,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
         private ModelsDevPricingProvider $modelsDevPricingProvider,
         private string $pricingCatalogPackage = ModelsDevPricingProvider::CATALOG_PACKAGE,
         private ?string $bundledAiPlatformVersion = null,
+        private ?ConfiguredModelCheck $configuredModelCheck = null,
     ) {}
 
     /**
@@ -71,17 +72,27 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
     #[Override]
     public function diagnose(): array
     {
-        $doctorCheckResult = $this->configurationCheck();
+        $configuration = $this->loadedConfiguration();
+        $doctorCheckResult = $configuration instanceof DoctorCheckResult ? $configuration : new DoctorCheckResult(self::CONFIGURATION_CHECK, DoctorCheckStatus::Ok, $this->resolvedConfigurationDetail($configuration));
 
         return [
             $doctorCheckResult,
+            ...$this->modelChecks($configuration),
             $this->bridgeCheck(DoctorCheckStatus::Ok === $doctorCheckResult->status),
             $this->composerCheck(),
             $this->pricingCatalogCheck(),
         ];
     }
 
-    private function configurationCheck(): DoctorCheckResult
+    /**
+     * @return list<DoctorCheckResult>
+     */
+    private function modelChecks(StandaloneConfig|DoctorCheckResult $configuration): array
+    {
+        return $configuration instanceof StandaloneConfig ? $this->configuredModelCheck?->check($configuration) ?? [] : [];
+    }
+
+    private function loadedConfiguration(): StandaloneConfig|DoctorCheckResult
     {
         try {
             $standaloneConfig = $this->standaloneConfigLoader->load();
@@ -97,7 +108,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
             return new DoctorCheckResult(self::CONFIGURATION_CHECK, DoctorCheckStatus::Failure, $unresolvableConfigPathException->getMessage());
         }
 
-        return new DoctorCheckResult(self::CONFIGURATION_CHECK, DoctorCheckStatus::Ok, $this->resolvedConfigurationDetail($standaloneConfig));
+        return $standaloneConfig;
     }
 
     /**

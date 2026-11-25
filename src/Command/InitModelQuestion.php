@@ -40,10 +40,14 @@ final readonly class InitModelQuestion
 
     public function __construct(
         private ?PricedModelListInterface $pricedModelList,
-        private ?PulledModelListInterface $pulledModelList = null,
+        private ?PulledModelListInterface $pulledModelList,
+        private bool $interactive,
     ) {}
 
-    public function ask(SymfonyStyle $symfonyStyle, ProviderKey $providerKey, ?string $endpoint = null): string
+    /**
+     * Returns null where no model can be offered without interaction.
+     */
+    public function ask(SymfonyStyle $symfonyStyle, ProviderKey $providerKey, ?string $endpoint = null): ?string
     {
         $subscriptionModels = CliAgentPlatformFactory::SUBSCRIPTION_MODELS[$providerKey->platform] ?? null;
         if (null !== $subscriptionModels) {
@@ -61,7 +65,7 @@ final readonly class InitModelQuestion
 
         return 'anthropic' === $providerKey->platform
             ? InitPrompt::withDefault($symfonyStyle, 'Which model should the auditor use?', self::DEFAULT_MODEL)
-            : InitPrompt::required($symfonyStyle, 'Which model should the auditor use? Type its id as your provider names it');
+            : $this->typedModel($symfonyStyle, 'Which model should the auditor use? Type its id as your provider names it');
     }
 
     public function askReviewer(SymfonyStyle $symfonyStyle, ProviderKey $providerKey): ?string
@@ -74,13 +78,18 @@ final readonly class InitModelQuestion
         return NumberedChoice::ask($symfonyStyle, 'Which model should review the findings? Pick a number, or type a model id', $choices['models'], $choices['suggested']);
     }
 
-    private function askOllamaModel(SymfonyStyle $symfonyStyle, ?string $endpoint): string
+    private function askOllamaModel(SymfonyStyle $symfonyStyle, ?string $endpoint): ?string
     {
         $pulledModels = null === $endpoint ? [] : $this->pulledModelList?->pulledModels($endpoint) ?? [];
 
         return [] === $pulledModels
-            ? InitPrompt::required($symfonyStyle, 'Which Ollama model should the auditor use? Type the name of a model you pulled, e.g. qwen3 or llama3.3')
+            ? $this->typedModel($symfonyStyle, 'Which Ollama model should the auditor use? Type the name of a model you pulled, e.g. qwen3 or llama3.3')
             : NumberedChoice::ask($symfonyStyle, 'Which Ollama model should the auditor use? Pick a number, or type a model name', $pulledModels, $pulledModels[0]);
+    }
+
+    private function typedModel(SymfonyStyle $symfonyStyle, string $question): ?string
+    {
+        return $this->interactive ? InitPrompt::required($symfonyStyle, $question) : null;
     }
 
     /**

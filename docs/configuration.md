@@ -642,6 +642,8 @@ The bundle resolves `ai.yaml` through Symfony's own environment handling, so `.e
 
 Running against [Ollama](#supported-platforms) needs no credential. Pair it with [`privacy.offline_only: true`](#privacy-data-egress) to have that enforced rather than assumed.
 
+On Ollama, `audit:run` asks the server which models it pulled before the run starts (in a Symfony application as in the binary) and notes each configured `model`, `attacker_model` or `reviewer_model` it has not pulled. The run still goes ahead; a model the provider does not know stops it with an error naming the model and the setting to change.
+
 ## CLI Reference
 
 The bundle registers the `audit:run` console command, also reachable through the shorter `audit` alias (`bin/console audit`), plus `audit:diff`, `audit:trend` and `audit:baseline` for working with previously generated reports. The standalone CLI exposes the same commands, run as `symfony-security-auditor audit:diff …`; its three report commands need neither a configuration nor an API key.
@@ -960,12 +962,12 @@ The audit runs on the auditor's own configured platform and models and bills tha
 
 ### `init`: generating the standalone configuration
 
-Standalone only. Writes `config.yaml` and installs the provider bridge with the Composer the binary bundles. _Since 1.23_ it first asks how you access AI models (a Claude or ChatGPT [subscription](#running-on-a-claude-subscription), an API key, a local model such as Ollama, an AI gateway or a cloud account), then lists the matching providers and the newest model of each family with its price per million tokens, defaulting to `claude-opus-5-5` where listed. Type any other provider or model id to skip a list. It can end with one test request, sent only on `yes`. Each option given skips its prompt; under `--no-interaction` a missing option takes its default and a platform that needs a URL is refused rather than written half-configured.
+Standalone only. Writes `config.yaml` and installs the provider bridge with the Composer the binary bundles. _Since 1.23_ it first asks how you access AI models (a Claude or ChatGPT [subscription](#running-on-a-claude-subscription), an API key, a local model such as Ollama, an AI gateway or a cloud account), then lists the matching providers and the newest model of each family with its price per million tokens, defaulting to `claude-opus-5-5` where listed. Type any other provider or model id to skip a list. It can end with one test request, sent only on `yes`. Each option given skips its prompt; under `--no-interaction` a missing option takes its default and a platform that needs a URL is refused rather than written half-configured. A model `init` writes as a placeholder is marked with a comment in `config.yaml`; `doctor` warns about it until it is replaced.
 
 | Option | Default | Description |
 | --- | --- | --- |
 | `--provider` | `anthropic` | _Since 1.23_ also `claudecode` or `codex`, to run on a [Claude](#running-on-a-claude-subscription) or [ChatGPT](#running-on-a-chatgpt-subscription) subscription. Any platform the bundled `symfony/ai-bundle` declares; any other (`meta`, which 0.14 dropped, or a misspelling) is refused with exit code `2` before anything is installed, listing the ones it declares. A platform configured per instance takes it too, e.g. `generic.my_gateway`. |
-| `--model` | `claude-opus-5-5` | Used for every provider, not derived from one: set it for anything other than Anthropic. |
+| `--model` | The model `init` offers first | `claude-opus-5-5` for Anthropic or where the provider lists it, else a mid-priced model it lists, the first model of a subscription or the first model Ollama pulled. Where `init` can list no model (a gateway, an Ollama it cannot reach or with no model pulled, a provider the price catalog does not list), `--no-interaction` writes `claude-opus-5-5` as a placeholder and warns: set `model:` in the written file or pass `--model`. |
 | `--env-var` | `<PLATFORM>_API_KEY` | The environment variable the configuration reads the API key from. A platform you host yourself (`ollama`) defaults to none instead. |
 | `--base-url` | prompted when required | _Since 1.21._ The connection origin, for `albert`, `amazeeai`, `generic.<instance>` and `openresponses.<instance>`. Rejected for any other platform. |
 | `--endpoint` | prompted when required | _Since 1.21._ The connection URL under the name those platforms give it: `deepgram`, `elevenlabs`, `minimax`, `ollama`, `together` and `venice`. For `ollama` and `together` it is the origin; `deepgram`, `elevenlabs`, `minimax` and `venice` take it with the API version path their default carries (`https://api.deepgram.com/v1/`), since the bridge appends only the route. Rejected for any other platform. |

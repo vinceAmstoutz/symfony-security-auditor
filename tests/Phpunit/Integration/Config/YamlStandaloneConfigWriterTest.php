@@ -59,6 +59,33 @@ final class YamlStandaloneConfigWriterTest extends TestCase
      * @throws StandaloneConfigWriteException
      * @throws UnsafeStandaloneConfigWriteException
      */
+    public function test_it_reads_the_key_it_writes_a_comment_above_as_written(): void
+    {
+        (new YamlStandaloneConfigWriter())->write($this->configFile, ['xay' => 1, 'x.y' => 2], ['x.y' => 'Dotted.']);
+
+        self::assertStringEqualsFile($this->configFile, "xay: 1\n# Dotted.\nx.y: 2\n");
+    }
+
+    /**
+     * @throws StandaloneConfigWriteException
+     * @throws UnsafeStandaloneConfigWriteException
+     */
+    public function test_it_writes_a_comment_above_the_top_level_key_it_names_and_reads_back_the_same_configuration(): void
+    {
+        $config = ['provider' => 'ollama', 'platform' => ['ollama' => ['endpoint' => 'http://localhost:11434']], 'model' => 'claude-opus-5-5', 'audit' => ['model' => 'nested']];
+
+        (new YamlStandaloneConfigWriter())->write($this->configFile, $config, ['model' => 'A placeholder.']);
+
+        self::assertSame(
+            ["provider: ollama\nplatform:\n    ollama: { endpoint: 'http://localhost:11434' }\n# A placeholder.\nmodel: claude-opus-5-5\naudit:\n    model: nested\n", $config],
+            [(string) file_get_contents($this->configFile), Yaml::parseFile($this->configFile)],
+        );
+    }
+
+    /**
+     * @throws StandaloneConfigWriteException
+     * @throws UnsafeStandaloneConfigWriteException
+     */
     public function test_it_leaves_ordinary_values_as_plain_as_a_person_would_write_them(): void
     {
         (new YamlStandaloneConfigWriter())->write($this->configFile, ['provider' => 'anthropic', 'platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']], 'model' => 'claude-opus-4-8']);

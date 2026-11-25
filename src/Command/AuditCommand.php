@@ -28,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCost
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelNotice;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ConsoleProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\PlainProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressReporterHolder;
@@ -78,6 +79,7 @@ final readonly class AuditCommand
         private bool $fixSynthesisEnabled = false,
         private AuditCommandDefaults $auditCommandDefaults = new AuditCommandDefaults(),
         private BaselineFilePathsHolder $baselineFilePathsHolder = new BaselineFilePathsHolder(),
+        private ?PulledModelNotice $pulledModelNotice = null,
     ) {}
 
     /**
@@ -184,6 +186,7 @@ final readonly class AuditCommand
                     return ExitCode::BudgetAborted->value;
                 }
 
+                $this->auditPresenter->preflightWarnings($displayStyle, true, $this->pulledModelNotice?->notices() ?? []);
                 $this->beginAuditRun($symfonyStyle, $auditCommandInput);
 
                 $this->reviewerFeedbackHolder->set($this->baselineProcessor->feedback($auditCommandInput->baseline));

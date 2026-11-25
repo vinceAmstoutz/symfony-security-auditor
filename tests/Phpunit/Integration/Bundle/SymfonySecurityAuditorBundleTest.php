@@ -21,6 +21,7 @@ use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
+use ReflectionProperty;
 use Symfony\AI\Platform\Bridge\Anthropic\ModelCatalog as AnthropicModelCatalog;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\PlatformOptions;
@@ -119,6 +120,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Tran
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelNotice;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
@@ -363,6 +365,15 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $llmClient->complete('sys', 'usr');
 
         self::assertStringContainsString("--effort\0high\0", (string) file_get_contents($this->tmpDir.'/claude-arguments'));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_an_audit_on_the_ollama_platform_of_the_application_names_the_models_its_server_has_not_pulled(): void
+    {
+        $kernel = $this->boot(['model' => 'qwen9'], registerPlatform: false, registerHostServices: $this->servedBy('ollama'));
+
+        self::assertInstanceOf(PulledModelNotice::class, (new ReflectionProperty(AuditCommand::class, 'pulledModelNotice'))->getValue($this->getPrivateService($kernel, AuditCommand::class)));
     }
 
     /**

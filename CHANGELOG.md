@@ -44,6 +44,8 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `audit:run` reports a folder of a project named as the project in one `Scope:` line under the header, in place of a `[NOTE]` block that repeated the project and folder paths ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
 - `audit:run` writes its long-run notice with a colon in place of a dash ([#711](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/711))
 - The `html` report of `audit:run` and of `audit:trend` opens with the same pink and navy `SECURITY AUDITOR` banner as the console, in light and dark mode ([#720](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/720))
+- `init --no-interaction` without `--model` picks the first model Ollama pulled and warns when it writes `claude-opus-5-5` as a placeholder for a provider it cannot list models for, marking that line of `config.yaml` with a comment ([#733](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/733))
+- `doctor` warns about that placeholder or a model the Ollama server has not pulled; `audit:run` on Ollama notes a configured model the server has not pulled, in the binary and the bundle; an error from a provider that does not know the model names it and the setting that fixes it ([#733](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/733))
 
 ### Bugfixes 🐛
 

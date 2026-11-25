@@ -24,10 +24,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPreflightInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerAvailabilityCheckerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerProbe;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ConfiguredModelCheck;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCheckResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCheckStatus;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\EnvironmentDoctor;
@@ -77,6 +80,21 @@ final class EnvironmentDoctorTest extends TestCase
         $results = $this->doctorWith($this->resolver(), [], true)->diagnose();
 
         self::assertSame('Config resolves; the configured platform needs no API key.', $results[0]->detail);
+    }
+
+    public function test_it_warns_after_the_configuration_about_the_placeholder_model_init_wrote(): void
+    {
+        $this->writeConfig("provider: generic.gw\nplatform:\n    generic:\n        gw:\n            base_url: 'https://gateway.example'\n# A placeholder: replace it with a model the provider serves.\nmodel: claude-opus-5-5\n");
+        $this->installBridge();
+        $pricedModelList = self::createStub(PricedModelListInterface::class);
+        $pricedModelList->method('pricedModels')->willReturn([]);
+
+        $results = $this->doctorCheckingModelsWith(new ConfiguredModelCheck($pricedModelList, self::createStub(PulledModelListInterface::class)))->diagnose();
+
+        self::assertEquals(
+            [DoctorCheckStatus::Ok, new DoctorCheckResult('Model', DoctorCheckStatus::Warning, 'The model claude-opus-5-5 is the placeholder init writes for a provider it cannot list models for. Set model: in config.yaml to a model the provider serves, or run init again with --model.'), 'Provider bridge'],
+            [$results[0]->status, $results[1], $results[2]->label],
+        );
     }
 
     public function test_it_reports_the_bundled_pricing_catalog_version(): void
@@ -461,6 +479,21 @@ final class EnvironmentDoctorTest extends TestCase
             $composerAvailabilityChecker,
             $auditPreflight,
             new ModelsDevPricingProvider(new NullLogger()),
+        );
+    }
+
+    private function doctorCheckingModelsWith(ConfiguredModelCheck $configuredModelCheck): EnvironmentDoctor
+    {
+        $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
+        $composerAvailabilityChecker->method('probe')->willReturn(ComposerProbe::available());
+
+        return new EnvironmentDoctor(
+            new StandaloneConfigLoader($this->resolver(), new StandalonePlatformConfigResolver([])),
+            $this->resolver(),
+            $composerAvailabilityChecker,
+            self::createStub(AuditPreflightInterface::class),
+            new ModelsDevPricingProvider(new NullLogger()),
+            configuredModelCheck: $configuredModelCheck,
         );
     }
 
