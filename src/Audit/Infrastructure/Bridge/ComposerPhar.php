@@ -71,15 +71,30 @@ final readonly class ComposerPhar
         $path = \sprintf('%s.phar', $staging);
 
         try {
-            $this->filesystem->copy($this->bundledPhar, $path);
-            $this->assertPinnedRelease($path);
-            $this->filesystem->mirror(\sprintf('phar://%s', $path), $staging);
+            $this->unpack($path, $staging);
             $this->moveInPlace($staging, $unpacked, $entryScript);
         } catch (IOException $ioException) {
             throw BridgeInstallationFailedException::forUncopyableComposerPhar(self::VERSION, $directory, $ioException);
         }
 
         return $entryScript;
+    }
+
+    /**
+     * Deletes the staged copy of the phar, which PHP closes once its last stream is.
+     *
+     * @throws BridgeInstallationFailedException
+     * @throws IOException
+     */
+    private function unpack(string $path, string $staging): void
+    {
+        try {
+            $this->filesystem->copy($this->bundledPhar, $path);
+            $this->assertPinnedRelease($path);
+            $this->filesystem->mirror(\sprintf('phar://%s', $path), $staging);
+        } finally {
+            $this->filesystem->remove($path);
+        }
     }
 
     /**

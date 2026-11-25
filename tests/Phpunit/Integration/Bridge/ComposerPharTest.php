@@ -19,6 +19,8 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPhar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge\Fixture\CopyCountingFilesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge\Fixture\PharUnpackRefusingFilesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge\Fixture\RaceLosingFilesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge\Fixture\RenameRefusingFilesystem;
 
@@ -93,13 +95,15 @@ final class ComposerPharTest extends TestCase
      */
     public function test_it_reuses_the_composer_an_earlier_run_unpacked_without_touching_it(): void
     {
-        $composerPhar = new ComposerPhar(self::FIXTURE_PHAR, (string) hash_file('sha256', self::FIXTURE_PHAR));
+        $copyCountingFilesystem = new CopyCountingFilesystem();
+        $composerPhar = new ComposerPhar(self::FIXTURE_PHAR, (string) hash_file('sha256', self::FIXTURE_PHAR), $copyCountingFilesystem);
         $entryScript = $composerPhar->in($this->directory.'/.composer');
         $this->filesystem->dumpFile($entryScript, '<?php // unpacked by an earlier run');
+        $copiesOfTheFirstRun = $copyCountingFilesystem->copies;
 
         self::assertSame(
-            [$entryScript, '<?php // unpacked by an earlier run', 1],
-            [$composerPhar->in($this->directory.'/.composer'), file_get_contents($entryScript), \count((array) glob($this->directory.'/.composer/*.phar'))],
+            [$entryScript, '<?php // unpacked by an earlier run', $copiesOfTheFirstRun],
+            [$composerPhar->in($this->directory.'/.composer'), file_get_contents($entryScript), $copyCountingFilesystem->copies],
         );
     }
 
@@ -125,9 +129,37 @@ final class ComposerPharTest extends TestCase
     {
         $composerPhar = new ComposerPhar(self::FIXTURE_PHAR, (string) hash_file('sha256', self::FIXTURE_PHAR), new RenameRefusingFilesystem());
 
-        $this->expectExceptionMessageContaining('Cannot rename');
+        try {
+            $composerPhar->in($this->directory.'/.composer');
+            self::fail('A Composer that could not be moved in place was reported unpacked.');
+        } catch (BridgeInstallationFailedException $bridgeInstallationFailedException) {
+            self::assertSame(
+                [true, []],
+                [str_contains($bridgeInstallationFailedException->getMessage(), 'Cannot rename'), glob($this->directory.'/.composer/*.phar')],
+            );
+        }
+    }
 
-        $composerPhar->in($this->directory.'/.composer');
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_keeps_no_copy_of_the_phar_once_composer_is_unpacked(): void
+    {
+        (new ComposerPhar(self::FIXTURE_PHAR, (string) hash_file('sha256', self::FIXTURE_PHAR)))->in($this->directory.'/.composer');
+
+        self::assertSame([], glob($this->directory.'/.composer/*.phar'));
+    }
+
+    public function test_it_keeps_no_copy_of_the_phar_when_composer_cannot_be_unpacked(): void
+    {
+        $composerPhar = new ComposerPhar(self::FIXTURE_PHAR, (string) hash_file('sha256', self::FIXTURE_PHAR), new PharUnpackRefusingFilesystem());
+
+        try {
+            $composerPhar->in($this->directory.'/.composer');
+            self::fail('A Composer that could not be unpacked was reported unpacked.');
+        } catch (BridgeInstallationFailedException $bridgeInstallationFailedException) {
+            self::assertSame([], glob($this->directory.'/.composer/*.phar'), $bridgeInstallationFailedException->getMessage());
+        }
     }
 
     public function test_it_refuses_a_bundled_composer_whose_checksum_does_not_match_and_keeps_none_of_it(): void
@@ -138,7 +170,11 @@ final class ComposerPharTest extends TestCase
             $composerPhar->in($this->directory.'/.composer');
             self::fail('A tampered composer.phar was accepted.');
         } catch (BridgeInstallationFailedException $bridgeInstallationFailedException) {
-            self::assertSame([], glob($this->directory.'/.composer/*'), $bridgeInstallationFailedException->getMessage());
+            self::assertSame(
+                [[], true],
+                [glob($this->directory.'/.composer/*'), str_contains($bridgeInstallationFailedException->getMessage(), 'does not match its pinned SHA-256 checksum')],
+                $bridgeInstallationFailedException->getMessage(),
+            );
         }
     }
 
