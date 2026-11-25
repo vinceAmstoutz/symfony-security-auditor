@@ -158,6 +158,25 @@ final class ConfiguredCredentialVariableTest extends TestCase
         self::assertFalse($this->configuredCredentialVariable()->platformNeedsNoApiKey());
     }
 
+    #[DataProvider('blocksWithoutSettings')]
+    public function test_a_selected_platform_configured_without_settings_needs_no_api_key(string $yaml): void
+    {
+        $this->writeConfig($yaml);
+
+        self::assertTrue($this->configuredCredentialVariable()->platformNeedsNoApiKey());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function blocksWithoutSettings(): iterable
+    {
+        yield 'an empty map' => ["provider: claudecode\nplatform:\n    claudecode: {}\n"];
+        yield 'a null' => ["provider: claudecode\nplatform:\n    claudecode: ~\n"];
+        yield 'no value' => ["provider: claudecode\nplatform:\n    claudecode:\n"];
+        yield 'an instance with no value' => ["provider: generic.gateway\nplatform:\n    generic:\n        gateway:\n"];
+    }
+
     public function test_an_empty_platform_block_is_not_a_platform_needing_no_api_key(): void
     {
         $this->writeConfig("platform: {}\n");
