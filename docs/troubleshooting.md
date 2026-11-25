@@ -270,9 +270,13 @@ symfony_security_auditor:
 
 The file or finding is then recorded as errored. The call still counts against `audit.budget`.
 
+### `The provider does not know the model "…"` after `init -n`
+
+`init --no-interaction` without `--model` writes `claude-opus-5-5` as a placeholder for a provider it cannot list models for (a gateway such as LM Studio or vLLM, an Ollama it could not reach or with no model pulled, a provider the price catalog does not list). It warns when it does so and marks the line in `config.yaml` with a comment. `doctor` warns about it too. Set `model:` in `config.yaml` to a model the provider serves, or run `init` again with `--model`. In a Symfony application, set `symfony_security_auditor.model`.
+
 ### `Ollama: model not found`
 
-Pull the model, then check it with `ollama list`. The `model` setting must match its name exactly.
+Pull the model, then check it with `ollama list`. The `model` setting must match its name exactly. On Ollama, `audit:run` notes each configured model the server has not pulled before the run starts and `doctor` warns about it.
 
 ```bash
 ollama pull llama3.3

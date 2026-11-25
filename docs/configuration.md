@@ -642,6 +642,8 @@ The bundle resolves `ai.yaml` through Symfony's own environment handling, so `.e
 
 Running against [Ollama](#supported-platforms) needs no credential. Pair it with [`privacy.offline_only: true`](#privacy-data-egress) to have that enforced rather than assumed.
 
+On Ollama, `audit:run` asks the server which models it pulled before the run starts (in a Symfony application as in the binary) and notes each configured `model`, `attacker_model` or `reviewer_model` it has not pulled. The run still goes ahead; a model the provider does not know stops it with an error naming the model and the setting to change.
+
 ## CLI Reference
 
 The bundle registers the `audit:run` console command, also reachable through the shorter `audit` alias (`bin/console audit`), plus `audit:diff`, `audit:trend` and `audit:baseline` for working with previously generated reports. The standalone CLI exposes the same commands, run as `symfony-security-auditor audit:diff …`; its three report commands need neither a configuration nor an API key.
@@ -960,7 +962,7 @@ The audit runs on the auditor's own configured platform and models and bills tha
 
 ### `init`: generating the standalone configuration
 
-Standalone only. Writes `config.yaml` and installs the provider bridge with the Composer the binary bundles. _Since 1.23_ it first asks how you access AI models (a Claude or ChatGPT [subscription](#running-on-a-claude-subscription), an API key, a local model such as Ollama, an AI gateway or a cloud account), then lists the matching providers and the newest model of each family with its price per million tokens, defaulting to `claude-opus-5-5` where listed. Type any other provider or model id to skip a list. It can end with one test request, sent only on `yes`. Each option given skips its prompt; under `--no-interaction` a missing option takes its default and a platform that needs a URL is refused rather than written half-configured.
+Standalone only. Writes `config.yaml` and installs the provider bridge with the Composer the binary bundles. _Since 1.23_ it first asks how you access AI models (a Claude or ChatGPT [subscription](#running-on-a-claude-subscription), an API key, a local model such as Ollama, an AI gateway or a cloud account), then lists the matching providers and the newest model of each family with its price per million tokens, defaulting to `claude-opus-5-5` where listed. Type any other provider or model id to skip a list. It can end with one test request, sent only on `yes`. Each option given skips its prompt; under `--no-interaction` a missing option takes its default and a platform that needs a URL is refused rather than written half-configured. A model `init` writes as a placeholder is marked with a comment in `config.yaml`; `doctor` warns about it until it is replaced.
 
 | Option | Default | Description |
 | --- | --- | --- |
