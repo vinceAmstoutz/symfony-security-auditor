@@ -182,8 +182,8 @@ final readonly class UnifiedDiff
             }
 
             [$removed, $added] = self::sidesOf($marker, substr($lines[$index], 1));
-            $oldLines = [...$oldLines, ...$removed];
-            $newLines = [...$newLines, ...$added];
+            array_push($oldLines, ...$removed);
+            array_push($newLines, ...$added);
             ++$index;
         }
 
