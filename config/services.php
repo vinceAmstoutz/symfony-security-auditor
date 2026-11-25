@@ -735,6 +735,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(AttackerPromptBuilderInterface::class),
             service(MappingStage::class),
             service(SinceClosurePreview::class),
+            service(CandidateFindingSource::class),
         ]);
 
     $defaultsConfigurator->set(ListScannedFilesUseCase::class)

@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
 use Override;
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ReviewerCoverageRecorder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScanPathFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
@@ -30,8 +31,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInter
  */
 final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 {
-    private const string SKIPPED_FINGERPRINTS_META = 'audit.baseline_skipped_fingerprints';
-
     public const int DEFAULT_MAX_ITERATIONS = 3;
 
     public const float DEFAULT_MIN_CONFIDENCE = 0.6;
@@ -79,7 +78,10 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             $newFindings = $this->runIteration($mapping, $files, $auditContext, $iteration);
         } while (0 !== $newFindings && $iteration < $this->auditLoopSettings->maxIterations);
 
-        $auditContext->setMeta('audit.baseline_skipped', \count($this->skippedFingerprints($auditContext)));
+        $auditContext->setMeta('audit.baseline_skipped', \count(array_unique(array_map(
+            static fn (Vulnerability $vulnerability): string => $vulnerability->fingerprint(),
+            $auditContext->baselineSkippedFindings(),
+        ))));
         $auditContext->setMeta('audit.iterations', $iteration);
         $auditContext->setMeta('audit.total_findings', \count($auditContext->vulnerabilities()));
         $auditContext->setMeta('audit.validated', \count($auditContext->validatedVulnerabilities()));
@@ -103,17 +105,25 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         $previousFindings = array_values($auditContext->validatedVulnerabilities());
         $rejectedFindings = $this->rejectedFindings($auditContext);
         $knownFindings = [...$previousFindings, ...$auditContext->baselineSkippedFindings()];
-        $attackerFindings = $this->analyzeWithRecovery($symfonyMapping, $files, $knownFindings, $rejectedFindings, $auditContext);
-        $filtered = [...$auditContext->drainStaticCandidates(), ...$attackerFindings];
+        $staticCandidates = FindingPrecedence::collapseById($auditContext->drainStaticCandidates());
+        $attackerAnalysisRequest = new AttackerAnalysisRequest(
+            files: $files,
+            symfonyMapping: $symfonyMapping,
+            bypassCache: $auditContext->isCacheBypassed(),
+            previousFindings: $knownFindings,
+            rejectedFindings: $rejectedFindings,
+            toolFiles: $this->auditLoopSettings->toolFiles($auditContext),
+        );
+        $attackerFindings = $this->analyzeWithRecovery($attackerAnalysisRequest, $auditContext, $staticCandidates);
 
-        if ([] === $filtered) {
+        if ([] === $staticCandidates && [] === $attackerFindings) {
             $this->logger->info('Attacker found no new findings, stopping');
             $this->progressReporter->report(ProgressEvent::ReviewSkipped->value, ['reason' => 'no_new_findings']);
 
             return 0;
         }
 
-        $reviewCandidates = $this->withoutBaselineAccepted($filtered, $auditContext);
+        $reviewCandidates = $this->reviewCandidates($staticCandidates, $attackerFindings, $auditContext);
 
         if ([] === $reviewCandidates) {
             $this->logger->info('Every remaining finding is baseline-accepted, stopping');
@@ -126,8 +136,9 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             'findings' => \count($reviewCandidates),
         ]);
 
-        $reviewed = $this->reviewPersistingOnAbort($reviewCandidates, $files, $auditContext);
-        $newFindings = $this->persistReviewedFindings($this->mergeRecoveredFindings($reviewed, $auditContext->drainReviewedFindings()), $auditContext);
+        $staticCandidatesById = $this->byId($staticCandidates);
+        $reviewed = $this->reviewPersistingOnAbort($reviewCandidates, $staticCandidatesById, $files, $auditContext);
+        $newFindings = $this->persistReviewedFindings($this->mergeRecoveredFindings($reviewed, $auditContext->drainReviewedFindings()), $auditContext, $staticCandidatesById);
 
         $acceptedCount = \count(array_filter(
             $reviewed,
@@ -137,7 +148,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
         $this->logger->info('Iteration complete', [
             'iteration' => $iteration,
-            'attacker_found' => \count($filtered),
+            'attacker_found' => \count($staticCandidates) + \count($attackerFindings),
             'reviewer_accepted' => $acceptedCount,
             'new_unique' => $newFindings,
             'total' => \count($auditContext->vulnerabilities()),
@@ -148,23 +159,96 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
+     * Returns the findings to review: the static candidates no attacker finding
+     * replaces and the attacker findings, each without those the baseline
+     * accepts. An attacker finding that would replace a baseline-accepted
+     * static candidate is left out with it.
+     *
+     * @param list<Vulnerability> $staticCandidates one per id
+     * @param list<Vulnerability> $attackerFindings
+     *
+     * @return list<Vulnerability>
+     */
+    private function reviewCandidates(array $staticCandidates, array $attackerFindings, AuditContext $auditContext): array
+    {
+        $pendingStaticCandidates = $this->withoutBaselineAccepted($staticCandidates, $auditContext);
+        $acceptedStaticCandidates = array_values(array_diff_key($this->byId($staticCandidates), $this->byId($pendingStaticCandidates)));
+
+        return [
+            ...FindingOverlap::outside($pendingStaticCandidates, $attackerFindings),
+            ...$this->withoutBaselineAccepted(FindingOverlap::outside($attackerFindings, $acceptedStaticCandidates), $auditContext),
+        ];
+    }
+
+    /**
      * @param list<Vulnerability> $findings
-     * @param list<ProjectFile>   $files
+     *
+     * @return array<string, Vulnerability>
+     */
+    private function byId(array $findings): array
+    {
+        return array_combine(array_map(static fn (Vulnerability $finding): string => $finding->id(), $findings), $findings);
+    }
+
+    /**
+     * @param list<Vulnerability>          $findings
+     * @param array<string, Vulnerability> $staticCandidatesById
+     * @param list<ProjectFile>            $files
      *
      * @return list<Vulnerability>
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
-    private function reviewPersistingOnAbort(array $findings, array $files, AuditContext $auditContext): array
+    private function reviewPersistingOnAbort(array $findings, array $staticCandidatesById, array $files, AuditContext $auditContext): array
     {
         try {
-            return $this->reviewerAgent->review($findings, $files, $auditContext, $auditContext->isCacheBypassed(), $this->auditLoopSettings->toolFiles($auditContext));
+            return $this->review($findings, $staticCandidatesById, $files, $auditContext);
         } catch (BudgetExceededException|LLMProviderException $exception) {
             $this->persistReviewedFindings($auditContext->drainReviewedFindings(), $auditContext);
 
             throw $exception;
         }
+    }
+
+    /**
+     * Reviews the static candidates among `$findings` with the others of
+     * their file, so each file is sent once.
+     *
+     * @param list<Vulnerability>          $findings
+     * @param array<string, Vulnerability> $staticCandidatesById
+     * @param list<ProjectFile>            $files
+     *
+     * @return list<Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    private function review(array $findings, array $staticCandidatesById, array $files, AuditContext $auditContext): array
+    {
+        $isStaticCandidate = static fn (Vulnerability $vulnerability): bool => \array_key_exists($vulnerability->id(), $staticCandidatesById);
+        $staticCandidates = array_values(array_filter($findings, $isStaticCandidate));
+        $toolFiles = $this->auditLoopSettings->toolFiles($auditContext);
+
+        try {
+            $reviewed = $this->reviewerAgent->review(
+                array_values(array_filter($findings, static fn (Vulnerability $vulnerability): bool => !$isStaticCandidate($vulnerability))),
+                $files,
+                $auditContext,
+                $auditContext->isCacheBypassed(),
+                $toolFiles,
+            );
+        } catch (BudgetExceededException $budgetExceededException) {
+            ReviewerCoverageRecorder::recordEach($staticCandidates, 'aborted', $auditContext, $this->progressReporter);
+
+            throw $budgetExceededException;
+        } catch (LLMProviderException $llmProviderException) {
+            ReviewerCoverageRecorder::recordEach($staticCandidates, 'errored', $auditContext, $this->progressReporter);
+
+            throw $llmProviderException;
+        }
+
+        return [...$reviewed, ...$this->reviewerAgent->reviewByFile($staticCandidates, $files, $auditContext, $auditContext->isCacheBypassed(), $toolFiles)];
     }
 
     /**
@@ -184,31 +268,19 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
-     * @param list<Vulnerability> $previousFindings
-     * @param list<Vulnerability> $rejectedFindings
-     * @param list<ProjectFile>   $files
+     * @param list<Vulnerability> $staticCandidates reviewed with the recovered findings when the attacker aborts
      *
      * @return list<Vulnerability> the findings at or above the confidence floor, one per id, copies below it dropped before collapsing
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
-    private function analyzeWithRecovery(SymfonyMapping $symfonyMapping, array $files, array $previousFindings, array $rejectedFindings, AuditContext $auditContext): array
+    private function analyzeWithRecovery(AttackerAnalysisRequest $attackerAnalysisRequest, AuditContext $auditContext, array $staticCandidates): array
     {
         try {
-            $rawFindings = $this->attackerAgent->analyze(
-                new AttackerAnalysisRequest(
-                    files: $files,
-                    symfonyMapping: $symfonyMapping,
-                    bypassCache: $auditContext->isCacheBypassed(),
-                    previousFindings: $previousFindings,
-                    rejectedFindings: $rejectedFindings,
-                    toolFiles: $this->auditLoopSettings->toolFiles($auditContext),
-                ),
-                $auditContext,
-            );
+            $rawFindings = $this->attackerAgent->analyze($attackerAnalysisRequest, $auditContext);
         } catch (BudgetExceededException|LLMProviderException $attackerException) {
-            $this->reviewRecoveredFindings([...$auditContext->drainStaticCandidates(), ...$auditContext->drainFoundVulnerabilities()], $files, $auditContext);
+            $this->reviewRecoveredFindings($staticCandidates, $auditContext->drainFoundVulnerabilities(), $attackerAnalysisRequest->files, $auditContext);
 
             throw $attackerException;
         }
@@ -239,12 +311,13 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
      * as a completed iteration would. Persists the verdicts reached before a
      * further abort and swallows it, so the caller sees the original abort.
      *
+     * @param list<Vulnerability> $staticCandidates one per id
      * @param list<Vulnerability> $rawFindings
      * @param list<ProjectFile>   $files
      */
-    private function reviewRecoveredFindings(array $rawFindings, array $files, AuditContext $auditContext): void
+    private function reviewRecoveredFindings(array $staticCandidates, array $rawFindings, array $files, AuditContext $auditContext): void
     {
-        $filtered = $this->withoutBaselineAccepted($this->filterByConfidence($rawFindings), $auditContext);
+        $filtered = $this->reviewCandidates($staticCandidates, $this->filterByConfidence($rawFindings), $auditContext);
 
         if ([] === $filtered) {
             $this->progressReporter->report(ProgressEvent::ReviewSkipped->value, ['reason' => 'nothing_recovered']);
@@ -257,7 +330,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         ]);
 
         try {
-            $reviewed = $this->reviewerAgent->review($filtered, $files, $auditContext, $auditContext->isCacheBypassed(), $this->auditLoopSettings->toolFiles($auditContext));
+            $reviewed = $this->review($filtered, $this->byId($staticCandidates), $files, $auditContext);
         } catch (BudgetExceededException|LLMProviderException) {
             $this->persistReviewedFindings($auditContext->drainReviewedFindings(), $auditContext);
 
@@ -322,10 +395,8 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
     private function isReReportedBaselineSkip(Vulnerability $vulnerability, AuditContext $auditContext): bool
     {
-        foreach ($auditContext->baselineSkippedFindings() as $skippedFinding) {
-            if ($skippedFinding->fingerprint() === $vulnerability->fingerprint()
-                && $this->linesOverlap($skippedFinding->lineStart(), $skippedFinding->lineEnd(), $vulnerability->lineStart(), $vulnerability->lineEnd())
-            ) {
+        foreach ($auditContext->baselineSkippedFindingsWith($vulnerability->fingerprint()) as $skippedFinding) {
+            if ($this->linesOverlap($skippedFinding->lineStart(), $skippedFinding->lineEnd(), $vulnerability->lineStart(), $vulnerability->lineEnd())) {
                 return true;
             }
         }
@@ -335,13 +406,9 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
 
     private function recordBaselineSkip(Vulnerability $vulnerability, AuditContext $auditContext): void
     {
-        $skippedFingerprints = $this->skippedFingerprints($auditContext);
-        if (\in_array($vulnerability->fingerprint(), $skippedFingerprints, true)) {
+        if (1 < \count($auditContext->baselineSkippedFindingsWith($vulnerability->fingerprint()))) {
             return;
         }
-
-        $skippedFingerprints[] = $vulnerability->fingerprint();
-        $auditContext->setMeta(self::SKIPPED_FINGERPRINTS_META, $skippedFingerprints);
 
         $this->logger->info('Baseline-accepted finding skipped before review', [
             'fingerprint' => $vulnerability->fingerprint(),
@@ -354,16 +421,6 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             'line' => $vulnerability->lineStart(),
             'title' => $vulnerability->title(),
         ]);
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function skippedFingerprints(AuditContext $auditContext): array
-    {
-        $skipped = $auditContext->getMeta(self::SKIPPED_FINGERPRINTS_META, []);
-
-        return \is_array($skipped) ? array_values(array_filter($skipped, is_string(...))) : [];
     }
 
     /**
@@ -393,9 +450,13 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
-     * @param list<Vulnerability> $reviewed
+     * Returns how many admitted findings are new, leaving out the static
+     * candidates: only what the attacker discovers calls for another iteration.
+     *
+     * @param list<Vulnerability>          $reviewed
+     * @param array<string, Vulnerability> $staticCandidatesById
      */
-    private function persistReviewedFindings(array $reviewed, AuditContext $auditContext): int
+    private function persistReviewedFindings(array $reviewed, AuditContext $auditContext, array $staticCandidatesById = []): int
     {
         $newFindings = 0;
 
@@ -406,7 +467,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             }
 
             $auditContext->addVulnerability($vulnerability);
-            if (!FindingPrecedence::onlyOutranksOnConfidence($vulnerability, $replaced)) {
+            if (!\array_key_exists($vulnerability->id(), $staticCandidatesById) && !FindingPrecedence::onlyOutranksOnConfidence($vulnerability, $replaced)) {
                 ++$newFindings;
             }
         }
@@ -449,8 +510,8 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     private function overlappingValidated(Vulnerability $vulnerability, AuditContext $auditContext): array
     {
         return array_values(array_filter(
-            $auditContext->validatedVulnerabilities(),
-            fn (Vulnerability $existing): bool => $existing->filePath() === $vulnerability->filePath()
+            $auditContext->vulnerabilitiesIn($vulnerability->filePath()),
+            fn (Vulnerability $existing): bool => $existing->isReviewerValidated()
                 && $existing->type() === $vulnerability->type()
                 && $this->linesOverlap(
                     $existing->lineStart(),

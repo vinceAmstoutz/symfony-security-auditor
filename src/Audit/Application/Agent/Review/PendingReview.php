@@ -16,9 +16,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
- * A finding awaiting its verdict, with its position in the caller's list and
- * the code context to cache the verdict under, null when the cache is
- * bypassed.
+ * A finding awaiting its verdict, with its position in the caller's list, the
+ * code context it is reviewed against and the one to cache the verdict
+ * under, null when the cache is bypassed.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -28,5 +28,6 @@ final readonly class PendingReview
         public int $index,
         public Vulnerability $vulnerability,
         public ?string $cacheContext,
+        public string $codeContext,
     ) {}
 }

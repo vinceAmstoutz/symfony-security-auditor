@@ -30,4 +30,16 @@ interface ReviewerAgentInterface
      * @return list<Vulnerability>
      */
     public function review(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false, ?array $toolFiles = null): array;
+
+    /**
+     * Reviews each finding with the others of its file in one call, so the
+     * file is sent once per call.
+     *
+     * @param list<Vulnerability> $vulnerabilities
+     * @param list<ProjectFile>   $projectFiles
+     * @param ?list<ProjectFile>  $toolFiles       as {@see self::review()} takes them
+     *
+     * @return list<Vulnerability>
+     */
+    public function reviewByFile(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache, ?array $toolFiles): array;
 }

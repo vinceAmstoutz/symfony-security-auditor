@@ -18,6 +18,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskMarker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ScrubbedSecretFindings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\StaticMarkerFindings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -27,6 +28,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInter
 /** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class CandidateFindingSource implements CandidateFindingSourceInterface
 {
+    public const int MAX_CANDIDATES_PER_PATTERN = 20;
+
     public function __construct(
         private StaticPreScannerInterface $staticPreScanner,
         private bool $enabled = true,
@@ -81,16 +84,51 @@ final readonly class CandidateFindingSource implements CandidateFindingSourceInt
      */
     private function staticMatches(array $files): array
     {
-        $linesByPath = [];
+        $markersByPath = [];
+        foreach ($this->staticPreScanner->scan($files) as $riskMarker) {
+            $markersByPath[$riskMarker->filePath()][] = $riskMarker;
+        }
+
+        $filesByPath = [];
         foreach ($files as $file) {
-            $linesByPath[$file->relativePath()] = explode("\n", $file->content());
+            $filesByPath[$file->relativePath()] = $file;
         }
 
         $findings = [];
-        foreach ($this->staticPreScanner->scan($files) as $riskMarker) {
-            $finding = StaticMarkerFindings::from($riskMarker, $linesByPath[$riskMarker->filePath()][$riskMarker->line() - 1] ?? '');
+        foreach ($markersByPath as $path => $riskMarkers) {
+            array_push($findings, ...$this->findingsOnLines(explode("\n", ($filesByPath[$path] ?? null)?->content() ?? ''), $riskMarkers));
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Lists at most {@see self::MAX_CANDIDATES_PER_PATTERN} findings per
+     * pattern of one file.
+     *
+     * @param list<string>     $lines       the lines of the file the markers are in
+     * @param list<RiskMarker> $riskMarkers
+     *
+     * @return list<Vulnerability>
+     *
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function findingsOnLines(array $lines, array $riskMarkers): array
+    {
+        $findings = [];
+        $listedPerPattern = [];
+        foreach ($riskMarkers as $riskMarker) {
+            $listed = $listedPerPattern[$riskMarker->pattern()] ?? 0;
+            if ($listed >= self::MAX_CANDIDATES_PER_PATTERN) {
+                continue;
+            }
+
+            $finding = StaticMarkerFindings::from($riskMarker, $lines[$riskMarker->line() - 1] ?? '');
             if ($finding instanceof Vulnerability) {
                 $findings[] = $finding;
+                $listedPerPattern[$riskMarker->pattern()] = $listed + 1;
             }
         }
 

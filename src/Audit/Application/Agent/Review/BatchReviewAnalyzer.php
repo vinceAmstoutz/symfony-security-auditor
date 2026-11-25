@@ -123,7 +123,7 @@ final readonly class BatchReviewAnalyzer
      */
     private function reviewMissesInBatches(array $reviewed, array $misses, array $missIndexes, ReviewBatchSettings $reviewBatchSettings, ReviewCacheBuckets $reviewCacheBuckets): array
     {
-        $batches = array_chunk($misses, $reviewBatchSettings->batchSize);
+        [$batches, $missIndexes] = ReviewBatches::of($misses, $missIndexes, $reviewBatchSettings);
         $position = 0;
         foreach ($batches as $batchNumber => $batch) {
             try {

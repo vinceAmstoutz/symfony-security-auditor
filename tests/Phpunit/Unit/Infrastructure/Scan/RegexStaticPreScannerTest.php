@@ -798,6 +798,100 @@ final class RegexStaticPreScannerTest extends TestCase
      * @throws InvalidProjectFileException
      * @throws InvalidRiskMarkerException
      */
+    public function test_it_does_not_flag_a_redirect_to_a_fixed_path_followed_by_a_variable_after_the_call(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/LoginController.php',
+            '/app/src/Controller/LoginController.php',
+            "<?php\nclass LoginController {\n    public function logout() {\n        return \$this->redirect('/login');\n    }\n    public function show(string \$slug) {\n        return \$this->render('page.html.twig', ['slug' => \$slug]);\n    }\n}",
+        );
+
+        $markers = $this->regexStaticPreScanner->scan([$projectFile]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('redirect_with_input', $patterns);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    public function test_it_reports_a_redirect_with_input_on_the_line_of_the_redirect_call(): void
+    {
+        $projectFile = ProjectFile::create(
+            'src/Controller/LoginController.php',
+            '/app/src/Controller/LoginController.php',
+            "<?php\nclass LoginController {\n    public function back(\$request) {\n        return \$this->redirect(\n            \$request->query->get('next')\n        );\n    }\n}",
+        );
+
+        $markers = array_values(array_filter(
+            $this->regexStaticPreScanner->scan([$projectFile]),
+            static fn (RiskMarker $riskMarker): bool => 'redirect_with_input' === $riskMarker->pattern(),
+        ));
+
+        self::assertCount(1, $markers);
+        self::assertSame(4, $markers[0]->line());
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    #[DataProvider('nativeQueryConcatenationCases')]
+    public function test_it_flags_native_sql_built_by_concatenation(string $call): void
+    {
+        $markers = $this->regexStaticPreScanner->scan([$this->repositoryCalling($call)]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertContains('native_query_concat', $patterns);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function nativeQueryConcatenationCases(): iterable
+    {
+        yield 'executeQuery, single quotes' => ["\$this->conn->executeQuery('SELECT * FROM orders WHERE id = '.\$id)"];
+        yield 'executeStatement, double quotes' => ['$this->conn->executeStatement("DELETE FROM orders WHERE id = " . $id)'];
+        yield 'query' => ["\$this->conn->query('SELECT * FROM orders WHERE ref = ' . \$request->get('ref'))"];
+        yield 'prepare, after a literal joined to another' => ["\$this->conn->prepare('SELECT * ' . 'FROM orders WHERE id = ' . \$id)"];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
+    #[DataProvider('parameterizedNativeQueryCases')]
+    public function test_it_does_not_flag_parameterized_native_sql(string $call): void
+    {
+        $markers = $this->regexStaticPreScanner->scan([$this->repositoryCalling($call)]);
+
+        $patterns = array_map(static fn (RiskMarker $riskMarker): string => $riskMarker->pattern(), $markers);
+        self::assertNotContains('native_query_concat', $patterns);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function parameterizedNativeQueryCases(): iterable
+    {
+        yield 'positional parameter' => ["\$this->conn->executeQuery('SELECT * FROM orders WHERE id = ?', [\$id])"];
+        yield 'named parameter' => ["\$this->conn->executeStatement('DELETE FROM orders WHERE id = :id', ['id' => \$id])"];
+        yield 'prepared statement' => ["\$this->conn->prepare('SELECT * FROM orders WHERE id = :id')"];
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    private function repositoryCalling(string $call): ProjectFile
+    {
+        return ProjectFile::create(
+            'src/Repository/OrderRepository.php',
+            '/app/src/Repository/OrderRepository.php',
+            "<?php\nclass OrderRepository {\n    public function find(\$id, \$request) {\n        return {$call};\n    }\n}",
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     */
     #[DataProvider('forwardedHostUsageCases')]
     public function test_it_flags_forwarded_host_usage_in_a_controller(string $call): void
     {
