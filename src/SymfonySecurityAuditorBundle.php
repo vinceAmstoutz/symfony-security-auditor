@@ -74,6 +74,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\N
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\TypedNodeEnvPlaceholderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PulledModelNoticePass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\TypedNodeEnvPlaceholderFinder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\UnselectedPlatformsPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\GitTrackedIgnoredFiles;
@@ -125,6 +126,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $container->addCompilerPass(new PricingPlatformPass(PlatformInterface::class));
         $container->addCompilerPass(new UnselectedPlatformsPass(PlatformInterface::class));
         $container->addCompilerPass(new CheapAttackerClientNoticePass());
+        $container->addCompilerPass(new PulledModelNoticePass());
     }
 
     #[Override]
@@ -159,6 +161,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         }
 
         $platformServiceId = null === $cliAgent ? PlatformInterface::class : CliAgentPlatforms::serviceIdOf($cliAgent);
+        $builder->setParameter(PulledModelNoticePass::PLATFORM_SERVICE_PARAMETER, $platformServiceId);
 
         /** @var BundleConfigArray $config */
         $bundleConfiguration = BundleConfiguration::fromArray($config);

@@ -40,6 +40,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\N
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FreeTextSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PulledModelNoticePass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
@@ -140,6 +141,7 @@ final readonly class StandaloneContainerFactory
         $containerBuilder->getAlias(LLMClientInterface::class)->setPublic(true);
         $containerBuilder->getAlias(ComposerAuditRunnerInterface::class)->setPublic(true);
         $containerBuilder->addCompilerPass(new PricingPlatformPass(PlatformInterface::class));
+        $containerBuilder->addCompilerPass(new PulledModelNoticePass());
         $containerBuilder->compile(true);
 
         return $containerBuilder;

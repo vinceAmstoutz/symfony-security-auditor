@@ -18,6 +18,7 @@ use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
 use Symfony\AI\Platform\Bridge\Ollama\Factory as OllamaFactory;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
@@ -45,6 +46,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelNotice;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
@@ -434,6 +436,44 @@ final class StandaloneContainerFactoryTest extends TestCase
             chdir(sys_get_temp_dir());
             (new Filesystem())->remove($workingDirectory);
         }
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_an_audit_on_ollama_names_the_configured_models_its_server_has_not_pulled(): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig(['model' => 'qwen9'], new StandalonePlatformConfig(['ollama' => ['endpoint' => 'http://localhost:11434']], 'ollama')),
+            $this->cacheDir,
+        );
+
+        self::assertInstanceOf(PulledModelNotice::class, (new ReflectionProperty(AuditCommand::class, 'pulledModelNotice'))->getValue($containerBuilder->get(AuditCommand::class)));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_an_audit_on_another_platform_asks_no_ollama_server(): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(['ollama' => ['endpoint' => 'http://localhost:11434'], 'generic' => ['gw' => ['base_url' => 'http://localhost:8080']]], 'generic.gw')),
+            $this->cacheDir,
+        );
+
+        self::assertNull((new ReflectionProperty(AuditCommand::class, 'pulledModelNotice'))->getValue($containerBuilder->get(AuditCommand::class)));
     }
 
     /**
