@@ -19,8 +19,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Patch\UnifiedDiff;
 
 /**
  * A suggested fix as a GitHub `suggestion` block, which replaces one run of
- * lines: a fix that touches several hunks or files, or only adds lines, gets
- * none. Its fence outlasts any backtick run in the code.
+ * lines: a fix that touches several hunks or files, or only adds or only
+ * removes lines, gets none. Its fence outlasts any backtick run in the code.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -94,7 +94,7 @@ final readonly class GithubSuggestion
 
         $diffHunk = $filePatches[0]->hunks[0];
 
-        return [] === $diffHunk->oldLines ? null : $diffHunk;
+        return [] === $diffHunk->oldLines || [] === $diffHunk->newLines ? null : $diffHunk;
     }
 
     private function fenceAround(string $code): string
