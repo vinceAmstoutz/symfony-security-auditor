@@ -125,7 +125,7 @@ return [
     ],
     [
         'scenarios' => ['standalone/init-then-audit'],
-        'path' => 'runs.1.stdout.json.coverage.7',
+        'path' => 'runs.1.stdout.json.coverage.11',
         'match' => '#^<absent> -> \{"stage":"reviewer","file":"templates/base\.html\.twig","status":"validated"\}$#',
         'reason' => $staticFindingReason,
         'changelog' => '#696',
