@@ -105,7 +105,7 @@ final readonly class ProjectLayoutDetector
 
     private static function isCqrsHandler(ProjectFile $projectFile): bool
     {
-        return ProjectFileType::USE_CASE === $projectFile->fileType()
+        return (ProjectFileType::USE_CASE === $projectFile->fileType() && !ProjectFileContentSignatures::looksLikeApiPlatformState($projectFile->relativePath(), $projectFile->content()))
             || (ProjectFileType::MESSENGER_HANDLER === $projectFile->fileType() && 1 === preg_match('/(?:Command|Query)Handler\.php$/', $projectFile->relativePath()));
     }
 }
