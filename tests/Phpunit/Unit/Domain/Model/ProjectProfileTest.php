@@ -24,6 +24,11 @@ final class ProjectProfileTest extends TestCase
         self::assertTrue(ProjectProfile::unknown()->satisfies('symfony>=8.2 symfony/ai-agent'));
     }
 
+    public function test_a_lockfile_installing_no_kernel_is_not_the_application_s_and_satisfies_every_requirement(): void
+    {
+        self::assertTrue(ProjectProfile::of(['monolog/monolog' => '3.9.0'], [])->satisfies('symfony>=8.2 symfony/ai-agent'));
+    }
+
     public function test_a_package_the_lockfile_does_not_install_is_not_satisfied(): void
     {
         self::assertFalse(ProjectProfile::of(['symfony/http-kernel' => 'v8.1.4'], [])->satisfies('symfony/ai-agent'));
@@ -31,17 +36,17 @@ final class ProjectProfileTest extends TestCase
 
     public function test_any_installed_alternative_satisfies_a_requirement(): void
     {
-        self::assertTrue(ProjectProfile::of(['openai-php/client' => 'v0.10.1'], [])->satisfies('symfony/ai-agent|openai-php/client'));
+        self::assertTrue(ProjectProfile::of(['symfony/http-kernel' => 'v8.1.0', 'openai-php/client' => 'v0.10.1'], [])->satisfies('symfony/ai-agent|openai-php/client'));
     }
 
     public function test_every_space_separated_term_must_hold(): void
     {
-        self::assertFalse(ProjectProfile::of(['symfony/messenger' => 'v8.1.0'], [])->satisfies('symfony/messenger symfony/webhook'));
+        self::assertFalse(ProjectProfile::of(['symfony/http-kernel' => 'v8.1.0', 'symfony/messenger' => 'v8.1.0'], [])->satisfies('symfony/messenger symfony/webhook'));
     }
 
     public function test_a_requirement_holds_when_each_of_its_terms_does(): void
     {
-        self::assertTrue(ProjectProfile::of(['symfony/messenger' => 'v8.1.0', 'symfony/webhook' => 'v8.1.0'], [])->satisfies('symfony/messenger symfony/webhook'));
+        self::assertTrue(ProjectProfile::of(['symfony/http-kernel' => 'v8.1.0', 'symfony/messenger' => 'v8.1.0', 'symfony/webhook' => 'v8.1.0'], [])->satisfies('symfony/messenger symfony/webhook'));
     }
 
     public function test_a_locked_symfony_release_at_or_above_the_minimum_satisfies_a_version_requirement(): void
@@ -84,6 +89,5 @@ final class ProjectProfileTest extends TestCase
     public static function lockfilesBelowTheMinimum(): iterable
     {
         yield 'an older release' => [['symfony/http-kernel' => 'v8.1.4']];
-        yield 'no kernel at all' => [['monolog/monolog' => '3.9.0']];
     }
 }

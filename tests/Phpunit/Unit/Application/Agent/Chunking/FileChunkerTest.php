@@ -134,7 +134,7 @@ final class FileChunkerTest extends TestCase
     public function test_feature_strategy_groups_an_action_with_the_command_and_handler_it_dispatches(): void
     {
         $files = [
-            $this->makeFile('src/Billing/UI/Http/Action/CancelSubscriptionAction.php'),
+            $this->makeFileWithContent('src/Billing/UI/Http/Action/CancelSubscriptionAction.php', '<?php final class CancelSubscriptionAction { public function __invoke(Request $request): Response {} }'),
             $this->makeFile('src/Billing/Application/Command/CancelSubscriptionCommand.php'),
             $this->makeFile('src/Billing/Application/Command/CancelSubscriptionHandler.php'),
             $this->makeFile('src/Billing/Domain/Invoice.php'),

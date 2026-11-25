@@ -20,6 +20,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model;
  */
 final readonly class ProjectFileContentSignatures
 {
+    private const string HTTP_HANDLER = '/\)\s*:\s*\??(?:[\w\\\\]*\\\\)?\w*Response(?:Interface)?\b|function\s+__invoke\s*\([^)]*\b\w*Request(?:Interface)?\s+\$/';
+
     private const array AUTHENTICATION_SIGNATURES = [
         'implements AuthenticatorInterface',
         'extends AbstractAuthenticator',
@@ -46,6 +48,11 @@ final readonly class ProjectFileContentSignatures
             && (str_contains($content, 'extends AbstractController')
                 || str_contains($content, '#[AsController')
                 || str_contains($content, '#[Route'));
+    }
+
+    public static function handlesAnHttpRequest(string $content): bool
+    {
+        return 1 === preg_match(self::HTTP_HANDLER, $content);
     }
 
     public static function looksLikeApiResource(string $path, string $content): bool

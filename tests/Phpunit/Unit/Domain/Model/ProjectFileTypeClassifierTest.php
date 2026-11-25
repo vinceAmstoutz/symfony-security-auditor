@@ -77,8 +77,9 @@ final class ProjectFileTypeClassifierTest extends TestCase
         yield 'authenticator by login form base class without suffix' => ['src/Identity/Infrastructure/Security/FormLogin.php', "<?php\nclass FormLogin extends AbstractLoginFormAuthenticator {}", ProjectFileType::AUTHENTICATOR];
         yield 'access token handler by interface' => ['src/Security/ApiTokenHandler.php', "<?php\nclass ApiTokenHandler implements AccessTokenHandlerInterface {}", ProjectFileType::AUTHENTICATOR];
         yield 'form by as-form-type attribute on its data class' => ['src/Account/Application/Registration.php', "<?php\n#[AsFormType]\nclass Registration {}", ProjectFileType::FORM];
-        yield 'action routed outside the class by action directory and suffix' => ['src/Billing/UI/Http/Action/ShowInvoiceAction.php', "<?php\nfinal class ShowInvoiceAction { public function __invoke() {} }", ProjectFileType::CONTROLLER];
-        yield 'action routed outside the class by actions directory and suffix' => ['src/Http/Actions/DeleteAccountAction.php', "<?php\nfinal class DeleteAccountAction { public function __invoke() {} }", ProjectFileType::CONTROLLER];
+        yield 'action routed outside the class by action directory and suffix' => ['src/Billing/UI/Http/Action/ShowInvoiceAction.php', "<?php\nfinal class ShowInvoiceAction { public function __invoke(Request \$request) {} }", ProjectFileType::CONTROLLER];
+        yield 'action routed outside the class by actions directory and suffix' => ['src/Http/Actions/DeleteAccountAction.php', "<?php\nfinal class DeleteAccountAction { public function __invoke(): Response {} }", ProjectFileType::CONTROLLER];
+        yield 'an action that handles no http request stays plain php' => ['src/Payum/Action/CaptureAction.php', "<?php\nfinal class CaptureAction implements ActionInterface { public function execute(\$request): void {} }", ProjectFileType::PHP];
         yield 'a non-action class in an action directory stays plain php' => ['src/Domain/Action/ActionKind.php', "<?php\nenum ActionKind {}", ProjectFileType::PHP];
         yield 'use case by command handler suffix' => ['src/Ordering/Application/PlaceOrderCommandHandler.php', "<?php\nfinal class PlaceOrderCommandHandler {}", ProjectFileType::USE_CASE];
         yield 'use case by query handler suffix' => ['src/Ordering/Application/GetOrderQueryHandler.php', "<?php\nfinal class GetOrderQueryHandler {}", ProjectFileType::USE_CASE];
@@ -118,6 +119,8 @@ final class ProjectFileTypeClassifierTest extends TestCase
         yield 'an admin-suffixed class without sonata stays plain php' => ['src/Backoffice/StoreAdmin.php', "<?php\nfinal class StoreAdmin {}", ProjectFileType::PHP];
         yield 'a sonata service outside admin paths is not a sonata admin' => ['src/Block/StatsBlock.php', "<?php\nuse Sonata\\AdminBundle\\Admin\\Pool;\nfinal class StatsBlock {}", ProjectFileType::PHP];
         yield 'use case by handler in a command directory outside an application layer' => ['src/Billing/Command/CancelSubscriptionHandler.php', "<?php\nfinal class CancelSubscriptionHandler {}", ProjectFileType::USE_CASE];
+        yield 'an event subscriber in a use case directory stays an event subscriber' => ['src/UseCase/OrderPlacedSubscriber.php', "<?php\nfinal class OrderPlacedSubscriber {}", ProjectFileType::EVENT_SUBSCRIBER];
+        yield 'a remote event consumer in an application layer stays a webhook consumer' => ['src/Application/StripeWebhookHandler.php', "<?php\nuse Symfony\\Component\\RemoteEvent\\Attribute\\AsRemoteEventConsumer;\n#[AsRemoteEventConsumer('stripe')]\nfinal class StripeWebhookHandler {}", ProjectFileType::WEBHOOK_CONSUMER];
         yield 'template by extension' => ['templates/user/index.html.twig', '{{ user.name }}', ProjectFileType::TEMPLATE];
         yield 'config by yaml extension' => ['config/security.yaml', 'security:', ProjectFileType::CONFIG];
         yield 'config by xml extension' => ['config/services.xml', '', ProjectFileType::CONFIG];
