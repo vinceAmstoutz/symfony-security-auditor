@@ -27,10 +27,12 @@ final readonly class AuthTestCommand
 
     public function __construct(
         private ConnectionCheckInterface $connectionCheck,
+        private ?ProviderSetupReader $providerSetupReader = null,
     ) {}
 
     public function __invoke(SymfonyStyle $symfonyStyle): int
     {
+        $this->providerSetupReader?->report($symfonyStyle);
         $failureReason = $this->connectionCheck->failureReason();
         if (null !== $failureReason) {
             $symfonyStyle->error(\sprintf(ConnectionProbe::FAILURE, $failureReason));

@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatformFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentWorkingDirectory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionClis;
 
 /**
  * The platforms that run a coding agent's CLI on the user's subscription
@@ -145,6 +146,18 @@ final readonly class CliAgentPlatforms
         return \is_string($platform) ? $platform : null;
     }
 
+    /**
+     * Returns the CLI an application's `cli_agent.cli_binary` names, if any.
+     *
+     * @param array<array-key, mixed> $config the processed bundle configuration
+     */
+    public static function cliBinaryIn(array $config): ?string
+    {
+        $cliBinary = \is_array($config['cli_agent'] ?? null) ? ($config['cli_agent']['cli_binary'] ?? null) : null;
+
+        return \is_string($cliBinary) ? $cliBinary : null;
+    }
+
     public static function serviceIdOf(string $platform): string
     {
         return \sprintf('%s%s', self::PLATFORM_SERVICE_PREFIX, $platform);
@@ -175,7 +188,7 @@ final readonly class CliAgentPlatforms
             $containerBuilder->register($workingDirectoryServiceId, CliAgentWorkingDirectory::class);
             $containerBuilder->register($cliServiceId, Platform::class)
                 ->setFactory([CliAgentPlatformFactory::class, 'create'])
-                ->setArguments([$factory, \is_array($settings) ? ($settings['cli_binary'] ?? null) : null, new Reference($workingDirectoryServiceId)]);
+                ->setArguments([$factory, \is_array($settings) ? ($settings['cli_binary'] ?? null) : null, new Reference($workingDirectoryServiceId), SubscriptionClis::bundled()->of($name)?->billingVariables() ?? []]);
             $containerBuilder->register($serviceId, CliAgentPlatform::class)
                 ->setArguments([new Reference($cliServiceId), new Reference($workingDirectoryServiceId), self::optionsOf($name, $settings), \in_array($name, self::SHARED_PROMPT_ARGUMENT, true)])
                 ->addTag(self::PLATFORM_TAG);
@@ -191,7 +204,7 @@ final readonly class CliAgentPlatforms
      */
     private static function optionsOf(string $name, mixed $settings): array
     {
-        $options = self::ISOLATING_OPTIONS[$name];
+        $options = [...self::ISOLATING_OPTIONS[$name], ...SubscriptionClis::bundled()->of($name)?->subscriptionOnlyOptions() ?? []];
         $effort = \is_array($settings) ? ($settings['effort'] ?? null) : null;
 
         if (!\is_string($effort)) {

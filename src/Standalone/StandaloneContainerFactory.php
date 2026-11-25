@@ -19,7 +19,9 @@ use RuntimeException;
 use Symfony\AI\AiBundle\AiBundle;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBag;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\Process\Process;
@@ -41,13 +43,21 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ProcessCliAgentAccountProbe;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionCliInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionClis;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\CredentialConsoleBanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\NullConsoleBanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\SubscriptionAccountGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\ProviderBridgeException;
@@ -120,6 +130,7 @@ final readonly class StandaloneContainerFactory
         $this->announceProjectConfigs($containerBuilder, $standaloneConfig);
         $this->registerAuditHeaderBanner($containerBuilder, $standaloneConfig->platform);
         $this->registerSubscriptionPricing($containerBuilder, CliAgentPlatforms::activeAgentOf($standaloneConfig->platform));
+        $this->registerSubscriptionAccountGuard($containerBuilder, $standaloneConfig->platform);
 
         $this->selectActivePlatform($containerBuilder, $standaloneConfig->platform);
         $this->auditAdvisoriesWithEmbeddedComposer($containerBuilder);
@@ -205,6 +216,23 @@ final readonly class StandaloneContainerFactory
         $containerBuilder->setAlias(PricingProviderInterface::class, NullPricingProvider::class);
         $containerBuilder->getDefinition(UnpricedModelBudgetGuard::class)->setArgument('$cliAgent', $cliAgent);
         $containerBuilder->getDefinition(AuditPresenter::class)->setArgument('$cliAgent', $cliAgent);
+        foreach ([ConsoleReportRenderer::class, MarkdownReportRenderer::class, HtmlReportRenderer::class] as $renderer) {
+            $containerBuilder->getDefinition($renderer)->setArgument('$subscription', SubscriptionClis::bundled()->of($cliAgent)?->subscription());
+        }
+    }
+
+    private function registerSubscriptionAccountGuard(ContainerBuilder $containerBuilder, StandalonePlatformConfig $standalonePlatformConfig): void
+    {
+        $cliAgent = CliAgentPlatforms::activeAgentOf($standalonePlatformConfig);
+        $subscriptionCli = null === $cliAgent ? null : SubscriptionClis::bundled()->of($cliAgent);
+        if (!$subscriptionCli instanceof SubscriptionCliInterface) {
+            return;
+        }
+
+        $settings = $standalonePlatformConfig->platform[$cliAgent] ?? null;
+        $containerBuilder->register(SubscriptionAccountGuard::class, SubscriptionAccountGuard::class)
+            ->setDecoratedService(UnpricedModelBudgetGuardInterface::class)
+            ->setArguments([new Reference('.inner'), new Definition($subscriptionCli::class), \is_array($settings) ? ($settings['cli_binary'] ?? null) : null, new Definition(ProcessCliAgentAccountProbe::class)]);
     }
 
     private function registerAuditHeaderBanner(ContainerBuilder $containerBuilder, StandalonePlatformConfig $standalonePlatformConfig): void

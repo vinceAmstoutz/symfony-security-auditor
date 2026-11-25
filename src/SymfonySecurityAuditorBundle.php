@@ -84,10 +84,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformAccoun
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformRequestConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformResilienceConfig;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ProcessCliAgentAccountProbe;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\RetryAfterHeaderParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionCliInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionClis;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ProviderTokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
@@ -96,11 +99,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\UsageBookingCl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfiguredAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\SubscriptionAccountGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
@@ -160,6 +168,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
 
         $services = $container->services();
         $this->registerSubscriptionPricing($services, $cliAgent);
+        $this->registerSubscriptionAccountGuard($services, $cliAgent, CliAgentPlatforms::cliBinaryIn($config));
         $this->registerBudget($services, $bundleConfiguration);
         $this->registerRateLimiter($services, $bundleConfiguration);
         $this->registerLlmClients($services, $bundleConfiguration, $platformServiceId);
@@ -242,6 +251,18 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         }
     }
 
+    private function registerSubscriptionAccountGuard(ServicesConfigurator $servicesConfigurator, ?string $cliAgent, ?string $cliBinary): void
+    {
+        $subscriptionCli = null === $cliAgent ? null : SubscriptionClis::bundled()->of($cliAgent);
+        if (!$subscriptionCli instanceof SubscriptionCliInterface) {
+            return;
+        }
+
+        $servicesConfigurator->set(SubscriptionAccountGuard::class)
+            ->decorate(UnpricedModelBudgetGuardInterface::class)
+            ->args([service('.inner'), inline_service($subscriptionCli::class), $cliBinary, inline_service(ProcessCliAgentAccountProbe::class)]);
+    }
+
     private function registerSubscriptionPricing(ServicesConfigurator $servicesConfigurator, ?string $cliAgent): void
     {
         if (null === $cliAgent) {
@@ -252,6 +273,9 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $servicesConfigurator->alias(PricingProviderInterface::class, NullPricingProvider::class);
         $servicesConfigurator->get(UnpricedModelBudgetGuard::class)->arg('$cliAgent', $cliAgent);
         $servicesConfigurator->get(AuditPresenter::class)->arg('$cliAgent', $cliAgent);
+        foreach ([ConsoleReportRenderer::class, MarkdownReportRenderer::class, HtmlReportRenderer::class] as $renderer) {
+            $servicesConfigurator->get($renderer)->arg('$subscription', SubscriptionClis::bundled()->of($cliAgent)?->subscription());
+        }
     }
 
     /**

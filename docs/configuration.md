@@ -512,6 +512,7 @@ reviewer_model: claude-haiku-5-5
 ```
 
 - **Requirements.** The `claude` CLI is installed and logged in to the subscription. On a CI runner, set the `CLAUDE_CODE_OAUTH_TOKEN` that `claude setup-token` prints. When `claude` is not on the `PATH`, name it with `cli_binary:` under `claudecode:`.
+- **Which account pays.** _Since 1.23_ the auditor starts `claude` without `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` or the `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX` and `CLAUDE_CODE_USE_FOUNDRY` switches. It also passes an empty `--setting-sources`, so no `apiKeyHelper` of a settings file applies: each call bills the subscription `claude` is logged in to. The audit header, `auth:status`, `auth:test` and `doctor` read `claude auth status` and name that account, with a warning when an API key still bills in its place, such as one set by managed settings. An audit refuses to start in that case or while `claude` is not logged in, so it never bills per call.
 - **Models.** _Since 1.23_ `init` offers Opus 5.5 to find the issues and Haiku 5.5 to review them; `--model` and `--reviewer-model` set them without asking. Afterwards, edit `model` and `reviewer_model`: any Claude model id works, as do Claude Code's aliases `opus`, `sonnet` and `haiku`.
 - **Effort.** _Since 1.23_ `init` asks the effort the CLI runs at, `medium` by default: `low`, `medium`, `high`, `xhigh` or `max`. Higher finds more and uses more of the plan. `--effort` sets it without asking. Afterwards, edit `effort:` under `claudecode:`; without it, the CLI keeps its own default. In a Symfony application, set it as `cli_agent.effort`.
 - **How each call runs.** The auditor starts `claude` with its built-in tools off and the MCP servers of the machine ignored, outside the audited project, so the code it reads cannot make it act. The attacker and the reviewer answer in JSON: `audit.tools_enabled`, `audit.structured_collection`, `audit.reviewer_tools_enabled` and `audit.reviewer_structured_collection` are set to `false`, so the model cannot open other files of the project during a chunk.
@@ -532,6 +533,7 @@ reviewer_model: gpt-6-luna
 ```
 
 - **Requirements.** The `codex` CLI is installed and logged in to the subscription. When `codex` is not on the `PATH`, name it with `cli_binary:` under `codex:`.
+- **Which account pays.** _Since 1.23_ the auditor starts `codex` without `CODEX_API_KEY` or `OPENAI_API_KEY`. A `codex login` made with an API key still bills that key: the audit header, `auth:status`, `auth:test` and `doctor` read `codex login status`, name the account each call bills and warn when it is an API key. An audit refuses to start in that case (run `codex logout`, then `codex login` with your ChatGPT account) or while `codex` is not logged in, so it never bills per call.
 - **Models.** _Since 1.23_ `init` offers GPT-6.2 Sol (`gpt-6.2-sol`) to find the issues and GPT-6 Luna (`gpt-6-luna`) to review them, GPT-6.2 Astra (`gpt-6.2-astra`) among the choices for the hardest projects; `--model` and `--reviewer-model` set them without asking. Afterwards, edit `model` and `reviewer_model`: any model id your Codex CLI runs works, not only the ones the bundled bridge lists.
 - **Effort.** _Since 1.23_ `init` asks the reasoning effort, `medium` by default: `low`, `medium`, `high`, `xhigh` or `max`, passed to Codex as `model_reasoning_effort`. `--effort` sets it without asking. Afterwards, edit `effort:` under `codex:`; without it, Codex keeps its own default.
 - **How each call runs.** The auditor runs `codex exec` read-only and outside the audited project, with its shell and web search off, the user's Codex configuration and rules ignored and nothing kept of the session. As with Claude Code, the attacker and the reviewer answer in JSON.
@@ -579,9 +581,9 @@ The prompt never echoes, so the key stays out of the terminal and the shell hist
 | Command | What it does |
 | --- | --- |
 | `auth:set` | Store or replace the key; `--env-var` targets a variable other than the configured one |
-| `auth:status` | Report the variable, the source, the masked key, its fingerprint and the file path, or (_since 1.23_) that the configured platform, such as a subscription or a local model, needs no key |
+| `auth:status` | _Since 1.23_, name the provider, the models and what each call bills: the key's variable, nothing for a local model, or the account a subscription's CLI is logged in to, with a warning when an API key bills in place of the subscription. Then report the variable, the source, the masked key, its fingerprint and the file path, or that the configured platform needs no key |
 | `auth:remove` | Forget the stored key (the key stays valid with your provider, so revoke it there too) |
-| `auth:test` | _Since 1.23._ Send one short test request (billed by a paid API, usually well under a cent) and say whether the provider answers; exits `1` with the provider's reason when it does not. Same check as `doctor --check-connection` |
+| `auth:test` | _Since 1.23._ Name the provider, the models and what each call bills, as `auth:status` does, then send one short test request (billed by a paid API, usually well under a cent) and say whether the provider answers; exits `1` with the provider's reason when it does not. Same check as `doctor --check-connection` |
 
 **Permissions.** The file is written `0600` in a `0700` directory. A file other users can read, or that is not valid JSON, is refused on read with a message telling you to rotate the key; `auth:set` and `auth:remove` still rewrite it. On Windows, which has no POSIX permission bits, the file relies on the ACL of `%APPDATA%`.
 
@@ -1031,7 +1033,7 @@ Checks that the [standalone binary](#standalone-configuration) is ready to audit
 symfony-security-auditor doctor
 ```
 
-It runs four checks and prints one line for each:
+It runs four checks and prints one line for each. _Since 1.23_ it adds a `Provider` line once a provider is configured:
 
 | Check | What it verifies |
 | --- | --- |
@@ -1039,6 +1041,7 @@ It runs four checks and prints one line for each:
 | Provider bridge | the bridge `init` installed is there, matches the binary's `symfony/ai-platform` release and boots the audit |
 | Composer | the Composer the binary bundles runs, for the `lookup_advisory` tool; `init` runs it too |
 | Pricing catalog | the `symfony/models-dev` catalog that prices the run is there |
+| Provider | _Since 1.23._ The provider, the models and what each call bills. On a subscription, the account `claude auth status` or `codex login status` reports: a **warning** when an API key the auditor cannot keep from the CLI (an API-key Codex login, a key of managed settings) bills in place of the subscription or the CLI cannot tell, a **failure** while the CLI is not logged in |
 
 A Composer that does not run or a missing pricing catalog is a **warning**; a bad configuration or bridge is a **failure**. The command exits `1` on a failure only, so it fits a CI preflight step:
 

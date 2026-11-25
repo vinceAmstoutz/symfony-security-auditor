@@ -55,6 +55,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ProcessCliAgentAccountProbe;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\OllamaPulledModelList;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricedModelList;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
@@ -89,6 +90,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnava
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ProcessComposerAvailabilityChecker;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ProviderSetupDoctor;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ProviderSetupReader;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrendAnalyzer;
@@ -260,9 +263,9 @@ final readonly class StandaloneApplicationFactory
         $standaloneApplication->addCommand($this->selfUpdateCommand());
         $standaloneApplication->addCommand($this->doctorCommand());
         $standaloneApplication->addCommand(new AuthSetCommand($this->credentialStore, $this->configuredCredentialVariable()));
-        $standaloneApplication->addCommand(new AuthStatusCommand($this->credentialStore, $this->configuredCredentialVariable(), $this->environment));
+        $standaloneApplication->addCommand(new AuthStatusCommand($this->credentialStore, $this->configuredCredentialVariable(), $this->environment, cliAgentAccountProbe: new ProcessCliAgentAccountProbe()));
         $standaloneApplication->addCommand(new AuthRemoveCommand($this->credentialStore, $this->configuredCredentialVariable()));
-        $standaloneApplication->addCommand(new AuthTestCommand(new StandaloneConnectionCheck($this->standaloneConfigLoader, $this->xdgConfigPathResolver, $this->standaloneContainerFactory)));
+        $standaloneApplication->addCommand(new AuthTestCommand(new StandaloneConnectionCheck($this->standaloneConfigLoader, $this->xdgConfigPathResolver, $this->standaloneContainerFactory), new ProviderSetupReader($this->configuredCredentialVariable(), new ProcessCliAgentAccountProbe())));
         $standaloneApplication->addCommand($this->lazyAuditCommand($standaloneApplication));
         $standaloneApplication->addCommand(new DiffCommand(new ReportDiffer(), new DiffPresenter()));
         $standaloneApplication->addCommand(new TrendCommand(new ReportTrendAnalyzer(new ReportDiffer()), new TrendPresenter()));
@@ -414,7 +417,7 @@ final readonly class StandaloneApplicationFactory
     private function doctorCommand(): DoctorCommand
     {
         return new DoctorCommand(
-            new EnvironmentDoctor(
+            new ProviderSetupDoctor(new EnvironmentDoctor(
                 $this->standaloneConfigLoader,
                 $this->xdgConfigPathResolver,
                 $this->composerAvailabilityChecker(),
@@ -426,7 +429,7 @@ final readonly class StandaloneApplicationFactory
                 ),
                 new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath()),
                 bundledAiPlatformVersion: $this->bundledAiPlatformVersion,
-            ),
+            ), $this->configuredCredentialVariable(), new ProcessCliAgentAccountProbe()),
             new StandaloneConnectionCheck($this->standaloneConfigLoader, $this->xdgConfigPathResolver, $this->standaloneContainerFactory),
         );
     }

@@ -8,6 +8,10 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ### New Features ✨
 
+- `auth:status`, `auth:test` and `doctor` name the provider, the models and what each call bills: the API key's variable, nothing for a local model, or for a subscription the account its CLI is logged in to. They warn when an API key still bills in place of the subscription, such as an API-key Codex login. `doctor` fails while the CLI is not logged in ([#724](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/724))
+- On a Claude or ChatGPT subscription the audit runs the CLI without `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, the Bedrock, Vertex AI and Foundry switches, `CODEX_API_KEY` or `OPENAI_API_KEY`. The Claude Code CLI also runs without its settings files, so an exported key or an `apiKeyHelper` never bills in place of the subscription ([#724](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/724))
+- `audit:run` on a subscription names the account its CLI bills in the header and refuses to start while an API key would bill in its place or the CLI is not logged in, so a subscription run is never billed per call ([#724](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/724))
+- On a subscription, the console, Markdown and HTML reports say the run is not priced per call and name the subscription, or an API key the CLI bills in its place, instead of the `no published pricing` note ([#724](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/724))
 - The standalone binary runs on a Claude subscription instead of an API key: `init --provider=claudecode` sets it up and each call goes through the installed Claude Code CLI with its own tools off, on Linux, macOS or WSL but not on Windows itself ([#677](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/677))
 - The standalone binary runs on a ChatGPT subscription too: `init --provider=codex` sets it up and each call goes through the installed Codex CLI, read-only and with its shell off ([#678](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/678))
 - The attacker's and the reviewer's answers are streamed on every platform whose bridge streams tool calls and reports a stream's usage (all but Vertex AI, Venice, Cohere, MiniMax, Bedrock and a `cli_agent`), so a proxy or gateway that closes an idle connection no longer cuts a long generation; findings and cost stay the same; a gateway that cannot stream is called without streaming ([#685](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/685))
@@ -58,6 +62,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ### Core 🧱
 
+- A configuration file whose YAML aliases expand past the value limit is refused with the same message on `symfony/yaml` 7.4.24 and later, which caps alias expansion itself ([#724](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/724))
 - `mcp:serve` runs on `mcp/sdk` `^0.10`, for the bundle and the standalone binary; in bundle mode an application holding `mcp/sdk` at 0.9 must let it move to 0.10 ([#703](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/703))
 - A provider failure that symfony/ai marks as retryable is retried whatever its message says, so a provider rewording an error no longer stops a run that would have recovered ([#686](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/686))
 - Cached attacker answers refresh once after upgrading. The longer hunting instructions raise the attacker's input tokens, by about a third on a small project where they outweigh the code ([#693](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/693))

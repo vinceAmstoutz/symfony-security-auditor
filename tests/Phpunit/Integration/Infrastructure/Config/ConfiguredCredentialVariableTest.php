@@ -18,6 +18,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredCredentialVariable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 
 final class ConfiguredCredentialVariableTest extends TestCase
@@ -82,6 +83,34 @@ final class ConfiguredCredentialVariableTest extends TestCase
     public function test_it_names_no_variable_when_no_configuration_directory_can_be_resolved(): void
     {
         self::assertNull((new ConfiguredCredentialVariable(new XdgConfigPathResolver(null, null, null)))->name());
+    }
+
+    public function test_it_names_no_provider_among_several_platforms_none_selects(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n    openai:\n        api_key: '%env(OPENAI_API_KEY)%'\n");
+
+        self::assertNull($this->configuredCredentialVariable()->provider());
+    }
+
+    public function test_it_names_the_only_platform_as_the_provider(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: '%env(OPENAI_API_KEY)%'\n");
+
+        self::assertEquals(new ConfiguredProvider('openai', takesApiKey: true, apiKeyVariable: 'OPENAI_API_KEY'), $this->configuredCredentialVariable()->provider());
+    }
+
+    public function test_it_reads_the_cli_the_subscription_runs(): void
+    {
+        $this->writeConfig("provider: claudecode\nplatform:\n    claudecode: { cli_binary: /opt/claude/bin/claude, effort: low }\nmodel: opus\n");
+
+        self::assertEquals(new ConfiguredProvider('claudecode', 'opus', effort: 'low', cliBinary: '/opt/claude/bin/claude'), $this->configuredCredentialVariable()->provider());
+    }
+
+    public function test_it_reads_a_blank_model_as_none(): void
+    {
+        $this->writeConfig("provider: claudecode\nplatform:\n    claudecode: {}\nmodel: ''\n");
+
+        self::assertNull($this->configuredCredentialVariable()->provider()?->model);
     }
 
     private function writeConfig(string $contents): void

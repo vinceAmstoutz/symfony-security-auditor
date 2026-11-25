@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Standalone;
 
 use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\Exception\ExceedContextSizeException;
@@ -65,6 +66,34 @@ final class CodexPlatformTest extends TestCase
         $this->invoke([]);
 
         self::assertSame('drwx------', trim((string) file_get_contents($this->workingDirectory.'/cwd-mode')));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function variablesThatBillInPlaceOfTheSubscription(): iterable
+    {
+        yield 'a Codex API key' => ['CODEX_API_KEY'];
+        yield 'an OpenAI API key' => ['OPENAI_API_KEY'];
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[DataProvider('variablesThatBillInPlaceOfTheSubscription')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_codex_cli_never_sees_a_variable_that_bills_in_place_of_the_subscription(string $variable): void
+    {
+        putenv(\sprintf('%s=1', $variable));
+        $_SERVER[$variable] = '1';
+        $this->invoke([]);
+
+        self::assertStringNotContainsString(\sprintf('%s=', $variable), (string) file_get_contents($this->environmentFile()));
     }
 
     /**
@@ -194,10 +223,15 @@ final class CodexPlatformTest extends TestCase
     private function fakeCli(): string
     {
         $cli = $this->workingDirectory.'/codex';
-        (new Filesystem())->dumpFile($cli, \sprintf("#!/bin/sh\npwd -P > %s\nls -ld . | cut -c1-10 > %s\nprintf '%%s\\0' \"\$@\" > %s\necho '%s'\n", escapeshellarg($this->workingDirectory.'/cwd'), escapeshellarg($this->workingDirectory.'/cwd-mode'), escapeshellarg($this->argumentsFile()), self::ANSWER));
+        (new Filesystem())->dumpFile($cli, \sprintf("#!/bin/sh\npwd -P > %s\nls -ld . | cut -c1-10 > %s\nprintf '%%s\\0' \"\$@\" > %s\nenv > %s\necho '%s'\n", escapeshellarg($this->workingDirectory.'/cwd'), escapeshellarg($this->workingDirectory.'/cwd-mode'), escapeshellarg($this->argumentsFile()), escapeshellarg($this->environmentFile()), self::ANSWER));
         (new Filesystem())->chmod($cli, 0o755);
 
         return $cli;
+    }
+
+    private function environmentFile(): string
+    {
+        return $this->workingDirectory.'/environment';
     }
 
     private function argumentsFile(): string
