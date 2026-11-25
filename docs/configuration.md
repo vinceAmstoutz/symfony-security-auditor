@@ -1036,10 +1036,10 @@ It runs four checks and prints one line for each:
 | --- | --- |
 | Configuration | `config.yaml` resolves, holds a `platform:` block and sets every `%env(...)%` variable of the selected platform (an unset key is reported as `API key`); a key that resolves is shown masked, with a pointer to `auth:status` (_since 1.23_) for where it comes from |
 | Provider bridge | the bridge `init` installed is there, matches the binary's `symfony/ai-platform` release and boots the audit |
-| Composer | `composer` is on the host, for the `lookup_advisory` tool only; `init` uses its own |
+| Composer | the Composer the binary bundles runs, for the `lookup_advisory` tool; `init` runs it too |
 | Pricing catalog | the `symfony/models-dev` catalog that prices the run is there |
 
-A missing `composer` or pricing catalog is a **warning**; a bad configuration or bridge is a **failure**. The command exits `1` on a failure only, so it fits a CI preflight step:
+A Composer that does not run or a missing pricing catalog is a **warning**; a bad configuration or bridge is a **failure**. The command exits `1` on a failure only, so it fits a CI preflight step:
 
 ```bash
 symfony-security-auditor doctor && symfony-security-auditor audit path/to/app

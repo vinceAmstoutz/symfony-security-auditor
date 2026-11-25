@@ -428,7 +428,7 @@ symfony_security_auditor:
 
 The audit goes on without CVE data and logs a `warning`. Fix the cause:
 
-- **`composer` not in `PATH`**: install Composer 2.4+ on the audit host. `doctor` checks it in the standalone binary.
+- **`composer` not in `PATH`** (bundle only): install Composer 2.4+ on the audit host. The standalone binary runs the Composer it bundles; `doctor` checks it.
 - **`composer.lock` missing, over 8 MiB or a symlink leaving the project**: run `composer install` and keep the lockfile a regular file (a symlink to one inside the project works).
 - **Malformed output**: regenerate the corrupted `composer.lock`.
 - **Advisories of a private repository missing**: the audited project's `composer.json` and `auth.json` are not read. Configure the repository in the global Composer configuration (`COMPOSER_HOME`) of the user running the audit.

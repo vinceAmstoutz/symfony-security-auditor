@@ -355,6 +355,9 @@ jobs:
           PATH="$empty_path" SYMFONY_SECURITY_AUDITOR_HOME="$binary_home" SSA_NO_UPDATE_CHECK=1 \
             ./"$ASSET" init --no-interaction --provider=anthropic --model=claude-opus-5-5 --env-var=ANTHROPIC_API_KEY
           test -f "$ssa_home/.local/share/symfony-security-auditor/vendor/symfony/ai-anthropic-platform/composer.json"
+          doctor_output="$(PATH="$empty_path" SYMFONY_SECURITY_AUDITOR_HOME="$binary_home" SSA_NO_UPDATE_CHECK=1 ./"$ASSET" doctor --no-ansi || true)"
+          printf '%s\n' "$doctor_output"
+          printf '%s\n' "$doctor_output" | grep -F '[OK] Composer: Available.'
 
       - name: Generate the SHA-256 checksum
         run: |

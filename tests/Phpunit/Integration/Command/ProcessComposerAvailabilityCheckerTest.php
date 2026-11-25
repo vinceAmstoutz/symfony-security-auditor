@@ -15,7 +15,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPhar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\EmbeddedComposer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\SelfInvocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerProbe;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ProcessComposerAvailabilityChecker;
 
@@ -89,5 +94,66 @@ final class ProcessComposerAvailabilityCheckerTest extends TestCase
         self::assertStringContainsString("'composer'", $commandLine);
         self::assertStringContainsString("'--version'", $commandLine);
         self::assertSame(30.0, $process->getTimeout());
+    }
+
+    public function test_embedded_process_builder_probes_the_composer_the_binary_bundles(): void
+    {
+        $dataHome = sys_get_temp_dir().'/ssa-composer-probe-'.bin2hex(random_bytes(6));
+        $fixturePhar = __DIR__.'/../../../Fixture/Composer/composer.phar';
+        $processComposerAvailabilityChecker = new ProcessComposerAvailabilityChecker(ProcessComposerAvailabilityChecker::embeddedProcessBuilder(
+            new EmbeddedComposer(
+                new SelfInvocation(\dirname(__DIR__, 4).'/bin/symfony-security-auditor', 'cli', \PHP_BINARY),
+                new ComposerPhar($fixturePhar, (string) hash_file('sha256', $fixturePhar)),
+            ),
+            new XdgConfigPathResolver(null, null, null, $dataHome),
+        ));
+
+        try {
+            self::assertEquals(ComposerProbe::available(), $processComposerAvailabilityChecker->probe());
+            self::assertFileExists(\sprintf('%s/symfony-security-auditor/.composer/composer-2.8.12-%s/bin/composer', $dataHome, substr((string) hash_file('sha256', $fixturePhar), 0, 12)));
+        } finally {
+            (new Filesystem())->remove($dataHome);
+        }
+    }
+
+    public function test_it_reports_why_the_composer_the_binary_bundles_cannot_be_unpacked(): void
+    {
+        $dataHome = sys_get_temp_dir().'/ssa-composer-probe-'.bin2hex(random_bytes(6));
+        $processComposerAvailabilityChecker = new ProcessComposerAvailabilityChecker(ProcessComposerAvailabilityChecker::embeddedProcessBuilder(
+            new EmbeddedComposer(new SelfInvocation('/opt/symfony-security-auditor', 'cli', '/usr/bin/php'), new ComposerPhar('/nonexistent/composer.phar')),
+            new XdgConfigPathResolver(null, null, null, $dataHome),
+        ));
+
+        try {
+            self::assertStringContainsString('"/nonexistent/composer.phar" does not exist', $processComposerAvailabilityChecker->probe()->failure);
+        } finally {
+            (new Filesystem())->remove($dataHome);
+        }
+    }
+
+    public function test_it_reports_the_composer_the_binary_bundles_unavailable_when_no_home_directory_resolves(): void
+    {
+        $processComposerAvailabilityChecker = new ProcessComposerAvailabilityChecker(ProcessComposerAvailabilityChecker::embeddedProcessBuilder(
+            new EmbeddedComposer(new SelfInvocation('/opt/symfony-security-auditor', 'cli', '/usr/bin/php'), new ComposerPhar('/nonexistent/composer.phar')),
+            new XdgConfigPathResolver(null, null, null),
+        ));
+
+        self::assertFalse($processComposerAvailabilityChecker->probe()->isAvailable);
+    }
+
+    public function test_embedded_process_builder_probes_with_a_timeout(): void
+    {
+        $dataHome = sys_get_temp_dir().'/ssa-composer-probe-'.bin2hex(random_bytes(6));
+        $fixturePhar = __DIR__.'/../../../Fixture/Composer/composer.phar';
+        $processBuilder = ProcessComposerAvailabilityChecker::embeddedProcessBuilder(
+            new EmbeddedComposer(new SelfInvocation('/opt/symfony-security-auditor', 'cli', '/usr/bin/php'), new ComposerPhar($fixturePhar, (string) hash_file('sha256', $fixturePhar))),
+            new XdgConfigPathResolver(null, null, null, $dataHome),
+        );
+
+        try {
+            self::assertSame(30.0, $processBuilder()->getTimeout());
+        } finally {
+            (new Filesystem())->remove($dataHome);
+        }
     }
 }

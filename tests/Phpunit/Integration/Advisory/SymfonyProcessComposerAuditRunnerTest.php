@@ -14,9 +14,14 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Advisory;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPhar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\EmbeddedComposer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\SelfInvocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class SymfonyProcessComposerAuditRunnerTest extends TestCase
@@ -164,5 +169,112 @@ final class SymfonyProcessComposerAuditRunnerTest extends TestCase
         $this->expectExceptionMessageContaining('composer audit timed out after 0.1 seconds');
 
         $symfonyProcessComposerAuditRunner->run('/app');
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_embedded_process_builder_audits_with_the_composer_the_binary_bundles(): void
+    {
+        $workspace = sys_get_temp_dir().'/ssa-embedded-audit-'.bin2hex(random_bytes(6));
+        $fixturePhar = __DIR__.'/../../../Fixture/Composer/composer.phar';
+        $symfonyProcessComposerAuditRunner = new SymfonyProcessComposerAuditRunner(processBuilder: SymfonyProcessComposerAuditRunner::embeddedProcessBuilder(new EmbeddedComposer(
+            new SelfInvocation(\dirname(__DIR__, 4).'/bin/symfony-security-auditor', 'cli', \PHP_BINARY),
+            new ComposerPhar($fixturePhar, (string) hash_file('sha256', $fixturePhar)),
+        ), new XdgConfigPathResolver(null, null, null, $workspace.'/data')));
+
+        try {
+            self::assertSame('fixture composer', $symfonyProcessComposerAuditRunner->run($workspace));
+        } finally {
+            (new Filesystem())->remove($workspace);
+        }
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_a_bundled_composer_that_cannot_be_unpacked_leaves_the_advisory_source_unavailable(): void
+    {
+        $workspace = sys_get_temp_dir().'/ssa-embedded-audit-'.bin2hex(random_bytes(6));
+        $symfonyProcessComposerAuditRunner = new SymfonyProcessComposerAuditRunner(processBuilder: SymfonyProcessComposerAuditRunner::embeddedProcessBuilder(new EmbeddedComposer(
+            new SelfInvocation('/opt/symfony-security-auditor', 'cli', '/usr/bin/php'),
+            new ComposerPhar($workspace.'/missing/composer.phar'),
+        ), new XdgConfigPathResolver(null, null, null, $workspace.'/data')));
+
+        $this->expectException(AdvisorySourceUnavailableException::class);
+        $this->expectExceptionMessageContaining('missing/composer.phar');
+
+        $symfonyProcessComposerAuditRunner->run($workspace);
+    }
+
+    public function test_embedded_process_builder_keeps_the_users_composer_home(): void
+    {
+        $workspace = sys_get_temp_dir().'/ssa-embedded-audit-'.bin2hex(random_bytes(6));
+        $fixturePhar = __DIR__.'/../../../Fixture/Composer/composer.phar';
+        $processBuilder = SymfonyProcessComposerAuditRunner::embeddedProcessBuilder(new EmbeddedComposer(
+            new SelfInvocation('/opt/symfony-security-auditor', 'cli', '/usr/bin/php'),
+            new ComposerPhar($fixturePhar, (string) hash_file('sha256', $fixturePhar)),
+        ), new XdgConfigPathResolver(null, null, null, $workspace.'/data'));
+
+        try {
+            $env = $processBuilder($workspace)->getEnv();
+        } finally {
+            (new Filesystem())->remove($workspace);
+        }
+
+        self::assertSame([], array_intersect_key($env, ['COMPOSER_HOME' => true, 'COMPOSER_CACHE_DIR' => true]));
+    }
+
+    public function test_embedded_process_builder_audits_in_the_directory_it_is_given(): void
+    {
+        $workspace = sys_get_temp_dir().'/ssa-embedded-audit-'.bin2hex(random_bytes(6));
+        $fixturePhar = __DIR__.'/../../../Fixture/Composer/composer.phar';
+        $processBuilder = SymfonyProcessComposerAuditRunner::embeddedProcessBuilder(new EmbeddedComposer(
+            new SelfInvocation('/opt/symfony-security-auditor', 'cli', '/usr/bin/php'),
+            new ComposerPhar($fixturePhar, (string) hash_file('sha256', $fixturePhar)),
+        ), new XdgConfigPathResolver(null, null, null, $workspace.'/data'));
+
+        try {
+            $workingDirectory = $processBuilder($workspace)->getWorkingDirectory();
+        } finally {
+            (new Filesystem())->remove($workspace);
+        }
+
+        self::assertSame($workspace, $workingDirectory);
+    }
+
+    public function test_embedded_process_builder_unpacks_composer_in_the_data_directory_not_in_the_workspace(): void
+    {
+        $directory = sys_get_temp_dir().'/ssa-embedded-audit-'.bin2hex(random_bytes(6));
+        $fixturePhar = __DIR__.'/../../../Fixture/Composer/composer.phar';
+        $processBuilder = SymfonyProcessComposerAuditRunner::embeddedProcessBuilder(
+            new EmbeddedComposer(new SelfInvocation('/opt/symfony-security-auditor', 'cli', '/usr/bin/php'), new ComposerPhar($fixturePhar, (string) hash_file('sha256', $fixturePhar))),
+            new XdgConfigPathResolver(null, null, null, $directory.'/data'),
+        );
+
+        try {
+            $processBuilder($directory.'/workspace');
+            $unpacked = [is_dir($directory.'/workspace/.composer'), is_dir($directory.'/data/symfony-security-auditor/.composer')];
+        } finally {
+            (new Filesystem())->remove($directory);
+        }
+
+        self::assertSame([false, true], $unpacked);
+    }
+
+    /**
+     * @throws AdvisorySourceUnavailableException
+     */
+    public function test_no_home_directory_leaves_the_advisory_source_unavailable(): void
+    {
+        $fixturePhar = __DIR__.'/../../../Fixture/Composer/composer.phar';
+        $symfonyProcessComposerAuditRunner = new SymfonyProcessComposerAuditRunner(processBuilder: SymfonyProcessComposerAuditRunner::embeddedProcessBuilder(
+            new EmbeddedComposer(new SelfInvocation('/opt/symfony-security-auditor', 'cli', '/usr/bin/php'), new ComposerPhar($fixturePhar, (string) hash_file('sha256', $fixturePhar))),
+            new XdgConfigPathResolver(null, null, null),
+        ));
+
+        $this->expectException(AdvisorySourceUnavailableException::class);
+
+        $symfonyProcessComposerAuditRunner->run(sys_get_temp_dir());
     }
 }

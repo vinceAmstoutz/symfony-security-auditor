@@ -20,6 +20,10 @@ use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\EmbeddedComposer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 
 use function Symfony\Component\String\u;
 
@@ -36,6 +40,8 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
 {
     public const int DEFAULT_TIMEOUT_SECONDS = 60;
 
+    private const array AUDIT_ARGUMENTS = ['audit', '--format=json', '--locked', '--no-interaction', '--no-scripts', '--no-plugins'];
+
     /**
      * @param ?Closure(string): Process $processBuilder defaults to {@see self::defaultProcessBuilder()}
      */
@@ -49,10 +55,28 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
      */
     public static function defaultProcessBuilder(): Closure
     {
-        return static fn (string $path): Process => new Process(
-            ['composer', 'audit', '--format=json', '--locked', '--no-interaction', '--no-scripts', '--no-plugins'],
-            $path,
-        );
+        return static fn (string $path): Process => new Process(['composer', ...self::AUDIT_ARGUMENTS], $path);
+    }
+
+    /**
+     * Runs the bundled Composer, unpacked where `init` unpacks it, so the
+     * audited directory holds none of it.
+     *
+     * @return Closure(string): Process the closure throws {@see AdvisorySourceUnavailableException} when the bundled Composer cannot be unpacked or no home directory resolves
+     */
+    public static function embeddedProcessBuilder(EmbeddedComposer $embeddedComposer, XdgConfigPathResolver $xdgConfigPathResolver): Closure
+    {
+        return static function (string $path) use ($embeddedComposer, $xdgConfigPathResolver): Process {
+            try {
+                $process = $embeddedComposer->process(\sprintf('%s/.composer', $xdgConfigPathResolver->dataDir()), self::AUDIT_ARGUMENTS);
+            } catch (BridgeInstallationFailedException|UnresolvableConfigPathException $exception) {
+                throw AdvisorySourceUnavailableException::forProcessSetupFailure($exception);
+            }
+
+            $process->setWorkingDirectory($path);
+
+            return $process;
+        };
     }
 
     #[Override]

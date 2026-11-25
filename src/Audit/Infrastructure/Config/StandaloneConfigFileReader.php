@@ -18,6 +18,7 @@ use RecursiveArrayIterator;
 use RecursiveIteratorIterator;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Exception\ParseException;
+use Symfony\Component\Yaml\Parser;
 use Symfony\Component\Yaml\Yaml;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 
@@ -34,6 +35,12 @@ final readonly class StandaloneConfigFileReader
      * than any configuration holds.
      */
     public const int VALUE_LIMIT = 10_000;
+
+    /**
+     * An alias shares its anchor's values, so expanding one costs nothing:
+     * VALUE_LIMIT, checked once the file is parsed, caps what is walked.
+     */
+    private const int UNCAPPED_ALIASES = \PHP_INT_MAX;
 
     private const int MAX_BYTES = 524_288;
 
@@ -59,7 +66,7 @@ final readonly class StandaloneConfigFileReader
         $this->assertParseable($configFile);
 
         try {
-            $parsed = Yaml::parseFile($configFile);
+            $parsed = Yaml::parseFile($configFile, 0, Parser::DEFAULT_MAX_NESTING_LEVEL, self::UNCAPPED_ALIASES);
         } catch (ParseException $parseException) {
             throw MalformedProjectConfigException::fromParseException($configFile, $parseException);
         }

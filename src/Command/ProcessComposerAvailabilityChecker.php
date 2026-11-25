@@ -17,7 +17,11 @@ use Closure;
 use Override;
 use Symfony\Component\Process\Exception\ExceptionInterface;
 use Symfony\Component\Process\Process;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\EmbeddedComposer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\TerminalText;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 
 use function Symfony\Component\String\b;
 use function Symfony\Component\String\u;
@@ -55,14 +59,28 @@ final readonly class ProcessComposerAvailabilityChecker implements ComposerAvail
         };
     }
 
+    /**
+     * Probes the Composer this binary bundles, unpacked where `init` unpacks it.
+     *
+     * @return Closure(): Process the closure throws {@see BridgeInstallationFailedException} when that Composer cannot be unpacked and {@see UnresolvableConfigPathException} when no home directory resolves
+     */
+    public static function embeddedProcessBuilder(EmbeddedComposer $embeddedComposer, XdgConfigPathResolver $xdgConfigPathResolver): Closure
+    {
+        return static function () use ($embeddedComposer, $xdgConfigPathResolver): Process {
+            $process = $embeddedComposer->process(\sprintf('%s/.composer', $xdgConfigPathResolver->dataDir()), ['--version']);
+            $process->setTimeout(self::PROCESS_TIMEOUT_SECONDS);
+
+            return $process;
+        };
+    }
+
     #[Override]
     public function probe(): ComposerProbe
     {
-        $process = ($this->processBuilder)();
-
         try {
+            $process = ($this->processBuilder)();
             $process->run();
-        } catch (ExceptionInterface $exception) {
+        } catch (BridgeInstallationFailedException|ExceptionInterface|UnresolvableConfigPathException $exception) {
             return ComposerProbe::unavailable($this->printable($exception->getMessage()));
         }
 

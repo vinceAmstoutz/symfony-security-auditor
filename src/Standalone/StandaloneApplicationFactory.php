@@ -29,6 +29,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeTree;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BundledAiPlatformVersion;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPhar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\EmbeddedComposer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\StaleBridgeTreeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\SelfInvocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditedProjectConfig;
@@ -128,6 +129,7 @@ final readonly class StandaloneApplicationFactory
         private CredentialStoreInterface $credentialStore = new NullCredentialStore(),
         private array $environment = [],
         private ?string $bundledAiPlatformVersion = null,
+        private ?EmbeddedComposer $embeddedComposer = null,
     ) {}
 
     /**
@@ -151,6 +153,7 @@ final readonly class StandaloneApplicationFactory
         $pendingBinarySwap = new PendingBinarySwap();
         $filesystemCredentialStore = new FilesystemCredentialStore($xdgConfigPathResolver);
         $bundledAiPlatformVersion = BundledAiPlatformVersion::detect();
+        $embeddedComposer = EmbeddedComposer::bundled(new SelfInvocation($resolvedBinaryPath), new ComposerPhar(ComposerPhar::bundledPath()));
 
         return new self(
             new StandaloneConfigLoader(
@@ -160,6 +163,7 @@ final readonly class StandaloneApplicationFactory
             ),
             $xdgConfigPathResolver,
             $bridgeInstaller ?? self::bridgeInstaller($resolvedBinaryPath, $bundledAiPlatformVersion),
+            StandaloneContainerFactory::withEmbeddedComposer($embeddedComposer, $xdgConfigPathResolver),
             runningBinaryPath: $resolvedBinaryPath,
             pathEnvironment: $pathEnvironment,
             updateAvailabilityConsoleListener: self::updateAvailabilityConsoleListener(
@@ -173,6 +177,7 @@ final readonly class StandaloneApplicationFactory
             credentialStore: $filesystemCredentialStore,
             environment: $environment,
             bundledAiPlatformVersion: $bundledAiPlatformVersion,
+            embeddedComposer: $embeddedComposer,
         );
     }
 
@@ -299,7 +304,9 @@ final readonly class StandaloneApplicationFactory
 
     private function composerAvailabilityChecker(): ComposerAvailabilityCheckerInterface
     {
-        return new ProcessComposerAvailabilityChecker(ProcessComposerAvailabilityChecker::defaultProcessBuilder());
+        return new ProcessComposerAvailabilityChecker($this->embeddedComposer instanceof EmbeddedComposer
+            ? ProcessComposerAvailabilityChecker::embeddedProcessBuilder($this->embeddedComposer, $this->xdgConfigPathResolver)
+            : ProcessComposerAvailabilityChecker::defaultProcessBuilder());
     }
 
     private function configuredCredentialVariable(): ConfiguredCredentialVariable
