@@ -15,11 +15,13 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge;
 
 use Override;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPhar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge\Fixture\CopyCountingFilesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge\Fixture\PharRemovalRefusingFilesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge\Fixture\PharUnpackRefusingFilesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge\Fixture\RaceLosingFilesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge\Fixture\RenameRefusingFilesystem;
@@ -148,6 +150,35 @@ final class ComposerPharTest extends TestCase
         (new ComposerPhar(self::FIXTURE_PHAR, (string) hash_file('sha256', self::FIXTURE_PHAR)))->in($this->directory.'/.composer');
 
         self::assertSame([], glob($this->directory.'/.composer/*.phar'));
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_runs_composer_when_the_copy_of_the_phar_cannot_be_deleted(): void
+    {
+        $composerPhar = new ComposerPhar(self::FIXTURE_PHAR, (string) hash_file('sha256', self::FIXTURE_PHAR), new PharRemovalRefusingFilesystem());
+
+        self::assertStringEqualsFile($composerPhar->in($this->directory.'/.composer'), "<?php echo \"fixture composer\";\n");
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_logs_the_copy_of_the_phar_it_could_not_delete(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('info')->with(
+            'Kept the copy of composer.phar the system refused to delete.',
+            self::callback(fn (array $context): bool => ['path', 'reason'] === array_keys($context)
+                && \is_string($context['path'])
+                && \is_string($context['reason'])
+                && str_starts_with($context['path'], $this->directory.'/.composer/composer-2.8.12-')
+                && str_ends_with($context['path'], '.phar')
+                && str_ends_with($context['reason'], 'Permission denied.')),
+        );
+
+        (new ComposerPhar(self::FIXTURE_PHAR, (string) hash_file('sha256', self::FIXTURE_PHAR), new PharRemovalRefusingFilesystem(), $logger))->in($this->directory.'/.composer');
     }
 
     public function test_it_keeps_no_copy_of_the_phar_when_composer_cannot_be_unpacked(): void

@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge;
 
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
@@ -37,6 +39,7 @@ final readonly class ComposerPhar
         private string $bundledPhar,
         private string $sha256 = self::SHA256,
         private Filesystem $filesystem = new Filesystem(),
+        private LoggerInterface $logger = new NullLogger(),
     ) {}
 
     public static function bundledPath(): string
@@ -81,7 +84,7 @@ final readonly class ComposerPhar
     }
 
     /**
-     * Deletes the staged copy of the phar, which PHP closes once its last stream is.
+     * Deletes the staged copy of the phar where the system allows it.
      *
      * @throws BridgeInstallationFailedException
      * @throws IOException
@@ -93,7 +96,19 @@ final readonly class ComposerPhar
             $this->assertPinnedRelease($path);
             $this->filesystem->mirror(\sprintf('phar://%s', $path), $staging);
         } finally {
+            $this->discardStagedCopy($path);
+        }
+    }
+
+    /**
+     * Keeps a copy Windows refuses to delete while this process still holds it.
+     */
+    private function discardStagedCopy(string $path): void
+    {
+        try {
             $this->filesystem->remove($path);
+        } catch (IOException $ioException) {
+            $this->logger->info('Kept the copy of composer.phar the system refused to delete.', ['path' => $path, 'reason' => $ioException->getMessage()]);
         }
     }
 
