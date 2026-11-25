@@ -126,8 +126,9 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             'findings' => \count($reviewCandidates),
         ]);
 
-        $reviewed = $this->reviewPersistingOnAbort($reviewCandidates, $files, $auditContext);
-        $newFindings = $this->persistReviewedFindings($this->mergeRecoveredFindings($reviewed, $auditContext->drainReviewedFindings()), $auditContext, self::byId($staticCandidates));
+        $staticCandidatesById = self::byId($staticCandidates);
+        $reviewed = $this->reviewPersistingOnAbort($reviewCandidates, $staticCandidatesById, $files, $auditContext);
+        $newFindings = $this->persistReviewedFindings($this->mergeRecoveredFindings($reviewed, $auditContext->drainReviewedFindings()), $auditContext, $staticCandidatesById);
 
         $acceptedCount = \count(array_filter(
             $reviewed,
@@ -185,23 +186,51 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
     }
 
     /**
-     * @param list<Vulnerability> $findings
-     * @param list<ProjectFile>   $files
+     * @param list<Vulnerability>          $findings
+     * @param array<string, Vulnerability> $staticCandidatesById
+     * @param list<ProjectFile>            $files
      *
      * @return list<Vulnerability>
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
-    private function reviewPersistingOnAbort(array $findings, array $files, AuditContext $auditContext): array
+    private function reviewPersistingOnAbort(array $findings, array $staticCandidatesById, array $files, AuditContext $auditContext): array
     {
         try {
-            return $this->reviewerAgent->review($findings, $files, $auditContext, $auditContext->isCacheBypassed(), $this->auditLoopSettings->toolFiles($auditContext));
+            return $this->review($findings, $staticCandidatesById, $files, $auditContext);
         } catch (BudgetExceededException|LLMProviderException $exception) {
             $this->persistReviewedFindings($auditContext->drainReviewedFindings(), $auditContext);
 
             throw $exception;
         }
+    }
+
+    /**
+     * Reviews the static candidates among `$findings` with the others of
+     * their file, so each file is sent once.
+     *
+     * @param list<Vulnerability>          $findings
+     * @param array<string, Vulnerability> $staticCandidatesById
+     * @param list<ProjectFile>            $files
+     *
+     * @return list<Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    private function review(array $findings, array $staticCandidatesById, array $files, AuditContext $auditContext): array
+    {
+        $isStaticCandidate = static fn (Vulnerability $vulnerability): bool => \array_key_exists($vulnerability->id(), $staticCandidatesById);
+
+        return $this->reviewerAgent->review(
+            array_values(array_filter($findings, static fn (Vulnerability $vulnerability): bool => !$isStaticCandidate($vulnerability))),
+            $files,
+            $auditContext,
+            $auditContext->isCacheBypassed(),
+            $this->auditLoopSettings->toolFiles($auditContext),
+            array_values(array_filter($findings, $isStaticCandidate)),
+        );
     }
 
     /**
@@ -296,7 +325,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         ]);
 
         try {
-            $reviewed = $this->reviewerAgent->review($filtered, $files, $auditContext, $auditContext->isCacheBypassed(), $this->auditLoopSettings->toolFiles($auditContext));
+            $reviewed = $this->review($filtered, self::byId($staticCandidates), $files, $auditContext);
         } catch (BudgetExceededException|LLMProviderException) {
             $this->persistReviewedFindings($auditContext->drainReviewedFindings(), $auditContext);
 

@@ -24,12 +24,14 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\AuditOrchestratorHarness;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\FailingLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingLLMClient;
@@ -193,6 +195,36 @@ final class AuditOrchestratorStaticCandidateTest extends TestCase
 
         self::assertSame(1, $auditContext->getMeta('audit.iterations'));
         self::assertSame(['Static analysis: native query concat'], $this->validatedTitles($auditContext));
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_static_candidates_of_one_file_are_reviewed_in_one_call(): void
+    {
+        $first = $this->staticCandidate(10);
+        $second = $this->staticCandidate(20, 'Static analysis: unserialize call', vulnerabilityType: VulnerabilityType::INSECURE_DESERIALIZATION);
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn(AuditOrchestratorHarness::attackerResponse([]));
+        $reviewerLlm = $this->createMock(LLMClientInterface::class);
+        $reviewerLlm->expects(self::once())->method('complete')->willReturn(LLMResponse::of(
+            (string) json_encode([['id' => $first->id(), 'accepted' => true], ['id' => $second->id(), 'accepted' => true]]),
+            'test',
+            'end_turn',
+            TokenUsageSnapshot::of(0, 0),
+        ));
+
+        $auditContext = $this->contextWith([$first, $second]);
+        AuditOrchestratorHarness::orchestrator($attackerLlm, $reviewerLlm)->orchestrate($auditContext);
+
+        self::assertEqualsCanonicalizing(['Static analysis: native query concat', 'Static analysis: unserialize call'], $this->validatedTitles($auditContext));
     }
 
     /**

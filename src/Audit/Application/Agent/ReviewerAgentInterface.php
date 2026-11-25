@@ -26,8 +26,9 @@ interface ReviewerAgentInterface
      * @param ?list<ProjectFile>  $toolFiles       the files the investigation tools may open and a finding in
      *                                             them is reviewed against, when not the audited files; null
      *                                             means `$projectFiles`
+     * @param list<Vulnerability> $fileGroupedFindings findings reviewed with the others of their file in one call, so the file is sent once
      *
      * @return list<Vulnerability>
      */
-    public function review(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false, ?array $toolFiles = null): array;
+    public function review(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false, ?array $toolFiles = null, array $fileGroupedFindings = []): array;
 }
