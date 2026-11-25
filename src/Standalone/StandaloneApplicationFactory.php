@@ -81,6 +81,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerAvailabilityCheckerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ConfiguredModelCheck;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
@@ -429,6 +430,10 @@ final readonly class StandaloneApplicationFactory
                 ),
                 new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath()),
                 bundledAiPlatformVersion: $this->bundledAiPlatformVersion,
+                configuredModelCheck: new ConfiguredModelCheck(
+                    new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath())),
+                    new OllamaPulledModelList(HttpClient::create(['timeout' => 3])),
+                ),
             ), $this->configuredCredentialVariable(), new ProcessCliAgentAccountProbe()),
             new StandaloneConnectionCheck($this->standaloneConfigLoader, $this->xdgConfigPathResolver, $this->standaloneContainerFactory),
         );

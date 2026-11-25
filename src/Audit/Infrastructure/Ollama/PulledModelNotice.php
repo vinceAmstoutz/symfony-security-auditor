@@ -38,7 +38,7 @@ final readonly class PulledModelNotice
      *
      * @param list<string> $pulledModels
      */
-    public static function isPulled(string $model, array $pulledModels): bool
+    private function isPulled(string $model, array $pulledModels): bool
     {
         return \in_array($model, $pulledModels, true) || \in_array($model.self::DEFAULT_TAG, $pulledModels, true);
     }
@@ -55,7 +55,7 @@ final readonly class PulledModelNotice
 
         $notices = [];
         foreach ($this->models as $model) {
-            if (!self::isPulled($model, $pulledModels)) {
+            if (!$this->isPulled($model, $pulledModels)) {
                 $notices[] = \sprintf('The Ollama server at %s has not pulled the model "%s", so every call with it will fail. Run "ollama pull %2$s", or configure one of the models it pulled: %s.', $this->endpoint, $model, implode(', ', $pulledModels));
             }
         }
