@@ -32,7 +32,7 @@ final readonly class UnifiedDiff
 
     private const string HUNK_LINE = '/^(?:[-+ ]|@@)/';
 
-    private const string HUNK_LINE_AFTER_A_BLANK_LINE = '/^(?: |@@)/';
+    private const string NEW_HUNK = '/^@@/';
 
     private const string HUNK_HEADER = '/^@@ -(\d+)(?:,(\d+))? \+\d+(?:,(\d+))? @@/';
 
@@ -118,7 +118,7 @@ final readonly class UnifiedDiff
             return false;
         }
 
-        $pattern = self::holdsABlankLine($lines, $from, $next) ? self::HUNK_LINE_AFTER_A_BLANK_LINE : self::HUNK_LINE;
+        $pattern = self::holdsABlankLine($lines, $from, $next) ? self::NEW_HUNK : self::HUNK_LINE;
 
         return 1 === preg_match($pattern, $lines[$next]) && !self::isFileHeader($lines, $next);
     }

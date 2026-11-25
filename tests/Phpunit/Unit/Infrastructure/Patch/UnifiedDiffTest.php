@@ -71,8 +71,8 @@ final class UnifiedDiffTest extends TestCase
         yield 'no patch at all' => ['NO_FIX: the code is fine'];
         yield 'a blank line between two hunks' => ["--- a/x.php\n+++ b/x.php\n@@ -1,2 +1,2 @@\n a\n-b\n+B\n\n@@ -10,2 +10,2 @@\n x\n-y\n+Y\n"];
         yield 'an added line past what its header counts' => ["--- a/x.php\n+++ b/x.php\n@@ -1,2 +1,2 @@\n a\n-b\n+c\n+d\n e"];
-        yield 'a context line after a blank line past its count' => ["--- a/x.php\n+++ b/x.php\n@@ -1 +1 @@\n-a\n+b\n\n c"];
         yield 'a removed line after the no newline marker' => ["--- a/x.php\n+++ b/x.php\n@@ -1 +1 @@\n-a\n+b\n\\ No newline at end of file\n-c"];
+        yield 'an added line right after a hunk holding an empty line, before a note' => ["--- a/x.php\n+++ b/x.php\n@@ -1,3 +1,3 @@\n-a\n+b\n\n c\n+d\n\nThat is all."];
         yield 'prose inside a hunk' => ["--- a/x.php\n+++ b/x.php\n@@ -1,2 +1,2 @@\n a\nThen change b:\n-b\n+c"];
     }
 
@@ -102,6 +102,8 @@ final class UnifiedDiffTest extends TestCase
         yield 'lines added after line 2' => ["--- a/x.php\n+++ b/x.php\n@@ -2,0 +3,2 @@\n+a\n+b", [new FilePatch('x.php', [new DiffHunk(3, [], ['a', 'b'])])]];
         yield 'an empty context line written without its space' => ["--- a/x.php\n+++ b/x.php\n@@ -1,3 +1,3 @@\n-a\n+b\n\n c", [new FilePatch('x.php', [new DiffHunk(1, ['a', '', 'c'], ['b', '', 'c'])])]];
         yield 'a markdown bullet after a blank line past the patch' => ["--- a/x.php\n+++ b/x.php\n@@ -1 +1 @@\n-a\n+b\n\n- This also escapes the title", [new FilePatch('x.php', [new DiffHunk(1, ['a'], ['b'])])]];
+        yield 'an indented note after a blank line past the patch' => ["--- a/x.php\n+++ b/x.php\n@@ -1 +1 @@\n-a\n+b\n\n  Note: this also covers the edit form", [new FilePatch('x.php', [new DiffHunk(1, ['a'], ['b'])])]];
+        yield 'a line read as prose after a blank line past the patch' => ["--- a/x.php\n+++ b/x.php\n@@ -1 +1 @@\n-a\n+b\n\n c", [new FilePatch('x.php', [new DiffHunk(1, ['a'], ['b'])])]];
         yield 'a last line with no newline' => ["--- a/x.php\n+++ b/x.php\n@@ -1 +1 @@\n-a\n\\ No newline at end of file\n+b\n\\ No newline at end of file", [new FilePatch('x.php', [new DiffHunk(1, ['a'], ['b'])])]];
         yield 'windows line endings and a dated header' => ["--- a/x.php\t2026-11-01\r\n+++ b/x.php\t2026-11-01\r\n@@ -1 +1 @@\r\n-a\r\n+b\r\n", [new FilePatch('x.php', [new DiffHunk(1, ['a'], ['b'])])]];
     }
