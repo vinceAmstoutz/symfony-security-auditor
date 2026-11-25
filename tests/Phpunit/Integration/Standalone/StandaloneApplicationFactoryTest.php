@@ -27,7 +27,10 @@ use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPhar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\EmbeddedComposer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\StaleBridgeTreeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\SelfInvocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
@@ -741,6 +744,23 @@ final class StandaloneApplicationFactoryTest extends TestCase
             [$statusCode, str_contains((string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay()), 'was installed for symfony/ai-platform v0.12.0, but this binary bundles v0.14.1')],
             $applicationTester->getDisplay(),
         );
+    }
+
+    public function test_doctor_probes_the_composer_the_binary_bundles(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, $this->cacheHome, null, $this->cacheHome.'/data');
+        $standaloneApplication = (new StandaloneApplicationFactory(
+            new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver([])),
+            $xdgConfigPathResolver,
+            self::createStub(BridgeInstallerInterface::class),
+            embeddedComposer: new EmbeddedComposer(new SelfInvocation('/opt/symfony-security-auditor'), new ComposerPhar('/nonexistent/composer.phar')),
+        ))->create();
+        $standaloneApplication->setAutoExit(false);
+
+        $applicationTester = new ApplicationTester($standaloneApplication);
+        $applicationTester->run(['command' => 'doctor']);
+
+        self::assertStringContainsString('"/nonexistent/composer.phar" does not exist', (string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay()));
     }
 
     /**

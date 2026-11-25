@@ -27,6 +27,11 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPhar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\EmbeddedComposer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\SelfInvocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditedProjectConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
@@ -81,6 +86,35 @@ final class StandaloneContainerFactoryTest extends TestCase
         );
 
         self::assertInstanceOf(AuditCommand::class, $containerBuilder->get(AuditCommand::class));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     * @throws AdvisorySourceUnavailableException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_advisory_lookup_audits_with_the_composer_the_binary_bundles(): void
+    {
+        $fixturePhar = __DIR__.'/../../../Fixture/Composer/composer.phar';
+        $embeddedComposer = new EmbeddedComposer(
+            new SelfInvocation(\dirname(__DIR__, 4).'/bin/symfony-security-auditor', 'cli', \PHP_BINARY),
+            new ComposerPhar($fixturePhar, (string) hash_file('sha256', $fixturePhar)),
+        );
+        (new Filesystem())->dumpFile($this->cacheDir.'/project/composer.lock', '{"packages": []}');
+
+        $containerBuilder = (new StandaloneContainerFactory(embeddedComposer: $embeddedComposer))->create(
+            new StandaloneConfig(['cache' => ['enabled' => false]], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]])),
+            $this->cacheDir,
+        );
+        $composerAuditRunner = $containerBuilder->get(ComposerAuditRunnerInterface::class);
+        self::assertInstanceOf(ComposerAuditRunnerInterface::class, $composerAuditRunner);
+
+        self::assertSame('fixture composer', $composerAuditRunner->run($this->cacheDir.'/project'));
     }
 
     /**

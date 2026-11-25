@@ -20,6 +20,8 @@ use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\EmbeddedComposer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 
 use function Symfony\Component\String\u;
 
@@ -36,6 +38,8 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
 {
     public const int DEFAULT_TIMEOUT_SECONDS = 60;
 
+    private const array AUDIT_ARGUMENTS = ['audit', '--format=json', '--locked', '--no-interaction', '--no-scripts', '--no-plugins'];
+
     /**
      * @param ?Closure(string): Process $processBuilder defaults to {@see self::defaultProcessBuilder()}
      */
@@ -49,10 +53,28 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
      */
     public static function defaultProcessBuilder(): Closure
     {
-        return static fn (string $path): Process => new Process(
-            ['composer', 'audit', '--format=json', '--locked', '--no-interaction', '--no-scripts', '--no-plugins'],
-            $path,
-        );
+        return static fn (string $path): Process => new Process(['composer', ...self::AUDIT_ARGUMENTS], $path);
+    }
+
+    /**
+     * Unpacks the bundled Composer into the audited directory's `.composer`,
+     * which a private workspace keeps from other runs.
+     *
+     * @return Closure(string): Process the closure throws {@see AdvisorySourceUnavailableException} when the bundled Composer cannot be unpacked
+     */
+    public static function embeddedProcessBuilder(EmbeddedComposer $embeddedComposer): Closure
+    {
+        return static function (string $path) use ($embeddedComposer): Process {
+            try {
+                $process = $embeddedComposer->process(\sprintf('%s/.composer', $path), self::AUDIT_ARGUMENTS);
+            } catch (BridgeInstallationFailedException $bridgeInstallationFailedException) {
+                throw AdvisorySourceUnavailableException::forProcessSetupFailure($bridgeInstallationFailedException);
+            }
+
+            $process->setWorkingDirectory($path);
+
+            return $process;
+        };
     }
 
     #[Override]

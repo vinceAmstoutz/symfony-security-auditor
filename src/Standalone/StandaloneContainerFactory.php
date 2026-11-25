@@ -25,6 +25,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\EmbeddedComposer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterSyntax;
@@ -62,6 +65,7 @@ final readonly class StandaloneContainerFactory
     public function __construct(
         private BundleExtensionLoader $bundleExtensionLoader = new BundleExtensionLoader(),
         private OfflineOnlyPlatformGuard $offlineOnlyPlatformGuard = new OfflineOnlyPlatformGuard(),
+        private ?EmbeddedComposer $embeddedComposer = null,
     ) {}
 
     /**
@@ -100,14 +104,26 @@ final readonly class StandaloneContainerFactory
         $this->registerSubscriptionPricing($containerBuilder, CliAgentPlatforms::activeAgentOf($standaloneConfig->platform));
 
         $this->selectActivePlatform($containerBuilder, $standaloneConfig->platform);
+        $this->auditAdvisoriesWithEmbeddedComposer($containerBuilder);
 
         $containerBuilder->getDefinition(AuditCommand::class)->setPublic(true);
         $containerBuilder->getDefinition(McpServeCommand::class)->setPublic(true);
         $containerBuilder->getAlias(LLMClientInterface::class)->setPublic(true);
+        $containerBuilder->getAlias(ComposerAuditRunnerInterface::class)->setPublic(true);
         $containerBuilder->addCompilerPass(new PricingPlatformPass(PlatformInterface::class));
         $containerBuilder->compile(true);
 
         return $containerBuilder;
+    }
+
+    private function auditAdvisoriesWithEmbeddedComposer(ContainerBuilder $containerBuilder): void
+    {
+        if (!$this->embeddedComposer instanceof EmbeddedComposer) {
+            return;
+        }
+
+        $containerBuilder->getDefinition(SymfonyProcessComposerAuditRunner::class)
+            ->setArgument('$processBuilder', SymfonyProcessComposerAuditRunner::embeddedProcessBuilder($this->embeddedComposer));
     }
 
     /**

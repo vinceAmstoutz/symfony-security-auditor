@@ -40,6 +40,11 @@ final readonly class ComposerPhar
         return \sprintf('%s/resources/composer.phar', \dirname(__DIR__, 4));
     }
 
+    public function isBundled(): bool
+    {
+        return is_file($this->bundledPhar);
+    }
+
     /**
      * @return string Composer's entry script, unpacked from the PHAR, which Composer refuses to run from on phpmicro
      *
@@ -50,7 +55,7 @@ final readonly class ComposerPhar
         $path = \sprintf('%s/composer.phar', $directory);
         $unpacked = \sprintf('%s/composer', $directory);
 
-        if (!is_file($this->bundledPhar)) {
+        if (!$this->isBundled()) {
             throw BridgeInstallationFailedException::forUnbundledComposerPhar(self::VERSION, $this->bundledPhar);
         }
 

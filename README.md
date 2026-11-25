@@ -61,7 +61,7 @@ One install, many projects, zero footprint in the audited app. Each release ship
 
 ### Requirements
 
-Nothing but the binary and access to a model: an API key, a Claude or ChatGPT subscription through its CLI, or a [local model](#supported-platforms) such as Ollama. No PHP or Composer: the one-time [`init`](#2-configure-the-guided-init) fetches the provider bridge with the Composer the binary bundles. `--since` needs `git`. Live CVE lookups use `composer audit` when `composer` is present.
+Nothing but the binary and access to a model: an API key, a Claude or ChatGPT subscription through its CLI, or a [local model](#supported-platforms) such as Ollama. No PHP or Composer: the one-time [`init`](#2-configure-the-guided-init) fetches the provider bridge with the Composer the binary bundles. `--since` needs `git`. Live CVE lookups run `composer audit` with that bundled Composer too.
 
 ### 1. Install
 
