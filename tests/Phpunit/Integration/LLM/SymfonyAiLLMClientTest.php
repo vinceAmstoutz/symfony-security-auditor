@@ -2557,7 +2557,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         );
 
         $this->expectException(NonTransientLLMFailureException::class);
-        $this->expectExceptionMessage(\sprintf('The provider does not know the model "qwen9": %s. Set model: in the standalone config.yaml or run init --model=<model id>, or set symfony_security_auditor.model in a Symfony application.', $failure->getMessage()));
+        $this->expectExceptionMessageContaining(\sprintf('The provider does not know the model "qwen9": %s. Set model: in the standalone config.yaml or run init --model=<model id>, or set symfony_security_auditor.model in a Symfony application.', $failure->getMessage()));
 
         $symfonyAiLLMClient->complete('sys', 'usr');
     }
