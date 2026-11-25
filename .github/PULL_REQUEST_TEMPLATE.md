@@ -1,7 +1,7 @@
 ## Summary
 
 <!--
-The user-visible outcome, in 500 characters or fewer, under a title of 50 or fewer. Then a "Closes #123" or "Refs #123" line when an issue is involved. For a stacked pull request, add a "Stacked on #123" line with the code this one needs from it. The CHANGELOG entry carries the details. CI checks this description: run .github/scripts/check-pull-request.sh before opening the pull request (see CONTRIBUTING.md).
+The user-visible outcome, in 750 characters or fewer, under a title of 50 or fewer. Then a "Closes #123" or "Refs #123" line when an issue is involved. For a stacked pull request, add a "Stacked on #123" line with the code this one needs from it. The CHANGELOG entry carries the details. CI checks this description: run .github/scripts/check-pull-request.sh before opening the pull request (see CONTRIBUTING.md).
 -->
 
 ## Type of change
