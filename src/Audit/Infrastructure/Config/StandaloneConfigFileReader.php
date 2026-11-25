@@ -44,6 +44,12 @@ final readonly class StandaloneConfigFileReader
 
     private const int MAX_BYTES = 524_288;
 
+    /**
+     * How symfony/yaml 7.4.24 and later word the refusal of a file whose
+     * aliases expand past its own limit, before this reader counts the values.
+     */
+    private const string PARSER_ALIAS_LIMIT = 'Maximum number of nodes expanded by collection aliases';
+
     private const int MAX_DEPTH = 32;
 
     /**
@@ -68,7 +74,7 @@ final readonly class StandaloneConfigFileReader
         try {
             $parsed = Yaml::parseFile($configFile, 0, Parser::DEFAULT_MAX_NESTING_LEVEL, self::UNCAPPED_ALIASES);
         } catch (ParseException $parseException) {
-            throw MalformedProjectConfigException::fromParseException($configFile, $parseException);
+            throw str_contains($parseException->getMessage(), self::PARSER_ALIAS_LIMIT) ? MalformedProjectConfigException::forOversizedConfig($configFile, self::VALUE_LIMIT) : MalformedProjectConfigException::fromParseException($configFile, $parseException);
         }
 
         if (!\is_array($parsed)) {

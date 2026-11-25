@@ -242,4 +242,18 @@ return [
         'reason' => 'The html report and trend page open with the console banner and use its pink and navy colours, which rewrites their markup and stylesheet.',
         'changelog' => '#720',
     ],
+    [
+        'scenarios' => ['standalone/auth-status-environment', 'standalone/auth-status-stored', 'standalone/auth-status-other-variable', 'standalone/auth-status-invalid-name'],
+        'path' => 'runs.0.stdout.lines',
+        'match' => '/^\\+(?: -{10} -+| {2}(?:Provider|Model|Billing) {3,}.+)?$/',
+        'reason' => 'auth:status first names the provider, the models and what each call bills.',
+        'changelog' => '#724',
+    ],
+    [
+        'scenarios' => ['standalone/auth-remove'],
+        'path' => 'runs.1.stdout.lines',
+        'match' => '/^\\+(?: -{10} -+| {2}(?:Provider|Model|Billing) {3,}.+)?$/',
+        'reason' => 'auth:status first names the provider, the models and what each call bills.',
+        'changelog' => '#724',
+    ],
 ];

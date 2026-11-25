@@ -23,9 +23,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
  */
 final readonly class CostRateLabel
 {
-    public static function of(AuditCost $auditCost): string
+    /**
+     * @param ?string $subscription the subscription a coding agent's CLI ran the audit on, such as "your Claude subscription", which is not priced per call
+     */
+    public static function of(AuditCost $auditCost, ?string $subscription = null): string
     {
-        $rates = $auditCost->hasPublishedPricing() ? 'published rates' : 'no published pricing, or a self-hosted model';
+        $rates = match (true) {
+            null !== $subscription => \sprintf('not priced per call: billed to %s, or to an API key the CLI uses in its place', $subscription),
+            $auditCost->hasPublishedPricing() => 'published rates',
+            default => 'no published pricing, or a self-hosted model',
+        };
 
         return match ($auditCost->interruptedCalls()) {
             0 => $rates,

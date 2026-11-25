@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentAccountProbeInterface;
 
 /** @internal not part of the BC promise: the command *name* (`auth:status`) is public, but the PHP class itself is for internal use only. */
 #[AsCommand(name: self::NAME, description: self::DESCRIPTION)]
@@ -45,6 +46,7 @@ final readonly class AuthStatusCommand
         private ConfiguredCredentialVariable $configuredCredentialVariable,
         private array $environment = [],
         private Filesystem $filesystem = new Filesystem(),
+        private ?CliAgentAccountProbeInterface $cliAgentAccountProbe = null,
     ) {}
 
     /**
@@ -59,10 +61,12 @@ final readonly class AuthStatusCommand
             return Command::FAILURE;
         }
 
+        $providerSetup = (new ProviderSetupReader($this->configuredCredentialVariable, $this->cliAgentAccountProbe))->report($symfonyStyle);
+
         $placeholder = $this->configuredCredentialVariable->placeholder();
         $variableName = $envVar ?? $placeholder?->variableName;
         if (null === $variableName) {
-            return $this->reportWithoutVariable($symfonyStyle);
+            return $this->reportWithoutVariable($symfonyStyle, $providerSetup);
         }
 
         if (EnvironmentVariableRefusal::reported($symfonyStyle, $variableName)) {
@@ -81,10 +85,12 @@ final readonly class AuthStatusCommand
             : $this->reportResolved($symfonyStyle, $variableName, $exported, self::ENVIRONMENT_SOURCE, $shadowsStoredCredential);
     }
 
-    private function reportWithoutVariable(SymfonyStyle $symfonyStyle): int
+    private function reportWithoutVariable(SymfonyStyle $symfonyStyle, ?ProviderSetup $providerSetup): int
     {
         if ($this->configuredCredentialVariable->platformNeedsNoApiKey()) {
-            $symfonyStyle->success('The configured platform needs no API key, so an audit uses none.');
+            $symfonyStyle->success(true === $providerSetup?->runsOnACli()
+                ? 'The auditor stores no API key for this provider: its CLI bills the account under Billing.'
+                : 'The configured platform needs no API key, so an audit uses none.');
 
             return Command::SUCCESS;
         }

@@ -38,10 +38,11 @@ final readonly class CliAgentPlatformFactory
 
     /**
      * @param class-string<ClaudeCodeFactory>|class-string<CodexFactory> $bridgeFactory
+     * @param list<string>                                               $removedVariables the variables the CLI must not see
      */
-    public static function create(string $bridgeFactory, ?string $cliBinary, CliAgentWorkingDirectory $cliAgentWorkingDirectory): Platform
+    public static function create(string $bridgeFactory, ?string $cliBinary, CliAgentWorkingDirectory $cliAgentWorkingDirectory, array $removedVariables = []): Platform
     {
-        return $bridgeFactory::createPlatform($cliBinary, $cliAgentWorkingDirectory->path, modelCatalog: self::modelCatalogFor($bridgeFactory));
+        return $bridgeFactory::createPlatform($cliBinary, $cliAgentWorkingDirectory->path, environment: array_fill_keys($removedVariables, false), modelCatalog: self::modelCatalogFor($bridgeFactory));
     }
 
     /**

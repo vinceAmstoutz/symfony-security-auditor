@@ -671,6 +671,18 @@ final class ConsoleReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditCostException
      * @throws InvalidAuditContextException
      */
+    public function test_render_says_a_run_on_a_subscription_is_not_priced_per_call(): void
+    {
+        $auditReport = $this->makeReportWithCost(AuditCost::of(100, 50, 0.0, 'claude-opus-5-5'));
+        $output = (new ConsoleReportRenderer(subscription: 'your Claude subscription'))->render($auditReport);
+
+        self::assertStringContainsString('$0.0000 (not priced per call: billed to your Claude subscription, or to an API key the CLI uses in its place)', $output);
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     * @throws InvalidAuditContextException
+     */
     public function test_render_substitutes_actual_model_name_when_primary_model_is_set(): void
     {
         $auditReport = $this->makeReportWithCost(AuditCost::of(100, 50, 0.05, 'claude-opus-4-7'));

@@ -70,10 +70,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAudit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ToolsScope;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
@@ -120,6 +125,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\Re
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfiguredAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NestingDepthGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
@@ -242,7 +251,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
      * @throws LLMProviderException
      */
     #[RunInSeparateProcess]
-    #[MaximumDuration(4000)]
+    #[MaximumDuration(8000)]
     public function test_the_auditor_runs_on_the_claude_code_cli_its_cli_agent_names(): void
     {
         $kernel = $this->boot(['model' => 'opus', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
@@ -265,6 +274,50 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $commandTester->execute(['project-path' => $this->tmpDir.'/project', '--dry-run' => true], ['interactive' => false]);
 
         self::assertStringContainsString('The audit runs on a subscription through the Codex CLI, which is not priced per call', (string) preg_replace('/[\s!]+/', ' ', $commandTester->getDisplay()));
+    }
+
+    /**
+     * @return iterable<string, array{class-string<ReportRendererInterface>}>
+     */
+    public static function costLabellingRenderers(): iterable
+    {
+        yield 'console' => [ConsoleReportRenderer::class];
+        yield 'markdown' => [MarkdownReportRenderer::class];
+        yield 'html' => [HtmlReportRenderer::class];
+    }
+
+    /**
+     * @param class-string<ReportRendererInterface> $rendererClass
+     *
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    #[DataProvider('costLabellingRenderers')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_cli_agent_report_says_it_is_not_priced_per_call(string $rendererClass): void
+    {
+        $kernel = $this->boot(['model' => 'claude-opus-5-5', 'cli_agent' => ['platform' => 'codex', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
+        $reportRenderer = $this->getPrivateService($kernel, $rendererClass);
+        self::assertInstanceOf(ReportRendererInterface::class, $reportRenderer);
+
+        self::assertStringContainsString('not priced per call: billed to your ChatGPT subscription, or to an API key the CLI uses in its place', $reportRenderer->render(AuditReport::fromContext(AuditContext::forProject($this->tmpDir), AuditCost::of(100, 50, 0.0, 'gpt-6-luna'))));
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_cli_agent_run_names_the_subscription_its_cli_bills(): void
+    {
+        $kernel = $this->boot(['model' => 'claude-opus-5-5', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
+        $unpricedModelBudgetGuard = $this->getPrivateService($kernel, UnpricedModelBudgetGuardInterface::class);
+        self::assertInstanceOf(UnpricedModelBudgetGuardInterface::class, $unpricedModelBudgetGuard);
+        $input = new ArrayInput([]);
+        $input->setInteractive(false);
+
+        $bufferedOutput = new BufferedOutput();
+        $unpricedModelBudgetGuard->permitsRun($input, new SymfonyStyle($input, $bufferedOutput));
+
+        self::assertStringContainsString('Billing: your Claude subscription (pro plan)', (string) preg_replace('/\s+/', ' ', $bufferedOutput->fetch()));
     }
 
     #[RunInSeparateProcess]
@@ -2591,7 +2644,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     private function fakeClaudeCli(): string
     {
         $cli = $this->tmpDir.'/claude';
-        (new Filesystem())->dumpFile($cli, "#!/bin/sh\necho '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"OK\",\"usage\":{\"input_tokens\":3,\"output_tokens\":1}}'\n");
+        (new Filesystem())->dumpFile($cli, "#!/bin/sh\nif [ \"\$1\" = auth ]; then echo '{\"loggedIn\":true,\"subscriptionType\":\"pro\"}'; exit 0; fi\necho '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"OK\",\"usage\":{\"input_tokens\":3,\"output_tokens\":1}}'\n");
         (new Filesystem())->chmod($cli, 0o755);
 
         return $cli;

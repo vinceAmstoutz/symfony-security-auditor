@@ -75,6 +75,26 @@ final readonly class ConfiguredCredentialVariable
     }
 
     /**
+     * Returns the provider `provider:` selects, else the only platform the
+     * configuration declares, else null.
+     */
+    public function provider(): ?ConfiguredProvider
+    {
+        $parsed = $this->parsedConfig();
+        $platform = $parsed['platform'] ?? null;
+        if (!\is_array($platform)) {
+            return null;
+        }
+
+        $name = $this->activeProvider($parsed) ?? (1 === \count($platform) ? (string) array_key_first($platform) : null);
+        if (null === $name) {
+            return null;
+        }
+
+        return ConfiguredProvider::of($name, $parsed, PlatformApiKey::blockForProvider($platform, $name) ?? []);
+    }
+
+    /**
      * @param array<array-key, mixed> $parsed
      */
     private function activeProvider(array $parsed): ?string

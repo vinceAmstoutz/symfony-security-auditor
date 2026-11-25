@@ -217,6 +217,17 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
      * @throws InvalidAuditCostException
      * @throws InvalidAuditContextException
      */
+    public function test_render_says_a_run_on_a_subscription_is_not_priced_per_call(): void
+    {
+        $output = (new HtmlReportRenderer(subscription: 'your ChatGPT subscription'))->render($this->makeReportWithCost(AuditCost::of(100, 50, 0.0, 'gpt-6-luna')));
+
+        self::assertStringContainsString('$0.0000 (not priced per call: billed to your ChatGPT subscription, or to an API key the CLI uses in its place)', $output);
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     * @throws InvalidAuditContextException
+     */
     public function test_render_states_the_cost_is_a_minimum_when_calls_were_cut_before_their_answer_ended(): void
     {
         $output = $this->renderer->render($this->makeReportWithCost(AuditCost::of(100, 50, 0.0, 'ollama/llama3.2')->withInterruptedCalls(3)));
