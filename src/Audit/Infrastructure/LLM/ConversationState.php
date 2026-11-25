@@ -21,8 +21,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 /**
  * The state of one tool conversation. `$roundsLeft` counts the round in
  * flight; `$askedToRead` tells whether the model called a tool that does not
- * record. `$bag` is appended in place; every other change returns a new
- * instance.
+ * record; `$capRaised` whether `$options` carry the output cap raised for a
+ * cut tool call, which no later round raises again. `$bag` is appended in
+ * place; every other change returns a new instance.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -43,6 +44,7 @@ final readonly class ConversationState
         public int $estimatedInputTokens,
         public int $roundsLeft = 0,
         public bool $askedToRead = false,
+        public bool $capRaised = false,
     ) {}
 
     /**
@@ -99,6 +101,7 @@ final readonly class ConversationState
             $this->estimatedInputTokens,
             $this->roundsLeft,
             $this->askedToRead,
+            $this->capRaised,
         );
     }
 
@@ -116,6 +119,7 @@ final readonly class ConversationState
             $this->estimatedInputTokens,
             $this->roundsLeft,
             $this->askedToRead,
+            $this->capRaised,
         );
     }
 
@@ -133,6 +137,28 @@ final readonly class ConversationState
             $this->estimatedInputTokens + $estimatedToolResultTokens,
             $this->roundsLeft,
             $this->askedToRead || $askedToRead,
+            $this->capRaised,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $raisedOptions
+     */
+    public function withRaisedCap(array $raisedOptions): self
+    {
+        return new self(
+            $this->bag,
+            $raisedOptions,
+            $this->input,
+            $this->output,
+            $this->cacheRead,
+            $this->cacheCreation,
+            $this->toolsRan,
+            $this->response,
+            $this->estimatedInputTokens,
+            $this->roundsLeft,
+            $this->askedToRead,
+            true,
         );
     }
 
@@ -150,6 +176,7 @@ final readonly class ConversationState
             $this->estimatedInputTokens,
             $roundsLeft,
             $this->askedToRead,
+            $this->capRaised,
         );
     }
 }
