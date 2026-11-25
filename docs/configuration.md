@@ -191,7 +191,7 @@ Each model is priced from the `symfony/models-dev` listing of the platform the a
 
 Cache reads and writes are billed at the model's own cache rates (for Anthropic, reads at `0.1x` and writes at `1.25x` the input rate, `2x` with `cache_retention: long`), so the budget and `estimated_cost_usd` reflect the discounted spend.
 
-_Since 1.23_ every call streams its answer, so a proxy that closes idle connections no longer cuts a long generation. Vertex AI, Venice, Cohere, MiniMax, Bedrock and `cli_agent` stay buffered, as does a gateway that cannot stream. When a call is cut mid-answer, the report states its cost as a minimum and counts it in `cost.interrupted_calls`.
+_Since 1.23_ every call streams its answer, so a proxy that closes idle connections no longer cuts a long generation. Vertex AI, Venice, Cohere, MiniMax, Bedrock and `cli_agent` stay buffered, as does a gateway that cannot stream. A gateway whose stream reports no usage is switched to buffered calls after its first call, which is booked at its estimated input. When a call is cut mid-answer, or a streamed call fails without the usage it reported, the report states its cost as a minimum and counts it in `cost.interrupted_calls`.
 
 ### `privacy.*`: data egress
 

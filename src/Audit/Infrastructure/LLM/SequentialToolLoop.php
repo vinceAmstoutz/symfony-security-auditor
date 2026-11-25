@@ -187,7 +187,7 @@ final readonly class SequentialToolLoop
         return FinalRound::settled(LLMResponse::of(
             $content,
             $this->model,
-            $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
+            $this->platformResultExtractor->extractStopReason($deferredResult),
             $conversationState->tokenUsage(),
         ), $roundsLeft, $conversationState->askedToRead);
     }

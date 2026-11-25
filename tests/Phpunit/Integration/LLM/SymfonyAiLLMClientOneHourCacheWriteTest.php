@@ -17,6 +17,7 @@ use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\AI\Platform\Bridge\Anthropic\Factory;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
 use Symfony\AI\Platform\Exception\RuntimeException as PlatformRuntimeException;
 use Symfony\AI\Platform\PlainConverter;
@@ -27,6 +28,8 @@ use Symfony\AI\Platform\Result\ResultInterface;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Result\ToolCallResult;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
@@ -42,6 +45,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformAccoun
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformRequestConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformResilienceConfig;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\StreamingPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\AnthropicUsageExtractor;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FakeSleeper;
@@ -86,6 +90,32 @@ final class SymfonyAiLLMClientOneHourCacheWriteTest extends TestCase
     {
         yield 'every write kept for an hour' => [0, 40000, 0.243036];
         yield 'writes kept for five minutes and for an hour' => [10000, 30000, 0.220536];
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws NegativeTokenCountException
+     */
+    public function test_complete_prices_the_one_hour_cache_writes_a_streamed_anthropic_answer_reports_at_twice_the_input_rate(): void
+    {
+        $usage = $this->anthropicMessage(40000, ['cache_creation' => ['ephemeral_5m_input_tokens' => 0, 'ephemeral_1h_input_tokens' => 40000]])['usage'];
+        self::assertIsArray($usage);
+        $events = [
+            ['type' => 'message_start', 'message' => ['id' => 'msg_1', 'type' => 'message', 'role' => 'assistant', 'model' => 'claude-sonnet-4-5', 'content' => [], 'stop_reason' => null, 'usage' => ['output_tokens' => 1] + $usage]],
+            ['type' => 'content_block_start', 'index' => 0, 'content_block' => ['type' => 'text', 'text' => '']],
+            ['type' => 'content_block_delta', 'index' => 0, 'delta' => ['type' => 'text_delta', 'text' => '[]']],
+            ['type' => 'content_block_stop', 'index' => 0],
+            ['type' => 'message_delta', 'delta' => ['stop_reason' => 'end_turn', 'stop_sequence' => null], 'usage' => ['output_tokens' => 200]],
+            ['type' => 'message_stop'],
+        ];
+        $body = implode('', array_map(static fn (array $event): string => \sprintf("event: %s\ndata: %s\n\n", $event['type'], json_encode($event, \JSON_THROW_ON_ERROR)), $events));
+
+        $this->client(new StreamingPlatform(Factory::createPlatform('sk-test', new MockHttpClient([new MockResponse($body, ['response_headers' => ['content-type' => 'text/event-stream']])]))))->complete('sys', 'user');
+
+        self::assertSame(0.243036, $this->budgetTracker->costUsdUsed());
     }
 
     /**

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM;
 
+use Generator;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -30,6 +31,7 @@ use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\InMemoryRawResult;
 use Symfony\AI\Platform\Result\RawHttpResult;
+use Symfony\AI\Platform\Result\StreamResult;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ThinkingResult;
 use Symfony\AI\Platform\Result\ToolCall;
@@ -87,6 +89,20 @@ final class SymfonyAiLLMClientDegradedOutcomeTest extends TestCase
     private const string BOOKED_DEBUG = 'An answer the provider delivered as an error is booked at its estimated input tokens, since the provider bills the request it accepted';
 
     private const string AZURE_FILTERED = "The response was filtered due to the prompt triggering Azure OpenAI's content management policy.";
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidTokenUsageException
+     * @throws LLMProviderException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     */
+    public function test_complete_answers_a_stream_handed_back_unread_as_no_verdict(): void
+    {
+        $llmResponse = $this->client(new ScriptedDeferredPlatform([$this->unreadStream()]), new NullLogger())->complete('sys', 'usr');
+
+        self::assertSame(['', 'empty_content'], [$llmResponse->content(), $llmResponse->stopReason()]);
+    }
 
     /**
      * @throws BudgetExceededException
@@ -863,6 +879,11 @@ final class SymfonyAiLLMClientDegradedOutcomeTest extends TestCase
             new InMemoryRawResult(['error' => ['message' => self::AZURE_FILTERED, 'type' => null, 'param' => 'prompt', 'code' => 'content_filter', 'status' => 400]]),
             [],
         );
+    }
+
+    private function unreadStream(): DeferredResult
+    {
+        return new DeferredResult(new PlainConverter(new StreamResult((static fn (): Generator => yield from [])())), new InMemoryRawResult());
     }
 
     private function contentFiltered(): RuntimeException

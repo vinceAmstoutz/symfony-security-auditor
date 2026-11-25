@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\LLM;
 
+use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -25,6 +26,8 @@ use Symfony\AI\Platform\Result\InMemoryRawResult;
 use Symfony\AI\Platform\Result\MultiPartResult;
 use Symfony\AI\Platform\Result\RawHttpResult;
 use Symfony\AI\Platform\Result\RawResultInterface;
+use Symfony\AI\Platform\Result\ResultInterface;
+use Symfony\AI\Platform\Result\StreamResult;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
 use Symfony\AI\Platform\Result\ToolCallResult;
@@ -398,11 +401,30 @@ final class PlatformResultExtractorTest extends TestCase
         self::assertSame('end_turn', $stopReason);
     }
 
-    public function test_it_returns_null_when_the_result_carries_no_finish_reason(): void
+    /**
+     * @return iterable<string, array{0: ResultInterface, 1: string}>
+     */
+    public static function answersWithoutFinishReason(): iterable
+    {
+        yield 'a stream handed back unread' => [new StreamResult((static fn (): Generator => yield from [])()), 'empty_content'];
+        yield 'an empty text' => [new TextResult(''), 'end_turn'];
+        yield 'a tool call' => [new ToolCallResult([new ToolCall('call_1', 'lookup')]), 'end_turn'];
+        yield 'text and tool calls' => [new MultiPartResult([new TextResult('')]), 'end_turn'];
+    }
+
+    #[DataProvider('answersWithoutFinishReason')]
+    public function test_an_answer_without_finish_reason_is_no_verdict_only_when_it_cannot_be_read(ResultInterface $result, string $expectedStopReason): void
     {
         $platformResultExtractor = new PlatformResultExtractor(null);
 
-        self::assertNull($platformResultExtractor->extractStopReason($this->deferredResult()));
+        self::assertSame($expectedStopReason, $platformResultExtractor->extractStopReason(new DeferredResult(new PlainConverter($result), new InMemoryRawResult())));
+    }
+
+    public function test_it_reads_an_answer_that_carries_no_finish_reason_as_ended_by_the_model(): void
+    {
+        $platformResultExtractor = new PlatformResultExtractor(null);
+
+        self::assertSame('end_turn', $platformResultExtractor->extractStopReason($this->deferredResult()));
     }
 
     public function test_it_warns_when_the_response_was_truncated_by_the_output_token_limit(): void

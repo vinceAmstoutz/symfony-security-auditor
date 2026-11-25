@@ -340,7 +340,7 @@ final readonly class ToolConversationWavefront
         return $conversationState->withResponse(FinalRound::settled(LLMResponse::of(
             $this->platformResultExtractor->extractText($platformResult),
             $this->model,
-            $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
+            $this->platformResultExtractor->extractStopReason($deferredResult),
             $conversationState->tokenUsage(),
         ), $conversationState->roundsLeft, $conversationState->askedToRead));
     }

@@ -19,13 +19,16 @@ use Symfony\AI\Platform\PlainConverter;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\InMemoryRawResult;
 use Symfony\AI\Platform\Result\TextResult;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\BufferedResend;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\StreamedResultConverter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\StreamMetering;
 
 final class StreamedResultConverterTest extends TestCase
 {
     public function test_it_reads_the_streamed_answer_of_whichever_model_produced_it(): void
     {
-        $streamedResultConverter = new StreamedResultConverter(new DeferredResult(new PlainConverter(new TextResult('')), new InMemoryRawResult()));
+        $deferredResult = new DeferredResult(new PlainConverter(new TextResult('')), new InMemoryRawResult());
+        $streamedResultConverter = new StreamedResultConverter($deferredResult, new StreamMetering(), new BufferedResend(static fn (): DeferredResult => $deferredResult));
 
         self::assertTrue($streamedResultConverter->supports(new Model('any-model')));
     }

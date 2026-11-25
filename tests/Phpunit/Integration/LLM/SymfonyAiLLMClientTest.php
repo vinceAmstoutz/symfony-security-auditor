@@ -1808,7 +1808,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidRetryConfigurationException
      * @throws LLMRequestTooLargeException
      */
-    public function test_complete_with_tools_falls_back_to_empty_text_when_platform_returns_unknown_result_type(): void
+    public function test_complete_with_tools_answers_an_unknown_result_type_as_no_verdict(): void
     {
         $tool = $this->makeTool('lookup', 'lookup');
         $toolRegistry = new ToolRegistry([$tool], new NullLogger());
@@ -1828,7 +1828,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $llmResponse = $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 3);
 
         self::assertSame('', $llmResponse->content());
-        self::assertSame('end_turn', $llmResponse->stopReason());
+        self::assertSame('empty_content', $llmResponse->stopReason());
     }
 
     /**
