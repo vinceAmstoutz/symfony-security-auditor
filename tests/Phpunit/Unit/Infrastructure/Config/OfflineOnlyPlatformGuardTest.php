@@ -177,6 +177,29 @@ final class OfflineOnlyPlatformGuardTest extends TestCase
     /**
      * @throws NonLocalPlatformEndpointException
      */
+    #[DataProvider('cliAgentCases')]
+    public function test_it_refuses_a_cli_agent_whatever_its_settings_name(string $agent, mixed $settings): void
+    {
+        $this->expectException(NonLocalPlatformEndpointException::class);
+        $this->expectExceptionMessageContaining(\sprintf('privacy.offline_only is enabled, but "%s" runs a coding agent\'s CLI, which sends every prompt to its vendor\'s cloud service.', $agent));
+
+        $this->offlineOnlyPlatformGuard->assertEveryPlatformIsLocal(
+            new StandalonePlatformConfig(['ollama' => ['endpoint' => 'http://localhost:11434'], $agent => $settings], 'ollama'),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string, mixed}>
+     */
+    public static function cliAgentCases(): iterable
+    {
+        yield 'claude code with no settings' => ['claudecode', null];
+        yield 'codex naming a local-looking binary' => ['codex', ['cli_binary' => 'http://localhost:11434']];
+    }
+
+    /**
+     * @throws NonLocalPlatformEndpointException
+     */
     public function test_it_refuses_a_provider_whose_configuration_is_not_a_map(): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);

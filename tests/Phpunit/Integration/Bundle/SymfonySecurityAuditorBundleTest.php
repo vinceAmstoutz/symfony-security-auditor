@@ -102,6 +102,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemRe
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\GitTrackedIgnoredFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
@@ -354,6 +355,16 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertInstanceOf(PlatformInterface::class, $platform);
 
         self::assertSame(['OK', 'stub-response'], [$llmClient->complete('sys', 'usr')->content(), $platform->invoke('model', 'usr')->asText()]);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_an_offline_only_run_refuses_the_cli_agent_its_configuration_names(): void
+    {
+        $this->expectException(NonLocalPlatformEndpointException::class);
+        $this->expectExceptionMessageContaining('privacy.offline_only is enabled, but "codex" runs a coding agent\'s CLI');
+
+        $this->boot(['model' => 'opus', 'privacy' => ['offline_only' => true], 'cli_agent' => ['platform' => 'codex', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
     }
 
     public function test_the_auditor_asks_a_cli_for_json_answers_since_the_cli_cannot_carry_its_tools(): void

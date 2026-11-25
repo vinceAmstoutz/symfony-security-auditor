@@ -8,7 +8,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ### New Features ✨
 
-- The standalone binary runs on a Claude subscription instead of an API key: `init --provider=claudecode` sets it up and each call goes through the installed Claude Code CLI with its own tools off ([#677](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/677))
+- The standalone binary runs on a Claude subscription instead of an API key: `init --provider=claudecode` sets it up and each call goes through the installed Claude Code CLI with its own tools off, on Linux, macOS or WSL but not on Windows itself ([#677](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/677))
 - The standalone binary runs on a ChatGPT subscription too: `init --provider=codex` sets it up and each call goes through the installed Codex CLI, read-only and with its shell off ([#678](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/678))
 - The attacker's and the reviewer's answers are streamed on every platform whose bridge streams tool calls and reports a stream's usage (all but Vertex AI, Venice, Cohere, MiniMax, Bedrock and a `cli_agent`), so a proxy or gateway that closes an idle connection no longer cuts a long generation; findings and cost stay the same; a gateway that cannot stream is called without streaming ([#685](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/685))
 - A report states its cost is a minimum when a call was cut before its answer ended, since the provider may bill it beyond the usage it reported. The JSON report counts such calls in `cost.interrupted_calls` ([#685](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/685))

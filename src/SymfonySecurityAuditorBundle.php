@@ -69,7 +69,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfig
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CheapAttackerClientNoticePass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterRegistrar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingCliAgentBridgeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\TypedNodeEnvPlaceholderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\TypedNodeEnvPlaceholderFinder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\UnselectedPlatformsPass;
@@ -129,6 +132,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      * @throws JsonException
      * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
+     * @throws MissingCliAgentBridgeException
+     * @throws NonLocalPlatformEndpointException
      * @throws TypedNodeEnvPlaceholderException
      */
     #[Override]
@@ -149,6 +154,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
 
         /** @var BundleConfigArray $config */
         $bundleConfiguration = BundleConfiguration::fromArray($config);
+        $this->assertCliAgentAllowed($bundleConfiguration, $cliAgent);
 
         $this->registerParameters($builder, $bundleConfiguration);
 
@@ -161,6 +167,16 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $this->registerTrackedIgnoredFiles($services, $bundleConfiguration);
         $this->registerCustomSkills($services, $bundleConfiguration);
         $this->registerEscalation($services, $bundleConfiguration, $platformServiceId);
+    }
+
+    /**
+     * @throws NonLocalPlatformEndpointException
+     */
+    private function assertCliAgentAllowed(BundleConfiguration $bundleConfiguration, ?string $cliAgent): void
+    {
+        if (null !== $cliAgent && $bundleConfiguration->privacy->offlineOnly) {
+            (new OfflineOnlyPlatformGuard())->assertIsNoCliAgent($cliAgent);
+        }
     }
 
     /**
