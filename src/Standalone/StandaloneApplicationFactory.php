@@ -302,7 +302,7 @@ final readonly class StandaloneApplicationFactory
             $this->credentialStore,
             pricedModelList: new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath())),
             connectionTestRunner: new ProcessConnectionTestRunner(new SelfInvocation($this->runningBinaryPath)),
-            pulledModelList: new OllamaPulledModelList(HttpClient::create(['timeout' => 3])),
+            pulledModelList: new OllamaPulledModelList(HttpClient::create()),
         );
     }
 
@@ -432,7 +432,7 @@ final readonly class StandaloneApplicationFactory
                 bundledAiPlatformVersion: $this->bundledAiPlatformVersion,
                 configuredModelCheck: new ConfiguredModelCheck(
                     new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath())),
-                    new OllamaPulledModelList(HttpClient::create(['timeout' => 3])),
+                    new OllamaPulledModelList(HttpClient::create()),
                 ),
             ), $this->configuredCredentialVariable(), new ProcessCliAgentAccountProbe()),
             new StandaloneConnectionCheck($this->standaloneConfigLoader, $this->xdgConfigPathResolver, $this->standaloneContainerFactory),

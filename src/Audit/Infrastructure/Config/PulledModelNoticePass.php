@@ -40,8 +40,6 @@ final readonly class PulledModelNoticePass implements CompilerPassInterface
 
     private const string MODELS_PARAMETER = 'symfony_security_auditor.audit.models_requiring_pricing';
 
-    private const array HTTP_CLIENT_OPTIONS = ['timeout' => 3];
-
     #[Override]
     public function process(ContainerBuilder $container): void
     {
@@ -49,7 +47,7 @@ final readonly class PulledModelNoticePass implements CompilerPassInterface
             return;
         }
 
-        $httpClient = (new Definition(HttpClientInterface::class))->setFactory([HttpClient::class, 'create'])->setArguments([self::HTTP_CLIENT_OPTIONS]);
+        $httpClient = (new Definition(HttpClientInterface::class))->setFactory([HttpClient::class, 'create']);
         $container->register(self::SERVICE, PulledModelNotice::class)->setArguments([
             new Definition(OllamaPulledModelList::class, [$httpClient]),
             $container->getDefinition(self::OLLAMA)->getArguments()[0] ?? null,
