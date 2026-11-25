@@ -47,13 +47,13 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `doctor --check-connection` and the test request `init` offers to send no longer run out of memory under PHP's default 128 MB limit: the pricing catalog now keeps only the model details the auditor reads, about a quarter of the memory it took ([#709](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/709))
 - `auth:status`, `auth:set` and `auth:remove` say the configured platform needs no API key when the audit runs on a Claude or ChatGPT subscription or another platform without a key, instead of asking to run `init` again; `auth:status` and `auth:remove` exit `0` then ([#713](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/713))
 - A standalone configuration file that reuses YAML anchors many times is read again with `symfony/yaml` 7.4.24 or later. One whose aliases expand past 10,000 values is refused with the auditor's own message, not the parser's ([#725](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/725))
-- The `redirect_with_input` pre-scan marker the attacker reads flags a redirect only when its own argument holds a variable, on the line of the redirect call, instead of a redirect to a fixed path followed by any variable up to 200 characters further, on the line of that variable
-- The `native_query_concat` pre-scan marker flags native SQL built by string concatenation in `executeQuery()`, `executeStatement()`, `query()` and `prepare()`; it matched none before
+- The `redirect_with_input` pre-scan marker the attacker reads flags a redirect only when its own argument holds a variable, on the line of the redirect call, instead of a redirect to a fixed path followed by any variable up to 200 characters further, on the line of that variable ([#734](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/734))
+- The `native_query_concat` pre-scan marker flags native SQL built by string concatenation in `executeQuery()`, `executeStatement()`, `query()` and `prepare()`; it matched none before ([#734](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/734))
 
 ### Performance Improvements 🚀
 
-- A large `audit.baseline` no longer slows the run down: checking findings against the accepted ones took seconds at a thousand and minutes at several thousand; persisting thousands of reviewed findings no longer takes seconds either
-- `audit.reviewer_max_concurrent` above 1 holds only the prompts of the calls it is sending, instead of every finding's prompt with its whole file at once
+- A large `audit.baseline` no longer slows the run down: checking findings against the accepted ones took seconds at a thousand and minutes at several thousand; persisting thousands of reviewed findings no longer takes seconds either ([#734](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/734))
+- `audit.reviewer_max_concurrent` above 1 holds only the prompts of the calls it is sending, instead of every finding's prompt with its whole file at once ([#734](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/734))
 
 ### Core 🧱
 
