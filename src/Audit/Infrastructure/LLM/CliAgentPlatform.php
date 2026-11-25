@@ -23,6 +23,7 @@ use Symfony\AI\Platform\Model;
 use Symfony\AI\Platform\ModelCatalog\ModelCatalogInterface;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\CliAgentCommandLineTooLongException;
 
 /**
  * Runs a coding agent's CLI on the user's subscription as a plain model, its
@@ -38,23 +39,33 @@ final readonly class CliAgentPlatform implements PlatformInterface
 
     private const int SHARED_ARGUMENT_FRAME = 18;
 
+    // cmd.exe, which Symfony Process starts every command through on Windows, refuses a longer command line.
+    private const int LONGEST_WINDOWS_COMMAND_LINE = 8191;
+
+    private const int WINDOWS_PROMPT_ROOM = 7000;
+
     /**
      * @param CliAgentWorkingDirectory $workingDirectory        the directory the CLI starts in, kept as long as this platform
      * @param array<string, mixed>     $isolatingOptions        the CLI flags that keep the agent from acting, sent in place of the auditor's options
      * @param bool                     $promptsShareOneArgument whether the CLI joins the system and user prompts into one argument, framed by `[System]` and `[User]` lines
+     * @param bool                     $onWindows               whether the CLI starts through cmd.exe, whose command line leaves the prompts WINDOWS_PROMPT_ROOM bytes
      */
     public function __construct(
         private PlatformInterface $platform,
         private CliAgentWorkingDirectory $workingDirectory,
         private array $isolatingOptions,
         private bool $promptsShareOneArgument = false,
+        private bool $onWindows = \PHP_OS_FAMILY === 'Windows',
     ) {}
 
+    /**
+     * @throws CliAgentCommandLineTooLongException when the request cannot start the CLI however it is split
+     */
     #[Override]
     public function invoke(string|Model $model, array|string|object $input, array $options = []): DeferredResult
     {
-        if ($input instanceof MessageBag && $this->outgrowsOneArgument($input)) {
-            throw new ExceedContextSizeException(\sprintf('The prompt is longer than the %d bytes one command-line argument of the CLI can carry.', self::LONGEST_COMMAND_LINE_ARGUMENT));
+        if ($input instanceof MessageBag) {
+            $this->assertFitsTheCommandLine($input);
         }
 
         return $this->platform->invoke($model, $input, [...$this->isolatingOptions, 'cwd' => $this->workingDirectory->path]);
@@ -66,9 +77,48 @@ final readonly class CliAgentPlatform implements PlatformInterface
         return $this->platform->getModelCatalog();
     }
 
+    /**
+     * @throws CliAgentCommandLineTooLongException when no split can make the request fit
+     * @throws ExceedContextSizeException          when a smaller request may fit
+     */
+    private function assertFitsTheCommandLine(MessageBag $messageBag): void
+    {
+        if ($this->onWindows) {
+            $this->assertFitsTheWindowsCommandLine($messageBag);
+        }
+
+        if ($this->outgrowsOneArgument($messageBag)) {
+            throw new ExceedContextSizeException(\sprintf('The prompt is longer than the %d bytes one command-line argument of the CLI can carry.', self::LONGEST_COMMAND_LINE_ARGUMENT));
+        }
+    }
+
+    /**
+     * @throws CliAgentCommandLineTooLongException
+     * @throws ExceedContextSizeException
+     */
+    private function assertFitsTheWindowsCommandLine(MessageBag $messageBag): void
+    {
+        $systemPromptBytes = \strlen((string) $messageBag->getSystemMessage()?->getContent());
+        if ($systemPromptBytes > self::WINDOWS_PROMPT_ROOM) {
+            throw CliAgentCommandLineTooLongException::onWindows(self::LONGEST_WINDOWS_COMMAND_LINE, $systemPromptBytes);
+        }
+
+        if (array_sum($this->promptLengths($messageBag)) > self::WINDOWS_PROMPT_ROOM) {
+            throw new ExceedContextSizeException(\sprintf('The prompt is longer than the %d bytes the Windows command line of the CLI leaves it.', self::WINDOWS_PROMPT_ROOM));
+        }
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function promptLengths(MessageBag $messageBag): array
+    {
+        return array_map(fn (MessageInterface $message): int => \strlen($this->promptOf($message) ?? ''), $messageBag->getMessages());
+    }
+
     private function outgrowsOneArgument(MessageBag $messageBag): bool
     {
-        $lengths = array_map(fn (MessageInterface $message): int => \strlen($this->promptOf($message) ?? ''), $messageBag->getMessages());
+        $lengths = $this->promptLengths($messageBag);
 
         return $this->promptsShareOneArgument
             ? array_sum($lengths) + self::SHARED_ARGUMENT_FRAME > self::LONGEST_COMMAND_LINE_ARGUMENT

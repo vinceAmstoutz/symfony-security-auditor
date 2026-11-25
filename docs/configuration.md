@@ -517,6 +517,7 @@ reviewer_model: claude-haiku-5-5
 - **How each call runs.** The auditor starts `claude` with its built-in tools off and the MCP servers of the machine ignored, outside the audited project, so the code it reads cannot make it act. The attacker and the reviewer answer in JSON: `audit.tools_enabled`, `audit.structured_collection`, `audit.reviewer_tools_enabled` and `audit.reviewer_structured_collection` are set to `false`, so the model cannot open other files of the project during a chunk.
 - **In a Symfony application.** Require `symfony/ai-claude-code-platform` and set `cli_agent: { platform: claudecode, effort: medium }` with `model: claude-opus-5-5` and `reviewer_model: claude-haiku-5-5` under `symfony_security_auditor:`. The application's own `symfony/ai` platform is left as it is.
 - **Limits.** The plan's usage limits apply. Its terms decide what automated use it allows. The run is not priced, so `--dry-run` shows no cost and an `audit.budget` cost cap cannot be enforced. A prompt longer than the 128 KiB one command-line argument can carry is split like one the provider refuses as too large. `privacy.offline_only` refuses this platform.
+- **Not on Windows.** Windows starts the CLI through a command line of at most 8,191 characters. The auditor's instructions alone take more, so the run stops at its first call with a message saying so. Run the audit under WSL, on Linux or macOS, or on an API platform.
 
 ### Running on a ChatGPT subscription
 
@@ -535,7 +536,7 @@ reviewer_model: gpt-6-luna
 - **Effort.** _Since 1.23_ `init` asks the reasoning effort, `medium` by default: `low`, `medium`, `high`, `xhigh` or `max`, passed to Codex as `model_reasoning_effort`. `--effort` sets it without asking. Afterwards, edit `effort:` under `codex:`; without it, Codex keeps its own default.
 - **How each call runs.** The auditor runs `codex exec` read-only and outside the audited project, with its shell and web search off, the user's Codex configuration and rules ignored and nothing kept of the session. As with Claude Code, the attacker and the reviewer answer in JSON.
 - **In a Symfony application.** Require `symfony/ai-codex-platform` and set `cli_agent: { platform: codex, effort: medium }` with `model: gpt-6.2-sol` and `reviewer_model: gpt-6-luna` under `symfony_security_auditor:`.
-- **Limits.** The same as for a [Claude subscription](#running-on-a-claude-subscription), except that Codex joins the system and user prompts into one command-line argument, so the 128 KiB limit applies to both together.
+- **Limits.** The same as for a [Claude subscription](#running-on-a-claude-subscription), except that Codex joins the system and user prompts into one command-line argument, so the 128 KiB limit applies to both together. It does not run on Windows either.
 
 ## Providing the API key
 
