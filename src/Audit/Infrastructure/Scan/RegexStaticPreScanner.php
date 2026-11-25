@@ -201,7 +201,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
                 'description' => 'Request object access (query/body/payload/toArray/cookies/headers/files) — request input read; trace flow to dangerous sinks',
             ],
             'redirect_with_input' => [
-                'regex' => '/->redirect\s*\(.{0,200}\$/s',
+                'regex' => '/->redirect\s*\((?=(?:[^);]|\([^();]*\)){0,200}?\$)/s',
                 'description' => 'Redirect with variable target — verify protocol/host allowlist (open redirect)',
             ],
             'submit_request_all' => [
@@ -229,7 +229,7 @@ final readonly class RegexStaticPreScanner implements StaticPreScannerInterface
         ],
         ProjectFileType::REPOSITORY->value => [
             'native_query_concat' => [
-                'regex' => '/->executeQuery\s*\(\s*[\'"][^\'"]*\.\s*\$/',
+                'regex' => '/->(?:executeQuery|executeStatement|query|prepare)\s*\(\s*(?:\'[^\']*\'|"[^"]*")(?:\s*\.\s*(?:\'[^\']*\'|"[^"]*"))*\s*\.\s*\$/',
                 'description' => 'Native SQL with string concatenation — SQL injection risk',
             ],
             'dynamic_order_by' => [
