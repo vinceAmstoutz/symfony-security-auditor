@@ -28,13 +28,18 @@ use Symfony\AI\Platform\TokenUsage\TokenUsageInterface;
  */
 final readonly class StreamedTokenUsageExtractor implements TokenUsageExtractorInterface
 {
-    public function __construct(private DeferredResult $streamedResult) {}
+    public function __construct(
+        private DeferredResult $streamedResult,
+        private BufferedResend $bufferedResend,
+    ) {}
 
     #[Override]
     public function extract(RawResultInterface $rawResult, array $options = []): ?TokenUsageInterface
     {
         if (UnstreamedAnswer::in($this->streamedResult)) {
-            return $this->streamedResult->getResultConverter()->getTokenUsageExtractor()?->extract($rawResult, $options);
+            $answeringResult = $this->bufferedResend->answering($this->streamedResult);
+
+            return $answeringResult->getResultConverter()->getTokenUsageExtractor()?->extract($answeringResult->getRawResult(), $options);
         }
 
         $answer = $this->streamedResult->getResult();

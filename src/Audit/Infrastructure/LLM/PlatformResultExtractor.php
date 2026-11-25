@@ -40,6 +40,10 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
  */
 final readonly class PlatformResultExtractor
 {
+    private const string END_TURN_STOP_REASON = 'end_turn';
+
+    private const string EMPTY_CONTENT_STOP_REASON = 'empty_content';
+
     private FinishReasonReader $finishReasonReader;
 
     public function __construct(
@@ -248,16 +252,7 @@ final readonly class PlatformResultExtractor
      */
     public function extractOneHourCacheCreationTokens(DeferredResult $deferredResult, int $cacheCreationTokens): int
     {
-        try {
-            $usage = $deferredResult->getRawResult()->getData()['usage'] ?? null;
-        } catch (Throwable) {
-            return 0;
-        }
-
-        $cacheCreation = \is_array($usage) ? $usage['cache_creation'] ?? null : null;
-        $oneHourCacheCreationTokens = \is_array($cacheCreation) ? $cacheCreation['ephemeral_1h_input_tokens'] ?? null : null;
-
-        return \is_int($oneHourCacheCreationTokens) ? min($oneHourCacheCreationTokens, $cacheCreationTokens) : 0;
+        return min(ReportedUsages::oneHourCacheCreationTokens($deferredResult->getRawResult()), $cacheCreationTokens);
     }
 
     /**
@@ -298,14 +293,24 @@ final readonly class PlatformResultExtractor
         }
     }
 
-    public function extractStopReason(DeferredResult $deferredResult): ?string
+    /**
+     * Returns `empty_content`, never a verdict, for an answer that carries
+     * no finish reason and is neither text nor tool calls, such as a stream
+     * a platform handed back unread.
+     */
+    public function extractStopReason(DeferredResult $deferredResult): string
     {
         $finishReason = $deferredResult->getMetadata()->all()['finish_reason'] ?? null;
         if (!$finishReason instanceof FinishReason) {
-            return null;
+            return $this->isReadable($deferredResult->getResult()) ? self::END_TURN_STOP_REASON : self::EMPTY_CONTENT_STOP_REASON;
         }
 
         return $this->finishReasonReader->stopReason($finishReason, $this->extractText($deferredResult->getResult()));
+    }
+
+    private function isReadable(ResultInterface $result): bool
+    {
+        return $result instanceof TextResult || $result instanceof ToolCallResult || $result instanceof MultiPartResult;
     }
 
     /**

@@ -77,7 +77,9 @@ final readonly class StreamingPlatform implements PlatformInterface
 
         $streamedResult = $this->platform->invoke($model, $input, [...$options, ...$this->streamOptions, 'stream' => true]);
 
-        return new DeferredResult(new StreamedResultConverter($streamedResult, $this->streamMetering), $streamedResult->getRawResult(), $options);
+        $bufferedResend = new BufferedResend(fn (): DeferredResult => $this->platform->invoke($model, $input, $options));
+
+        return new DeferredResult(new StreamedResultConverter($streamedResult, $this->streamMetering, $bufferedResend), $streamedResult->getRawResult(), $options);
     }
 
     #[Override]

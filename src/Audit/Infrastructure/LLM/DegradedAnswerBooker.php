@@ -29,7 +29,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\RateLimiterInterface;
  * token totals and the rate-limit window: at the usage its raw answer
  * reports, else at its estimated input tokens and no output. A call the
  * provider never answered only releases its rate-limit reservation; one cut
- * mid-answer is counted as interrupted.
+ * mid-answer, or streamed without the usage it lost when it failed, is
+ * counted as interrupted.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -51,24 +52,35 @@ final readonly class DegradedAnswerBooker
      */
     public function bookFailedCall(Throwable $throwable, ?DeferredResult $deferredResult, int $estimatedInputTokens): void
     {
-        if ($this->transientFailureClassifier->isCutMidAnswer($throwable)) {
+        $stopReason = $this->transientFailureClassifier->billedStopReason($throwable);
+        $reportedUsage = null !== $stopReason && $deferredResult instanceof DeferredResult ? $this->platformResultExtractor->extractBilledUsage($deferredResult, $estimatedInputTokens) : null;
+        if ($this->transientFailureClassifier->isCutMidAnswer($throwable) || (null !== $stopReason && !$reportedUsage instanceof TokenUsageSnapshot && $this->lostStreamedUsage($deferredResult))) {
             $this->budgetTracker?->recordInterruptedCall();
         }
 
-        $stopReason = $this->transientFailureClassifier->billedStopReason($throwable);
         if (null === $stopReason) {
             $this->rateLimiter->record(0, 0);
 
             return;
         }
 
-        $reportedUsage = $deferredResult instanceof DeferredResult ? $this->platformResultExtractor->extractBilledUsage($deferredResult, $estimatedInputTokens) : null;
         $billedUsage = $reportedUsage ?? TokenUsageSnapshot::of($estimatedInputTokens, 0);
 
         $this->rateLimiter->record($this->rateLimitedInputTokens($deferredResult, $billedUsage), $billedUsage->outputTokens());
         $this->budgetTracker?->recordCall(LLMResponse::of('', $this->model, $stopReason, $billedUsage), $this->oneHourCacheCreationTokens($deferredResult, $billedUsage));
         $this->tokenUsageRecorder?->record($billedUsage->inputTokens(), $billedUsage->outputTokens(), $billedUsage->cacheReadTokens(), $billedUsage->cacheCreationTokens());
         $this->logBooking($stopReason, $reportedUsage, $estimatedInputTokens);
+    }
+
+    /**
+     * Whether the call streamed an answer whose usage was lost with its
+     * failure, so the booked cost is a minimum.
+     */
+    private function lostStreamedUsage(?DeferredResult $deferredResult): bool
+    {
+        $resultConverter = $deferredResult?->getResultConverter();
+
+        return $resultConverter instanceof StreamedResultConverter && $resultConverter->readsAStream();
     }
 
     private function oneHourCacheCreationTokens(?DeferredResult $deferredResult, TokenUsageSnapshot $tokenUsageSnapshot): int

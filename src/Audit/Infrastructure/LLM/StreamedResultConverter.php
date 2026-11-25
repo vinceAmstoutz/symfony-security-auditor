@@ -37,7 +37,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Unme
  * Returns a streamed answer, read to its end, as the result a buffered call
  * gives, with the stream's finish reason; its usage comes once, through
  * StreamedTokenUsageExtractor. An answer sent unstreamed goes through the
- * bridge's own converter.
+ * bridge's own converter; when the platform hands it back unread, the call
+ * is sent again unstreamed through BufferedResend.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -47,9 +48,12 @@ final readonly class StreamedResultConverter implements ResultConverterInterface
 
     private const string FINISH_REASON = 'finish_reason';
 
+    private const string REASONING_ITEM = 'reasoning';
+
     public function __construct(
         private DeferredResult $streamedResult,
-        private StreamMetering $streamMetering = new StreamMetering(),
+        private StreamMetering $streamMetering,
+        private BufferedResend $bufferedResend,
     ) {}
 
     #[Override]
@@ -72,10 +76,18 @@ final readonly class StreamedResultConverter implements ResultConverterInterface
         return $bufferedResult;
     }
 
+    /**
+     * Whether the answer came as a stream, not in one piece.
+     */
+    public function readsAStream(): bool
+    {
+        return !UnstreamedAnswer::in($this->streamedResult);
+    }
+
     #[Override]
     public function getTokenUsageExtractor(): TokenUsageExtractorInterface
     {
-        return new StreamedTokenUsageExtractor($this->streamedResult);
+        return new StreamedTokenUsageExtractor($this->streamedResult, $this->bufferedResend);
     }
 
     /**
@@ -83,9 +95,11 @@ final readonly class StreamedResultConverter implements ResultConverterInterface
      */
     private function unstreamedResult(array $options): ResultInterface
     {
+        $answer = $this->streamedResult->getResultConverter()->convert($this->streamedResult->getRawResult(), $options);
+        $unstreamedAnswer = $answer instanceof StreamResult ? $this->bufferedResend->resent()->getResult() : $answer;
         $this->streamMetering->stopStreaming();
 
-        return $this->streamedResult->getResultConverter()->convert($this->streamedResult->getRawResult(), $options);
+        return $unstreamedAnswer;
     }
 
     /**
@@ -132,7 +146,7 @@ final readonly class StreamedResultConverter implements ResultConverterInterface
         $parts = [];
         foreach ($assistantMessage->getContent() as $content) {
             if ($content instanceof Thinking) {
-                $parts[] = new ThinkingResult($content->getContent(), $content->getSignature());
+                array_push($parts, ...$this->replayedThinking($content));
             }
 
             if ($content instanceof Text) {
@@ -145,5 +159,19 @@ final readonly class StreamedResultConverter implements ResultConverterInterface
         }
 
         return $parts;
+    }
+
+    /**
+     * Returns the thinking part as a buffered answer keeps it: none for an
+     * OpenAI reasoning item with no summary text and no encrypted content.
+     *
+     * @return list<ThinkingResult>
+     */
+    private function replayedThinking(Thinking $thinking): array
+    {
+        $reasoningItem = json_decode($thinking->getSignature() ?? '', true);
+        $unreplayable = '' === $thinking->getContent() && \is_array($reasoningItem) && self::REASONING_ITEM === ($reasoningItem['type'] ?? null) && !\array_key_exists('encrypted_content', $reasoningItem);
+
+        return $unreplayable ? [] : [new ThinkingResult($thinking->getContent(), $thinking->getSignature())];
     }
 }
