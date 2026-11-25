@@ -66,12 +66,14 @@ final readonly class StandaloneContainerFactory
     private const string PLATFORM_SERVICE_PREFIX = 'ai.platform.';
 
     /**
-     * @param ?Closure(string): Process $advisoryProcessBuilder the `composer audit` process builder, `composer` on `PATH` when null
+     * @param ?Closure(string): Process                           $advisoryProcessBuilder the `composer audit` process builder, `composer` on `PATH` when null
+     * @param array<key-of<CliAgentPlatforms::FACTORIES>, string> $cliAgentFactories
      */
     public function __construct(
         private BundleExtensionLoader $bundleExtensionLoader = new BundleExtensionLoader(),
         private OfflineOnlyPlatformGuard $offlineOnlyPlatformGuard = new OfflineOnlyPlatformGuard(),
         private ?Closure $advisoryProcessBuilder = null,
+        private array $cliAgentFactories = CliAgentPlatforms::FACTORIES,
     ) {}
 
     /**
@@ -108,11 +110,10 @@ final readonly class StandaloneContainerFactory
 
         try {
             $this->bundleExtensionLoader->load(new AiBundle(), $standaloneConfig->platform->toAiConfig(), $containerBuilder);
+            CliAgentPlatforms::register($containerBuilder, $standaloneConfig->platform->platform, $this->cliAgentFactories);
         } catch (RuntimeException $runtimeException) {
             throw ProviderBridgeException::forBundleFailure($runtimeException) ?? $runtimeException;
         }
-
-        CliAgentPlatforms::register($containerBuilder, $standaloneConfig->platform->platform);
 
         $this->bundleExtensionLoader->load(new SymfonySecurityAuditorBundle(), FreeTextSettings::literalIn(CliAgentPlatforms::auditConfigFor($standaloneConfig->auditConfig, $standaloneConfig->platform), $containerBuilder->getParameterBag()), $containerBuilder);
 

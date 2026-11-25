@@ -15,7 +15,9 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Infrastructure\Config;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingCliAgentBridgeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 
 final class CliAgentPlatformsTest extends TestCase
@@ -36,6 +38,23 @@ final class CliAgentPlatformsTest extends TestCase
             ],
             CliAgentPlatforms::auditConfigFor(['model' => 'sonnet', 'audit' => ['max_iterations' => 2, 'tools_enabled' => true]], new StandalonePlatformConfig([$provider => []], $provider)),
         );
+    }
+
+    /**
+     * @throws MissingCliAgentBridgeException
+     */
+    public function test_a_cli_agent_whose_bridge_is_not_installed_is_refused_before_anything_is_registered(): void
+    {
+        $containerBuilder = new ContainerBuilder();
+
+        try {
+            CliAgentPlatforms::register($containerBuilder, ['claudecode' => ['cli_binary' => '/usr/bin/claude']], ['claudecode' => 'Missing\\ClaudeCode\\Factory']);
+            self::fail('A CLI agent without its bridge was registered.');
+        } catch (MissingCliAgentBridgeException $missingCliAgentBridgeException) {
+            self::assertSame('The "claudecode" CLI agent requires "symfony/ai-claude-code-platform" package. Try running "composer require symfony/ai-claude-code-platform".', $missingCliAgentBridgeException->getMessage());
+        }
+
+        self::assertFalse($containerBuilder->has('ai.platform.claudecode.cli'));
     }
 
     public function test_a_run_on_an_api_platform_keeps_its_audit_settings(): void

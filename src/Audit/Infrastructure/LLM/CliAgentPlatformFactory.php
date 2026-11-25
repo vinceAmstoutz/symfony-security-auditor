@@ -18,19 +18,16 @@ use Symfony\AI\Platform\Bridge\ClaudeCode\ModelCatalog as ClaudeCodeModelCatalog
 use Symfony\AI\Platform\Bridge\Codex\Factory as CodexFactory;
 use Symfony\AI\Platform\Bridge\Codex\ModelCatalog as CodexModelCatalog;
 use Symfony\AI\Platform\Platform;
-use Symfony\Component\Filesystem\Filesystem;
 
 /**
- * Builds the platform of a coding agent's CLI, started in a fresh directory
- * only the user running the audit can open, since the CLI reads its
- * settings, hooks included, from the directory it starts in.
+ * Builds the platform of a coding agent's CLI, started in a
+ * CliAgentWorkingDirectory, since the CLI reads its settings, hooks
+ * included, from the directory it starts in.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class CliAgentPlatformFactory
 {
-    private const int PRIVATE_DIRECTORY_MODE = 0o700;
-
     /**
      * The models each CLI offers a subscription, the suggested one first.
      */
@@ -42,12 +39,9 @@ final readonly class CliAgentPlatformFactory
     /**
      * @param class-string<ClaudeCodeFactory>|class-string<CodexFactory> $bridgeFactory
      */
-    public static function create(string $bridgeFactory, ?string $cliBinary): Platform
+    public static function create(string $bridgeFactory, ?string $cliBinary, CliAgentWorkingDirectory $cliAgentWorkingDirectory): Platform
     {
-        $workingDirectory = \sprintf('%s/symfony-security-auditor-cli-%s', sys_get_temp_dir(), bin2hex(random_bytes(16)));
-        (new Filesystem())->mkdir($workingDirectory, self::PRIVATE_DIRECTORY_MODE);
-
-        return $bridgeFactory::createPlatform($cliBinary, $workingDirectory, modelCatalog: self::modelCatalogFor($bridgeFactory));
+        return $bridgeFactory::createPlatform($cliBinary, $cliAgentWorkingDirectory->path, modelCatalog: self::modelCatalogFor($bridgeFactory));
     }
 
     /**

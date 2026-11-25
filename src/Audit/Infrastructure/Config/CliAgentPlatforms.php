@@ -18,9 +18,12 @@ use Symfony\AI\Platform\Bridge\Codex\Factory as CodexFactory;
 use Symfony\AI\Platform\Platform;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingCliAgentBridgeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatformFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentWorkingDirectory;
 
 /**
  * The platforms that run a coding agent's CLI on the user's subscription
@@ -148,19 +151,33 @@ final readonly class CliAgentPlatforms
     }
 
     /**
-     * @param array<array-key, mixed> $platform
+     * @param array<array-key, mixed>                $platform
+     * @param array<key-of<self::FACTORIES>, string> $factories
+     *
+     * @throws MissingCliAgentBridgeException when the bridge of a configured CLI agent is not installed
      */
-    public static function register(ContainerBuilder $containerBuilder, array $platform): void
+    public static function register(ContainerBuilder $containerBuilder, array $platform, array $factories = self::FACTORIES): void
     {
-        foreach (array_intersect_key($platform, self::FACTORIES) as $name => $settings) {
+        $cliAgents = array_intersect_key($factories, $platform);
+
+        foreach ($cliAgents as $name => $factory) {
+            if (!class_exists($factory)) {
+                throw MissingCliAgentBridgeException::forCliAgent($name, ComposerBridgeInstaller::packageFor($name));
+            }
+        }
+
+        foreach ($cliAgents as $name => $factory) {
+            $settings = $platform[$name];
             $serviceId = self::serviceIdOf($name);
             $cliServiceId = \sprintf('%s.cli', $serviceId);
+            $workingDirectoryServiceId = \sprintf('%s.working_directory', $serviceId);
 
+            $containerBuilder->register($workingDirectoryServiceId, CliAgentWorkingDirectory::class);
             $containerBuilder->register($cliServiceId, Platform::class)
                 ->setFactory([CliAgentPlatformFactory::class, 'create'])
-                ->setArguments([self::FACTORIES[$name], \is_array($settings) ? ($settings['cli_binary'] ?? null) : null]);
+                ->setArguments([$factory, \is_array($settings) ? ($settings['cli_binary'] ?? null) : null, new Reference($workingDirectoryServiceId)]);
             $containerBuilder->register($serviceId, CliAgentPlatform::class)
-                ->setArguments([new Reference($cliServiceId), self::optionsOf($name, $settings), \in_array($name, self::SHARED_PROMPT_ARGUMENT, true)])
+                ->setArguments([new Reference($cliServiceId), new Reference($workingDirectoryServiceId), self::optionsOf($name, $settings), \in_array($name, self::SHARED_PROMPT_ARGUMENT, true)])
                 ->addTag(self::PLATFORM_TAG);
         }
     }

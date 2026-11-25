@@ -33,6 +33,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPha
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\EmbeddedComposer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\SelfInvocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditedProjectConfig;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
@@ -841,6 +842,36 @@ final class StandaloneContainerFactoryTest extends TestCase
             new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']], 'anthropic' => ['api_key' => 'sk-test']], 'generic.default')),
             $this->cacheDir,
         );
+    }
+
+    /**
+     * @param key-of<CliAgentPlatforms::FACTORIES> $cliAgent
+     *
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[DataProvider('cliAgentBridges')]
+    public function test_a_cli_agent_whose_bridge_is_not_installed_is_answered_with_the_init_command(string $cliAgent, string $package): void
+    {
+        $this->expectException(ProviderBridgeException::class);
+        $this->expectExceptionMessage(\sprintf('The "%1$s" provider bridge (%2$s) is not installed under the standalone data directory. Run "symfony-security-auditor init --provider=%1$s" to download it;', $cliAgent, $package));
+
+        (new StandaloneContainerFactory(cliAgentFactories: [$cliAgent => 'Missing\\CliAgent\\Factory']))->create(
+            new StandaloneConfig([], new StandalonePlatformConfig([$cliAgent => []], $cliAgent)),
+            $this->cacheDir,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{key-of<CliAgentPlatforms::FACTORIES>, string}>
+     */
+    public static function cliAgentBridges(): iterable
+    {
+        yield 'Claude Code' => ['claudecode', 'symfony/ai-claude-code-platform'];
+        yield 'Codex' => ['codex', 'symfony/ai-codex-platform'];
     }
 
     /**

@@ -69,6 +69,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfig
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CheapAttackerClientNoticePass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterRegistrar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingCliAgentBridgeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\TypedNodeEnvPlaceholderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
@@ -131,6 +132,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      * @throws JsonException
      * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
+     * @throws MissingCliAgentBridgeException
      * @throws NonLocalPlatformEndpointException
      * @throws TypedNodeEnvPlaceholderException
      */

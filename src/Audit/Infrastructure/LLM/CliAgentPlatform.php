@@ -39,11 +39,13 @@ final readonly class CliAgentPlatform implements PlatformInterface
     private const int SHARED_ARGUMENT_FRAME = 18;
 
     /**
-     * @param array<string, mixed> $isolatingOptions        the CLI flags that keep the agent from acting, sent in place of the auditor's options
-     * @param bool                 $promptsShareOneArgument whether the CLI joins the system and user prompts into one argument, framed by `[System]` and `[User]` lines
+     * @param CliAgentWorkingDirectory $workingDirectory        the directory the CLI starts in, kept as long as this platform
+     * @param array<string, mixed>     $isolatingOptions        the CLI flags that keep the agent from acting, sent in place of the auditor's options
+     * @param bool                     $promptsShareOneArgument whether the CLI joins the system and user prompts into one argument, framed by `[System]` and `[User]` lines
      */
     public function __construct(
         private PlatformInterface $platform,
+        private CliAgentWorkingDirectory $workingDirectory,
         private array $isolatingOptions,
         private bool $promptsShareOneArgument = false,
     ) {}
@@ -55,7 +57,7 @@ final readonly class CliAgentPlatform implements PlatformInterface
             throw new ExceedContextSizeException(\sprintf('The prompt is longer than the %d bytes one command-line argument of the CLI can carry.', self::LONGEST_COMMAND_LINE_ARGUMENT));
         }
 
-        return $this->platform->invoke($model, $input, $this->isolatingOptions);
+        return $this->platform->invoke($model, $input, [...$this->isolatingOptions, 'cwd' => $this->workingDirectory->path]);
     }
 
     #[Override]
