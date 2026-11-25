@@ -163,7 +163,7 @@ final readonly class StandaloneApplicationFactory
             ),
             $xdgConfigPathResolver,
             $bridgeInstaller ?? self::bridgeInstaller($resolvedBinaryPath, $bundledAiPlatformVersion),
-            new StandaloneContainerFactory(embeddedComposer: $embeddedComposer),
+            StandaloneContainerFactory::withEmbeddedComposer($embeddedComposer, $xdgConfigPathResolver),
             runningBinaryPath: $resolvedBinaryPath,
             pathEnvironment: $pathEnvironment,
             updateAvailabilityConsoleListener: self::updateAvailabilityConsoleListener(

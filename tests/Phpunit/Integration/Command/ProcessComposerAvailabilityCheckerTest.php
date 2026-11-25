@@ -110,7 +110,7 @@ final class ProcessComposerAvailabilityCheckerTest extends TestCase
 
         try {
             self::assertEquals(ComposerProbe::available(), $processComposerAvailabilityChecker->probe());
-            self::assertFileExists($dataHome.'/symfony-security-auditor/.composer/composer/bin/composer');
+            self::assertFileExists(\sprintf('%s/symfony-security-auditor/.composer/composer-2.8.12-%s/bin/composer', $dataHome, substr((string) hash_file('sha256', $fixturePhar), 0, 12)));
         } finally {
             (new Filesystem())->remove($dataHome);
         }

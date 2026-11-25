@@ -22,6 +22,8 @@ use Symfony\Component\Process\Process;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\EmbeddedComposer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 
 use function Symfony\Component\String\u;
 
@@ -57,18 +59,18 @@ final readonly class SymfonyProcessComposerAuditRunner implements ComposerAuditR
     }
 
     /**
-     * Unpacks the bundled Composer into the audited directory's `.composer`,
-     * which a private workspace keeps from other runs.
+     * Runs the bundled Composer, unpacked where `init` unpacks it, so the
+     * audited directory holds none of it.
      *
-     * @return Closure(string): Process the closure throws {@see AdvisorySourceUnavailableException} when the bundled Composer cannot be unpacked
+     * @return Closure(string): Process the closure throws {@see AdvisorySourceUnavailableException} when the bundled Composer cannot be unpacked or no home directory resolves
      */
-    public static function embeddedProcessBuilder(EmbeddedComposer $embeddedComposer): Closure
+    public static function embeddedProcessBuilder(EmbeddedComposer $embeddedComposer, XdgConfigPathResolver $xdgConfigPathResolver): Closure
     {
-        return static function (string $path) use ($embeddedComposer): Process {
+        return static function (string $path) use ($embeddedComposer, $xdgConfigPathResolver): Process {
             try {
-                $process = $embeddedComposer->process(\sprintf('%s/.composer', $path), self::AUDIT_ARGUMENTS);
-            } catch (BridgeInstallationFailedException $bridgeInstallationFailedException) {
-                throw AdvisorySourceUnavailableException::forProcessSetupFailure($bridgeInstallationFailedException);
+                $process = $embeddedComposer->process(\sprintf('%s/.composer', $xdgConfigPathResolver->dataDir()), self::AUDIT_ARGUMENTS);
+            } catch (BridgeInstallationFailedException|UnresolvableConfigPathException $exception) {
+                throw AdvisorySourceUnavailableException::forProcessSetupFailure($exception);
             }
 
             $process->setWorkingDirectory($path);

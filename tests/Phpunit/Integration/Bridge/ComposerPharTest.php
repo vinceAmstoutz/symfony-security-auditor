@@ -19,6 +19,8 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPhar;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge\Fixture\RaceLosingFilesystem;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Bridge\Fixture\RenameRefusingFilesystem;
 
 final class ComposerPharTest extends TestCase
 {
@@ -84,6 +86,48 @@ final class ComposerPharTest extends TestCase
         $composerPhar = new ComposerPhar(self::FIXTURE_PHAR, (string) hash_file('sha256', self::FIXTURE_PHAR));
 
         self::assertStringEqualsFile($composerPhar->in($this->directory.'/.composer'), "<?php echo \"fixture composer\";\n");
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_reuses_the_composer_an_earlier_run_unpacked_without_touching_it(): void
+    {
+        $composerPhar = new ComposerPhar(self::FIXTURE_PHAR, (string) hash_file('sha256', self::FIXTURE_PHAR));
+        $entryScript = $composerPhar->in($this->directory.'/.composer');
+        $this->filesystem->dumpFile($entryScript, '<?php // unpacked by an earlier run');
+
+        self::assertSame(
+            [$entryScript, '<?php // unpacked by an earlier run', 1],
+            [$composerPhar->in($this->directory.'/.composer'), file_get_contents($entryScript), \count((array) glob($this->directory.'/.composer/*.phar'))],
+        );
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_runs_the_composer_another_run_unpacked_first(): void
+    {
+        $composerPhar = new ComposerPhar(self::FIXTURE_PHAR, (string) hash_file('sha256', self::FIXTURE_PHAR), new RaceLosingFilesystem());
+
+        $entryScript = $composerPhar->in($this->directory.'/.composer');
+
+        self::assertSame(
+            ['<?php // unpacked by another run', [\dirname($entryScript, 2)]],
+            [file_get_contents($entryScript), glob($this->directory.'/.composer/*', \GLOB_ONLYDIR)],
+        );
+    }
+
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_reports_an_unpacked_composer_it_cannot_move_in_place(): void
+    {
+        $composerPhar = new ComposerPhar(self::FIXTURE_PHAR, (string) hash_file('sha256', self::FIXTURE_PHAR), new RenameRefusingFilesystem());
+
+        $this->expectExceptionMessageContaining('Cannot rename');
+
+        $composerPhar->in($this->directory.'/.composer');
     }
 
     public function test_it_refuses_a_bundled_composer_whose_checksum_does_not_match_and_keeps_none_of_it(): void

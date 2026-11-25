@@ -422,7 +422,7 @@ final class ComposerBridgeInstallerTest extends TestCase
         $process = $this->embeddedProcess('symfony/ai-anthropic-platform', 'v0.14.1');
 
         self::assertStringStartsWith("'/usr/bin/php' '/opt/symfony-security-auditor' 'require' 'symfony/ai-anthropic-platform'", $process->getCommandLine());
-        self::assertSame($this->targetDirectory.'/.composer/composer/bin/composer', $process->getEnv()['SYMFONY_SECURITY_AUDITOR_COMPOSER'] ?? null);
+        self::assertSame(\sprintf('%s/.composer/composer-2.8.12-%s/bin/composer', $this->targetDirectory, substr((string) hash_file('sha256', __DIR__.'/../../../Fixture/Composer/composer.phar'), 0, 12)), $process->getEnv()['SYMFONY_SECURITY_AUDITOR_COMPOSER'] ?? null);
     }
 
     /**

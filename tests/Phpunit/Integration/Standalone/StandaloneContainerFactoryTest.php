@@ -43,6 +43,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
@@ -107,7 +108,7 @@ final class StandaloneContainerFactoryTest extends TestCase
         );
         (new Filesystem())->dumpFile($this->cacheDir.'/project/composer.lock', '{"packages": []}');
 
-        $containerBuilder = (new StandaloneContainerFactory(embeddedComposer: $embeddedComposer))->create(
+        $containerBuilder = StandaloneContainerFactory::withEmbeddedComposer($embeddedComposer, new XdgConfigPathResolver(null, null, null, $this->cacheDir.'/data'))->create(
             new StandaloneConfig(['cache' => ['enabled' => false]], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]])),
             $this->cacheDir,
         );

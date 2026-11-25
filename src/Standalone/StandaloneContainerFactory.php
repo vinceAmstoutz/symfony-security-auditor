@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 
+use Closure;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\AI\AiBundle\AiBundle;
@@ -21,6 +22,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBag;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Component\Process\Process;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullPricingProvider;
@@ -38,6 +40,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnly
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
@@ -62,11 +65,25 @@ final readonly class StandaloneContainerFactory
 
     private const string PLATFORM_SERVICE_PREFIX = 'ai.platform.';
 
+    /**
+     * @param ?Closure(string): Process $advisoryProcessBuilder the `composer audit` process builder, `composer` on `PATH` when null
+     */
     public function __construct(
         private BundleExtensionLoader $bundleExtensionLoader = new BundleExtensionLoader(),
         private OfflineOnlyPlatformGuard $offlineOnlyPlatformGuard = new OfflineOnlyPlatformGuard(),
-        private ?EmbeddedComposer $embeddedComposer = null,
+        private ?Closure $advisoryProcessBuilder = null,
     ) {}
+
+    /**
+     * Audits advisories with the Composer this binary bundles, unpacked in the
+     * data directory, or with `composer` on `PATH` when it bundles none.
+     */
+    public static function withEmbeddedComposer(?EmbeddedComposer $embeddedComposer, XdgConfigPathResolver $xdgConfigPathResolver): self
+    {
+        return $embeddedComposer instanceof EmbeddedComposer
+            ? new self(advisoryProcessBuilder: SymfonyProcessComposerAuditRunner::embeddedProcessBuilder($embeddedComposer, $xdgConfigPathResolver))
+            : new self();
+    }
 
     /**
      * @throws MissingBundleExtensionException
@@ -118,12 +135,12 @@ final readonly class StandaloneContainerFactory
 
     private function auditAdvisoriesWithEmbeddedComposer(ContainerBuilder $containerBuilder): void
     {
-        if (!$this->embeddedComposer instanceof EmbeddedComposer) {
+        if (!$this->advisoryProcessBuilder instanceof Closure) {
             return;
         }
 
         $containerBuilder->getDefinition(SymfonyProcessComposerAuditRunner::class)
-            ->setArgument('$processBuilder', SymfonyProcessComposerAuditRunner::embeddedProcessBuilder($this->embeddedComposer));
+            ->setArgument('$processBuilder', $this->advisoryProcessBuilder);
     }
 
     /**
