@@ -19,8 +19,8 @@ use function Symfony\Component\String\u;
  * A unified-diff patch read from a model's answer, ignoring the prose and code
  * fences around it and replacing invalid UTF-8. parse() returns null for a
  * patch that creates, deletes or renames a file, leaves the project, has a
- * header with no hunk or a hunk whose counts do not add up, so no part of it
- * is applied.
+ * header with no hunk, a hunk whose counts do not add up or a hunk line past
+ * the lines its header counts, so no part of it is applied.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -29,6 +29,8 @@ final readonly class UnifiedDiff
     private const string NEW_FILE_PREFIX = '+++ ';
 
     private const string NO_NEWLINE_MARKER = '\\';
+
+    private const string HUNK_LINE = '/^(?:[-+ ]|@@)/';
 
     private const string HUNK_HEADER = '/^@@ -(\d+)(?:,(\d+))? \+\d+(?:,(\d+))? @@/';
 
@@ -63,12 +65,20 @@ final readonly class UnifiedDiff
     private static function nextFileHeader(array $lines, int $from): ?int
     {
         for ($index = $from, $count = \count($lines) - 1; $index < $count; ++$index) {
-            if (str_starts_with($lines[$index], '--- ') && str_starts_with($lines[$index + 1], self::NEW_FILE_PREFIX)) {
+            if (self::isFileHeader($lines, $index)) {
                 return $index;
             }
         }
 
         return null;
+    }
+
+    /**
+     * @param list<string> $lines
+     */
+    private static function isFileHeader(array $lines, int $index): bool
+    {
+        return str_starts_with($lines[$index], '--- ') && str_starts_with($lines[$index + 1] ?? '', self::NEW_FILE_PREFIX);
     }
 
     /**
@@ -93,7 +103,21 @@ final readonly class UnifiedDiff
             [$hunks[], $index] = $hunk;
         }
 
-        return null === $path || [] === $hunks ? null : [new FilePatch($path, $hunks), $index];
+        return null === $path || [] === $hunks || self::hunkLineFollows($lines, $index) ? null : [new FilePatch($path, $hunks), $index];
+    }
+
+    /**
+     * @param list<string> $lines
+     */
+    private static function hunkLineFollows(array $lines, int $from): bool
+    {
+        for ($index = $from, $count = \count($lines); $index < $count; ++$index) {
+            if ('' !== $lines[$index] && !str_starts_with($lines[$index], self::NO_NEWLINE_MARKER)) {
+                return 1 === preg_match(self::HUNK_LINE, $lines[$index]) && !self::isFileHeader($lines, $index);
+            }
+        }
+
+        return false;
     }
 
     private static function pathOf(string $line, string $marker, string $side): ?string

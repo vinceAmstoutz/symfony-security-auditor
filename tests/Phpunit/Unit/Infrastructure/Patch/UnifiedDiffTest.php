@@ -69,6 +69,10 @@ final class UnifiedDiffTest extends TestCase
         yield 'a header without its a/ and b/ sides' => ["--- x.php\n+++ x.php\n@@ -1 +1 @@\n-a\n+b"];
         yield 'a hunk longer than its header says' => ["--- a/x.php\n+++ b/x.php\n@@ -1,2 +1 @@\n-a\n+b\n+c\n d"];
         yield 'no patch at all' => ['NO_FIX: the code is fine'];
+        yield 'a blank line between two hunks' => ["--- a/x.php\n+++ b/x.php\n@@ -1,2 +1,2 @@\n a\n-b\n+B\n\n@@ -10,2 +10,2 @@\n x\n-y\n+Y\n"];
+        yield 'an added line past what its header counts' => ["--- a/x.php\n+++ b/x.php\n@@ -1,2 +1,2 @@\n a\n-b\n+c\n+d\n e"];
+        yield 'a context line after a blank line past its count' => ["--- a/x.php\n+++ b/x.php\n@@ -1 +1 @@\n-a\n+b\n\n c"];
+        yield 'a removed line after the no newline marker' => ["--- a/x.php\n+++ b/x.php\n@@ -1 +1 @@\n-a\n+b\n\\ No newline at end of file\n-c"];
         yield 'prose inside a hunk' => ["--- a/x.php\n+++ b/x.php\n@@ -1,2 +1,2 @@\n a\nThen change b:\n-b\n+c"];
     }
 

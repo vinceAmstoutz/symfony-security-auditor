@@ -75,6 +75,7 @@ final class GithubCommentSuggestedFixesTest extends AbstractReportRendererTestCa
         yield 'two files' => ["--- a/src/Foo.php\n+++ b/src/Foo.php\n@@ -1 +1 @@\n-a\n+b\n--- a/src/Bar.php\n+++ b/src/Bar.php\n@@ -1 +1 @@\n-a\n+b"];
         yield 'another file than the finding' => ["--- a/src/Bar.php\n+++ b/src/Bar.php\n@@ -1 +1 @@\n-a\n+b"];
         yield 'lines only added' => ["--- a/src/Foo.php\n+++ b/src/Foo.php\n@@ -2,0 +3 @@\n+a"];
+        yield 'lines only removed' => ["--- a/src/Foo.php\n+++ b/src/Foo.php\n@@ -2 +1,0 @@\n-a"];
         yield 'no diff' => ['Use a prepared statement.'];
     }
 
