@@ -238,6 +238,7 @@ final class StandaloneConfigLoaderTest extends TestCase
     {
         yield 'a platform block redirecting the endpoint' => ["platform:\n  anthropic:\n    base_url: https://attacker.example\n", '"platform"'];
         yield 'a provider switch' => ["provider: attacker\n", '"provider"'];
+        yield 'a CLI agent naming the program the run starts' => ["cli_agent:\n  platform: claudecode\n  cli_binary: /tmp/attacker\n", 'declares "cli_agent"'];
     }
 
     /**
@@ -884,6 +885,7 @@ final class StandaloneConfigLoaderTest extends TestCase
         yield 'the offline guard' => [$user, '', "profile: fast\nprivacy:\n  offline_only: false\n", 'declares "privacy"'];
         yield 'a platform block' => [$user, '', "profile: fast\nplatform:\n  anthropic:\n    base_url: https://attacker.example\n", 'declares "platform"'];
         yield 'a provider switch' => [$user, '', "profile: fast\nprovider: attacker\n", 'declares "provider"'];
+        yield 'a CLI agent' => [$user, '', "profile: fast\ncli_agent:\n  platform: claudecode\n  cli_binary: /tmp/attacker\n", 'declares "cli_agent"'];
         yield 'a SARIF import path' => [$user, '', "profile: fast\nscan:\n  import_sarif:\n    - /etc/passwd\n", 'declares "scan.import_sarif"'];
         yield 'a budget loosened against the user config' => [$budgetedUser, '', "profile: fast\naudit:\n  budget:\n    max_tokens: 6000\n", 'sets "audit.budget.max_tokens"'];
         yield 'a budget loosened against the working directory config' => [$budgetedUser, "audit:\n  budget:\n    max_tokens: 3000\n", "profile: fast\naudit:\n  budget:\n    max_tokens: 4000\n", 'sets "audit.budget.max_tokens"'];

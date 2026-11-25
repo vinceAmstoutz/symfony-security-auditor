@@ -197,7 +197,7 @@ _Since 1.23_ every call streams its answer, so a proxy that closes idle connecti
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `privacy.offline_only` | `bool` | `false` | Refuse every network call the auditor itself makes: `composer audit` never runs, so `lookup_advisory` finds no advisory; `self-update` no longer refreshes the pricing catalog. The standalone binary also refuses to start unless every platform endpoint is loopback or private-range (Ollama, LM Studio, a LAN box) and ignores proxy variables for a loopback endpoint. In bundle mode, pointing `ai.yaml` at a local platform is up to you. See [How do I verify that nothing leaves my machine?](faq.md#how-do-i-verify-that-nothing-leaves-my-machine) |
+| `privacy.offline_only` | `bool` | `false` | Refuse every network call the auditor itself makes: `composer audit` never runs, so `lookup_advisory` finds no advisory; `self-update` no longer refreshes the pricing catalog. The standalone binary also refuses to start unless every platform endpoint is loopback or private-range (Ollama, LM Studio, a LAN box) and ignores proxy variables for a loopback endpoint. In bundle mode, pointing `ai.yaml` at a local platform is up to you; a `cli_agent` is refused. See [How do I verify that nothing leaves my machine?](faq.md#how-do-i-verify-that-nothing-leaves-my-machine) |
 
 ```yaml
 # config/packages/symfony_security_auditor.yaml
@@ -468,7 +468,7 @@ Maps merge key by key; a list such as `scan.included_paths` is replaced whole by
 
 A project file ships with the repository you audit, so it may not decide what the run trusts, where your key and code go, or what it writes:
 
-- **Keys it may not set:** `platform`, `provider` and `scan.import_sarif`, which could send your API key, your code or any file of yours elsewhere; and `cache`, `privacy`, `audit.custom_skills`, `audit.output`, `audit.tools_scope`, `scan.custom_risk_patterns` and `scan.secret_scrubbing`.
+- **Keys it may not set:** `platform`, `provider` and `scan.import_sarif`, which could send your API key, your code or any file of yours elsewhere; `cli_agent`, which could start a program of its choosing with your environment; and `cache`, `privacy`, `audit.custom_skills`, `audit.output`, `audit.tools_scope`, `scan.custom_risk_patterns` and `scan.secret_scrubbing`.
 - **Values it may not set:** a `%env()%` or other container reference, text that is not plain (control characters, `::`), a model name that is not a bare model id, a non-map value in place of one of your sections or an `audit.budget` that raises or removes your caps, which it may only lower. `http_timeout` may only be raised.
 - **Files refused:** a symlink, a file over 512 KiB, nested over 32 levels or expanding to 10,000 values or more, and, in the audited project, one naming an `audit.baseline` that is not a regular file of at most 1 MiB inside the project. `scan.included_paths` stays confined to the project root by real path.
 

@@ -29,6 +29,8 @@ final readonly class GuardedProjectConfigReader
 {
     public const array PLATFORM_KEYS = ['platform', 'provider'];
 
+    private const string CLI_AGENT_KEY = 'cli_agent';
+
     private const array SCAN_SURFACE_KEYS = ['import_sarif'];
 
     /**
@@ -46,7 +48,8 @@ final readonly class GuardedProjectConfigReader
 
     /**
      * Refuses a connection setting, which would let a repository aim the
-     * user's API credentials at an endpoint of its choosing.
+     * user's API credentials at an endpoint of its choosing, or a CLI agent,
+     * which would let it pick the program the run starts.
      *
      * @param array<array-key, mixed> $baseConfig the configuration read before this file, which it may tighten but not loosen or erase
      *
@@ -69,6 +72,10 @@ final readonly class GuardedProjectConfigReader
 
         if ([] !== $connectionKeys) {
             throw ProjectConfigPlatformOverrideException::forKeys($projectConfigFile, $connectionKeys);
+        }
+
+        if (\array_key_exists(self::CLI_AGENT_KEY, $projectConfig)) {
+            throw ProjectConfigPlatformOverrideException::forCliAgent($projectConfigFile, self::CLI_AGENT_KEY);
         }
 
         $this->guardAgainstSectionErasure($projectConfigFile, $projectConfig, $baseConfig);
