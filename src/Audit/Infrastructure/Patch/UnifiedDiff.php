@@ -32,6 +32,8 @@ final readonly class UnifiedDiff
 
     private const string HUNK_LINE = '/^(?:[-+ ]|@@)/';
 
+    private const string HUNK_LINE_AFTER_A_BLANK_LINE = '/^(?: |@@)/';
+
     private const string HUNK_HEADER = '/^@@ -(\d+)(?:,(\d+))? \+\d+(?:,(\d+))? @@/';
 
     /**
@@ -111,13 +113,36 @@ final readonly class UnifiedDiff
      */
     private static function hunkLineFollows(array $lines, int $from): bool
     {
+        $next = self::nextContentLine($lines, $from);
+        if (null === $next) {
+            return false;
+        }
+
+        $pattern = self::holdsABlankLine($lines, $from, $next) ? self::HUNK_LINE_AFTER_A_BLANK_LINE : self::HUNK_LINE;
+
+        return 1 === preg_match($pattern, $lines[$next]) && !self::isFileHeader($lines, $next);
+    }
+
+    /**
+     * @param list<string> $lines
+     */
+    private static function nextContentLine(array $lines, int $from): ?int
+    {
         for ($index = $from, $count = \count($lines); $index < $count; ++$index) {
             if ('' !== $lines[$index] && !str_starts_with($lines[$index], self::NO_NEWLINE_MARKER)) {
-                return 1 === preg_match(self::HUNK_LINE, $lines[$index]) && !self::isFileHeader($lines, $index);
+                return $index;
             }
         }
 
-        return false;
+        return null;
+    }
+
+    /**
+     * @param list<string> $lines
+     */
+    private static function holdsABlankLine(array $lines, int $from, int $to): bool
+    {
+        return \in_array('', \array_slice($lines, $from, $to - $from), true);
     }
 
     private static function pathOf(string $line, string $marker, string $side): ?string

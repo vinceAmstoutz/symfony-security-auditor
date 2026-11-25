@@ -101,6 +101,7 @@ final class UnifiedDiffTest extends TestCase
         yield 'a second file after a last line with no newline' => ["--- a/x.php\n+++ b/x.php\n@@ -1 +1 @@\n-a\n+b\n\\ No newline at end of file\n--- a/y.php\n+++ b/y.php\n@@ -1 +1 @@\n-c\n+d", [new FilePatch('x.php', [new DiffHunk(1, ['a'], ['b'])]), new FilePatch('y.php', [new DiffHunk(1, ['c'], ['d'])])]];
         yield 'lines added after line 2' => ["--- a/x.php\n+++ b/x.php\n@@ -2,0 +3,2 @@\n+a\n+b", [new FilePatch('x.php', [new DiffHunk(3, [], ['a', 'b'])])]];
         yield 'an empty context line written without its space' => ["--- a/x.php\n+++ b/x.php\n@@ -1,3 +1,3 @@\n-a\n+b\n\n c", [new FilePatch('x.php', [new DiffHunk(1, ['a', '', 'c'], ['b', '', 'c'])])]];
+        yield 'a markdown bullet after a blank line past the patch' => ["--- a/x.php\n+++ b/x.php\n@@ -1 +1 @@\n-a\n+b\n\n- This also escapes the title", [new FilePatch('x.php', [new DiffHunk(1, ['a'], ['b'])])]];
         yield 'a last line with no newline' => ["--- a/x.php\n+++ b/x.php\n@@ -1 +1 @@\n-a\n\\ No newline at end of file\n+b\n\\ No newline at end of file", [new FilePatch('x.php', [new DiffHunk(1, ['a'], ['b'])])]];
         yield 'windows line endings and a dated header' => ["--- a/x.php\t2026-11-01\r\n+++ b/x.php\t2026-11-01\r\n@@ -1 +1 @@\r\n-a\r\n+b\r\n", [new FilePatch('x.php', [new DiffHunk(1, ['a'], ['b'])])]];
     }
