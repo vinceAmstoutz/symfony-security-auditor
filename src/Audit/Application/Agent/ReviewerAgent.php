@@ -207,10 +207,11 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
     }
 
     /**
-     * Reviews the findings that share a file with another in calls of at most
+     * Reviews a finding alone in its file as {@see self::review()} does. The
+     * findings that share a file go in calls of at most
      * {@see self::MAX_FILE_GROUP_SIZE} findings of one file, so the file is
-     * sent once per call, and the others as {@see self::review()} does. An
-     * abort before the grouped calls marks their findings unreached.
+     * sent once per call. An abort before those calls marks their findings
+     * unreached.
      *
      * @param list<Vulnerability> $vulnerabilities
      * @param list<ProjectFile>   $projectFiles

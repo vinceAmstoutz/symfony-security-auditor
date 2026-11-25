@@ -159,7 +159,7 @@
             },
             "report_static_findings": {
               "type": "boolean",
-              "description": "Report every redacted credential and every static pre-scan match as a finding, validated by the reviewer. Default: false; the configuration init writes turns it on. Since 1.23."
+              "description": "Report every redacted credential and every static pre-scan match, up to 20 of one pattern per file, as a finding, validated by the reviewer. Default: false; the configuration init writes turns it on. Since 1.23."
             },
             "tools_enabled": {
               "type": "boolean",
