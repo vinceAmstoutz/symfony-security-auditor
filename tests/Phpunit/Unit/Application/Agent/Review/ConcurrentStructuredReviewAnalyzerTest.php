@@ -45,6 +45,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ToolBatchCapableLLMCl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordReviewToolFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\CountingReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
 
 final class ConcurrentStructuredReviewAnalyzerTest extends TestCase
@@ -84,6 +85,44 @@ final class ConcurrentStructuredReviewAnalyzerTest extends TestCase
         $concurrentStructuredReviewAnalyzer->analyze([$this->vulnerabilityAt('src/A.php'), $this->vulnerabilityAt('src/B.php')], [], new NullCoverageRecorder(), false);
 
         self::assertSame([1, 1], $batchSizes);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_it_builds_the_requests_of_a_window_only_when_it_dispatches_that_window(): void
+    {
+        $countingReviewerPromptBuilder = new CountingReviewerPromptBuilder(new ReviewerPromptBuilder(useStructuredCollection: true));
+        $builtAtDispatch = [];
+        $llmClient = self::createStub(ToolBatchCapableLLMClientInterface::class);
+        $llmClient->method('completeBatchWithTools')->willReturnCallback(
+            static function (array $requests) use (&$builtAtDispatch, $countingReviewerPromptBuilder): array {
+                $builtAtDispatch[] = $countingReviewerPromptBuilder->userMessagesBuilt;
+
+                return array_fill(0, \count($requests), LLMResponse::of('', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)));
+            },
+        );
+
+        $concurrentStructuredReviewAnalyzer = new ConcurrentStructuredReviewAnalyzer(
+            $llmClient,
+            $countingReviewerPromptBuilder,
+            new ReviewerVerdictCache(new NullReviewerCache(), new NullLogger()),
+            $this->reviewOutcomeRecorder(),
+            new RecordReviewToolFactory(),
+            new NullLogger(),
+            2,
+            4,
+            RecordingToolClients::forReviewer(new NullLogger()),
+        );
+
+        $concurrentStructuredReviewAnalyzer->analyze([$this->vulnerabilityAt('src/A.php'), $this->vulnerabilityAt('src/B.php'), $this->vulnerabilityAt('src/C.php')], [], new NullCoverageRecorder(), false);
+
+        self::assertSame([2, 3], $builtAtDispatch);
     }
 
     private function reviewOutcomeRecorder(): ReviewOutcomeRecorder

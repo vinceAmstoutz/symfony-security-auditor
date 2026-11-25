@@ -96,7 +96,7 @@ final readonly class CandidateFindingSource implements CandidateFindingSourceInt
 
         $findings = [];
         foreach ($markersByPath as $path => $riskMarkers) {
-            array_push($findings, ...self::findingsOnLines(explode("\n", ($filesByPath[$path] ?? null)?->content() ?? ''), $riskMarkers));
+            array_push($findings, ...$this->findingsOnLines(explode("\n", ($filesByPath[$path] ?? null)?->content() ?? ''), $riskMarkers));
         }
 
         return $findings;
@@ -115,7 +115,7 @@ final readonly class CandidateFindingSource implements CandidateFindingSourceInt
      * @throws InvalidVulnerabilityClassificationException
      * @throws InvalidVulnerabilityNarrativeException
      */
-    private static function findingsOnLines(array $lines, array $riskMarkers): array
+    private function findingsOnLines(array $lines, array $riskMarkers): array
     {
         $findings = [];
         $listedPerPattern = [];

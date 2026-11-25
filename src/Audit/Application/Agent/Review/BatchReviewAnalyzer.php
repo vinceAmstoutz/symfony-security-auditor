@@ -123,9 +123,7 @@ final readonly class BatchReviewAnalyzer
      */
     private function reviewMissesInBatches(array $reviewed, array $misses, array $missIndexes, ReviewBatchSettings $reviewBatchSettings, ReviewCacheBuckets $reviewCacheBuckets): array
     {
-        [$batches, $missIndexes] = $reviewBatchSettings->groupByFile
-            ? self::fileBatches($misses, $missIndexes, $reviewBatchSettings->batchSize)
-            : [array_chunk($misses, $reviewBatchSettings->batchSize), $missIndexes];
+        [$batches, $missIndexes] = ReviewBatches::of($misses, $missIndexes, $reviewBatchSettings);
         $position = 0;
         foreach ($batches as $batchNumber => $batch) {
             try {
@@ -146,35 +144,6 @@ final readonly class BatchReviewAnalyzer
         }
 
         return $reviewed;
-    }
-
-    /**
-     * Returns batches of at most `$batchSize` findings of one file, with the
-     * input index of each finding in batch order.
-     *
-     * @param list<Vulnerability> $misses
-     * @param list<int>           $missIndexes
-     * @param int<1, max>         $batchSize
-     *
-     * @return array{list<list<Vulnerability>>, list<int>}
-     */
-    private static function fileBatches(array $misses, array $missIndexes, int $batchSize): array
-    {
-        $positionsByFile = [];
-        foreach ($misses as $position => $miss) {
-            $positionsByFile[$miss->filePath()][] = $position;
-        }
-
-        $batches = [];
-        $batchedIndexes = [];
-        foreach ($positionsByFile as $positions) {
-            foreach (array_chunk($positions, $batchSize) as $batchPositions) {
-                $batches[] = array_map(static fn (int $position): Vulnerability => $misses[$position], $batchPositions);
-                array_push($batchedIndexes, ...array_map(static fn (int $position): int => $missIndexes[$position], $batchPositions));
-            }
-        }
-
-        return [$batches, $batchedIndexes];
     }
 
     /**

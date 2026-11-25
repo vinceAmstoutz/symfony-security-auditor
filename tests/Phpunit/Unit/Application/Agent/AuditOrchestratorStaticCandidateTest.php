@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent;
 
+use Exception;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
@@ -225,6 +227,44 @@ final class AuditOrchestratorStaticCandidateTest extends TestCase
         AuditOrchestratorHarness::orchestrator($attackerLlm, $reviewerLlm)->orchestrate($auditContext);
 
         self::assertEqualsCanonicalizing(['Static analysis: native query concat', 'Static analysis: unserialize call'], $this->validatedTitles($auditContext));
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('reviewAbortCases')]
+    public function test_an_abort_while_reviewing_the_attacker_findings_marks_the_static_candidates_unreached(Exception $exception, string $status): void
+    {
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturn(AuditOrchestratorHarness::attackerResponse([AuditOrchestratorHarness::vulnerabilityPayload(lineStart: 40, lineEnd: 42)]));
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm->method('complete')->willThrowException($exception);
+
+        $auditContext = $this->contextWith([$this->staticCandidate(10)]);
+        $aborted = false;
+        try {
+            AuditOrchestratorHarness::orchestrator($attackerLlm, $reviewerLlm, ['maxIterations' => 1])->orchestrate($auditContext);
+        } catch (BudgetExceededException|LLMProviderException) {
+            $aborted = true;
+        }
+
+        self::assertTrue($aborted, 'The orchestrator must rethrow the abort.');
+        self::assertSame(
+            [['stage' => 'reviewer', 'file' => self::FILE, 'status' => $status], ['stage' => 'reviewer', 'file' => self::FILE, 'status' => $status]],
+            array_values(array_filter($auditContext->coverage(), static fn (array $entry): bool => 'reviewer' === $entry['stage'])),
+        );
+    }
+
+    /** @return iterable<string, array{Exception, string}> */
+    public static function reviewAbortCases(): iterable
+    {
+        yield 'budget exceeded' => [BudgetExceededException::forTokens(500, 100), 'aborted'];
+        yield 'provider failure' => [new LLMProviderException('platform unreachable'), 'errored'];
     }
 
     /**

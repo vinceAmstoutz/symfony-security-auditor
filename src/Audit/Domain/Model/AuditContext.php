@@ -35,6 +35,9 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     /** @var array<string, Vulnerability> keyed by vulnerability id */
     private array $vulnerabilities = [];
 
+    /** @var array<string, array<string, true>> the ids of the vulnerabilities of each file */
+    private array $vulnerabilityIdsByFile = [];
+
     /** @var array<string, mixed> */
     private array $metadata = [];
 
@@ -64,6 +67,9 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
 
     /** @var list<Vulnerability> */
     private array $baselineSkippedFindings = [];
+
+    /** @var array<string, list<Vulnerability>> */
+    private array $baselineSkippedFindingsByFingerprint = [];
 
     private bool $costEstimate = false;
 
@@ -192,6 +198,20 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     public function recordBaselineSkippedFinding(Vulnerability $vulnerability): void
     {
         $this->baselineSkippedFindings[] = $vulnerability;
+        $this->baselineSkippedFindingsByFingerprint[$vulnerability->fingerprint()][] = $vulnerability;
+    }
+
+    /**
+     * The baseline-skipped findings under `$fingerprint`, in the order they
+     * were skipped.
+     *
+     * @internal not part of the BC promise, see docs/versioning.md
+     *
+     * @return list<Vulnerability>
+     */
+    public function baselineSkippedFindingsWith(string $fingerprint): array
+    {
+        return $this->baselineSkippedFindingsByFingerprint[$fingerprint] ?? [];
     }
 
     /** @return list<Vulnerability> */
@@ -317,16 +337,39 @@ final class AuditContext implements CoverageRecorderInterface, RejectedFindingRe
     public function addVulnerability(Vulnerability $vulnerability): void
     {
         $this->vulnerabilities[$vulnerability->id()] = $vulnerability;
+        $this->vulnerabilityIdsByFile[$vulnerability->filePath()][$vulnerability->id()] = true;
     }
 
     public function replaceVulnerability(Vulnerability $vulnerability): void
     {
-        $this->vulnerabilities[$vulnerability->id()] = $vulnerability;
+        $this->addVulnerability($vulnerability);
     }
 
     public function removeVulnerability(string $id): void
     {
+        $vulnerability = $this->vulnerabilities[$id] ?? null;
+        if ($vulnerability instanceof Vulnerability) {
+            unset($this->vulnerabilityIdsByFile[$vulnerability->filePath()][$id]);
+        }
+
         unset($this->vulnerabilities[$id]);
+    }
+
+    /**
+     * The vulnerabilities of one file, by id.
+     *
+     * @internal not part of the BC promise, see docs/versioning.md
+     *
+     * @return array<string, Vulnerability>
+     */
+    public function vulnerabilitiesIn(string $filePath): array
+    {
+        $vulnerabilities = [];
+        foreach (array_keys($this->vulnerabilityIdsByFile[$filePath] ?? []) as $id) {
+            $vulnerabilities[$id] = $this->vulnerabilities[$id];
+        }
+
+        return $vulnerabilities;
     }
 
     public function setMeta(string $key, mixed $value): void

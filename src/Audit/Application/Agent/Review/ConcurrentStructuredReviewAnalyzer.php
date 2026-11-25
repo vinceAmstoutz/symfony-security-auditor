@@ -67,7 +67,6 @@ final readonly class ConcurrentStructuredReviewAnalyzer
         $codeContexts = [];
         $sessions = [];
         $pendingIndexes = [];
-        $requests = [];
         foreach ($vulnerabilities as $index => $vulnerability) {
             $codeContext = CodeContextResolver::resolve($vulnerability->filePath(), $projectFiles);
             $codeContexts[$index] = $codeContext;
@@ -79,14 +78,12 @@ final readonly class ConcurrentStructuredReviewAnalyzer
                 continue;
             }
 
-            $structuredReviewCollectionSession = StructuredReviewCollectionSession::begin($this->recordReviewToolFactory, $this->logger);
-            $sessions[$index] = $structuredReviewCollectionSession;
+            $sessions[$index] = StructuredReviewCollectionSession::begin($this->recordReviewToolFactory, $this->logger);
             $pendingIndexes[] = $index;
-            $requests[] = $this->buildRequest($vulnerability, $codeContext, $structuredReviewCollectionSession);
         }
 
-        if ([] !== $requests) {
-            $concurrentReviewBatch = new ConcurrentReviewBatch($requests, $pendingIndexes, $sessions, $vulnerabilities, $codeContexts, $bypassCache);
+        if ([] !== $pendingIndexes) {
+            $concurrentReviewBatch = new ConcurrentReviewBatch([], $pendingIndexes, $sessions, $vulnerabilities, $codeContexts, $bypassCache);
             $reviewed = $this->dispatchInWindows($concurrentReviewBatch, $coverageRecorder, $reviewed);
         }
 
@@ -98,17 +95,18 @@ final readonly class ConcurrentStructuredReviewAnalyzer
     /**
      * @return array{system: string, user: string, tools: ToolRegistry}
      */
-    private function buildRequest(Vulnerability $vulnerability, string $codeContext, StructuredReviewCollectionSession $structuredReviewCollectionSession): array
+    private function buildRequest(int $index, ConcurrentReviewBatch $concurrentReviewBatch): array
     {
         return [
             'system' => $this->reviewerPromptBuilder->buildSystemPrompt(),
-            'user' => $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
-            'tools' => $structuredReviewCollectionSession->toolRegistry,
+            'user' => $this->reviewerPromptBuilder->buildUserMessage($concurrentReviewBatch->vulnerabilities[$index], $concurrentReviewBatch->codeContexts[$index]),
+            'tools' => $concurrentReviewBatch->sessions[$index]->toolRegistry,
         ];
     }
 
     /**
-     * Applies each window's verdicts before dispatching the next.
+     * Builds and applies each window's requests before dispatching the next,
+     * so only one window's prompts are held at a time.
      *
      * @param array<int, Vulnerability> $reviewed
      *
@@ -119,12 +117,11 @@ final readonly class ConcurrentStructuredReviewAnalyzer
      */
     private function dispatchInWindows(ConcurrentReviewBatch $concurrentReviewBatch, CoverageRecorderInterface $coverageRecorder, array $reviewed): array
     {
-        $windowSize = max(1, $this->maxConcurrent);
-        $requestWindows = array_chunk($concurrentReviewBatch->requests, $windowSize);
-        $indexWindows = array_chunk($concurrentReviewBatch->pendingIndexes, $windowSize);
+        $indexWindows = array_chunk($concurrentReviewBatch->pendingIndexes, max(1, $this->maxConcurrent));
 
-        foreach ($requestWindows as $windowNumber => $requestWindow) {
-            $windowBatch = new ConcurrentReviewBatch($requestWindow, $indexWindows[$windowNumber], $concurrentReviewBatch->sessions, $concurrentReviewBatch->vulnerabilities, $concurrentReviewBatch->codeContexts, $concurrentReviewBatch->bypassCache);
+        foreach ($indexWindows as $windowNumber => $indexWindow) {
+            $requestWindow = array_map(fn (int $index): array => $this->buildRequest($index, $concurrentReviewBatch), $indexWindow);
+            $windowBatch = new ConcurrentReviewBatch($requestWindow, $indexWindow, $concurrentReviewBatch->sessions, $concurrentReviewBatch->vulnerabilities, $concurrentReviewBatch->codeContexts, $concurrentReviewBatch->bypassCache);
 
             try {
                 $reviewed = $this->dispatchPending($windowBatch, $coverageRecorder, $reviewed);

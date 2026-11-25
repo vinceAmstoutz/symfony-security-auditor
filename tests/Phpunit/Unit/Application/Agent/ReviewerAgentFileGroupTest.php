@@ -20,8 +20,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\Budg
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
@@ -61,11 +61,10 @@ final class ReviewerAgentFileGroupTest extends TestCase
             return self::verdicts($user, true);
         });
 
-        $reviewed = ReviewerAgentHarness::reviewerAgent($llmClient)->review(
-            [],
+        $reviewed = ReviewerAgentHarness::reviewerAgent($llmClient)->reviewByFile(
+            [$this->findingAt('src/A.php', 1), $this->findingAt('src/B.php', 1), $this->findingAt('src/A.php', 2)],
             [ProjectFile::create('src/A.php', '/app/src/A.php', "<?php\n// UNIQUE-A-SOURCE\n"), ProjectFile::create('src/B.php', '/app/src/B.php', '<?php')],
             AuditContext::forProject(sys_get_temp_dir()),
-            fileGroupedFindings: [$this->findingAt('src/A.php', 1), $this->findingAt('src/B.php', 1), $this->findingAt('src/A.php', 2)],
         );
 
         self::assertCount(2, $userMessages);
@@ -89,7 +88,7 @@ final class ReviewerAgentFileGroupTest extends TestCase
         $llmClient->method('complete')->willReturnCallback(static fn (string $system, string $user): LLMResponse => self::verdicts($user, str_contains($user, 'src/A.php')));
         $findings = [$this->findingAt('src/A.php', 1), $this->findingAt('src/B.php', 1), $this->findingAt('src/A.php', 2), $this->findingAt('src/B.php', 2)];
 
-        $reviewed = ReviewerAgentHarness::reviewerAgent($llmClient)->review([], [], AuditContext::forProject(sys_get_temp_dir()), fileGroupedFindings: $findings);
+        $reviewed = ReviewerAgentHarness::reviewerAgent($llmClient)->reviewByFile($findings, [], AuditContext::forProject(sys_get_temp_dir()));
 
         self::assertSame(
             [['src/A.php', 1, true], ['src/B.php', 1, false], ['src/A.php', 2, true], ['src/B.php', 2, false]],
@@ -117,11 +116,10 @@ final class ReviewerAgentFileGroupTest extends TestCase
             return self::verdicts($user, true);
         });
 
-        ReviewerAgentHarness::reviewerAgent($llmClient)->review(
-            [],
+        ReviewerAgentHarness::reviewerAgent($llmClient)->reviewByFile(
+            array_map(fn (int $line): Vulnerability => $this->findingAt('src/A.php', $line), range(1, 21)),
             [],
             AuditContext::forProject(sys_get_temp_dir()),
-            fileGroupedFindings: array_map(fn (int $line): Vulnerability => $this->findingAt('src/A.php', $line), range(1, 21)),
         );
 
         self::assertSame(2, $calls);
@@ -135,7 +133,7 @@ final class ReviewerAgentFileGroupTest extends TestCase
      * @throws InvalidVulnerabilityNarrativeException
      */
     #[DataProvider('abortCases')]
-    public function test_an_abort_before_the_file_groups_marks_their_findings_unreached(Exception $exception, string $status): void
+    public function test_an_abort_before_the_grouped_calls_marks_their_findings_unreached(Exception $exception, string $status): void
     {
         $llmClient = self::createStub(LLMClientInterface::class);
         $llmClient->method('complete')->willThrowException($exception);
@@ -143,11 +141,10 @@ final class ReviewerAgentFileGroupTest extends TestCase
 
         $aborted = false;
         try {
-            ReviewerAgentHarness::reviewerAgent($llmClient)->review(
-                [$this->findingAt('src/C.php', 1)],
+            ReviewerAgentHarness::reviewerAgent($llmClient)->reviewByFile(
+                [$this->findingAt('src/C.php', 1), $this->findingAt('src/A.php', 1), $this->findingAt('src/A.php', 2)],
                 [],
                 $auditContext,
-                fileGroupedFindings: [$this->findingAt('src/A.php', 1), $this->findingAt('src/A.php', 2)],
             );
         } catch (BudgetExceededException|LLMProviderException) {
             $aborted = true;

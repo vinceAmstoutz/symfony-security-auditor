@@ -850,7 +850,7 @@ final class RegexStaticPreScannerTest extends TestCase
     public static function nativeQueryConcatenationCases(): iterable
     {
         yield 'executeQuery, single quotes' => ["\$this->conn->executeQuery('SELECT * FROM orders WHERE id = '.\$id)"];
-        yield 'executeStatement, double quotes' => ["\$this->conn->executeStatement(\"DELETE FROM orders WHERE id = \" . \$id)"];
+        yield 'executeStatement, double quotes' => ['$this->conn->executeStatement("DELETE FROM orders WHERE id = " . $id)'];
         yield 'query' => ["\$this->conn->query('SELECT * FROM orders WHERE ref = ' . \$request->get('ref'))"];
         yield 'prepare, after a literal joined to another' => ["\$this->conn->prepare('SELECT * ' . 'FROM orders WHERE id = ' . \$id)"];
     }

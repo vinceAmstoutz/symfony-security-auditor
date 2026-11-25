@@ -37,6 +37,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\CountingReviewerPromptBuilder;
 
 final class ConcurrentReviewAnalyzerTest extends TestCase
 {
@@ -113,6 +114,42 @@ final class ConcurrentReviewAnalyzerTest extends TestCase
             ['src/A.php', 'src/B.php', 'src/C.php', 'src/D.php'],
             array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->filePath(), $reviewed),
         );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_it_builds_the_requests_of_a_window_only_when_it_dispatches_that_window(): void
+    {
+        $countingReviewerPromptBuilder = new CountingReviewerPromptBuilder(new ReviewerPromptBuilder());
+        $builtAtDispatch = [];
+        $llmClient = self::createStub(BatchCapableLLMClientInterface::class);
+        $llmClient->method('completeBatch')->willReturnCallback(
+            static function (array $requests) use (&$builtAtDispatch, $countingReviewerPromptBuilder): array {
+                $builtAtDispatch[] = $countingReviewerPromptBuilder->userMessagesBuilt;
+
+                return array_map(
+                    static fn (): LLMResponse => LLMResponse::of('{"accepted": true}', 'm', 'end_turn', TokenUsageSnapshot::of(1, 1)),
+                    $requests,
+                );
+            },
+        );
+
+        $concurrentReviewAnalyzer = new ConcurrentReviewAnalyzer(
+            $llmClient,
+            $countingReviewerPromptBuilder,
+            new ReviewerVerdictCache(new NullReviewerCache(), new NullLogger()),
+            $this->reviewOutcomeRecorder(),
+            2,
+        );
+
+        $concurrentReviewAnalyzer->analyze([$this->vulnerabilityAt('src/A.php'), $this->vulnerabilityAt('src/B.php'), $this->vulnerabilityAt('src/C.php')], [], new NullCoverageRecorder(), false);
+
+        self::assertSame([2, 3], $builtAtDispatch);
     }
 
     private function reviewOutcomeRecorder(): ReviewOutcomeRecorder

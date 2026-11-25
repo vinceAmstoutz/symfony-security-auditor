@@ -55,7 +55,6 @@ final readonly class ConcurrentReviewAnalyzer
     {
         $reviewed = [];
         $pending = [];
-        $requests = [];
         foreach ($vulnerabilities as $index => $vulnerability) {
             $codeContext = CodeContextResolver::resolve($vulnerability->filePath(), $projectFiles);
 
@@ -66,11 +65,10 @@ final readonly class ConcurrentReviewAnalyzer
                 continue;
             }
 
-            $pending[] = new PendingReview($index, $vulnerability, $bypassCache ? null : $codeContext);
-            $requests[] = $this->buildRequest($vulnerability, $codeContext);
+            $pending[] = new PendingReview($index, $vulnerability, $bypassCache ? null : $codeContext, $codeContext);
         }
 
-        foreach ($this->dispatchPending($requests, $pending, $coverageRecorder) as $index => $verdict) {
+        foreach ($this->dispatchPending($pending, $coverageRecorder) as $index => $verdict) {
             $reviewed[$index] = $verdict;
         }
 
@@ -92,35 +90,33 @@ final readonly class ConcurrentReviewAnalyzer
     /**
      * @return array{system: string, user: string}
      */
-    private function buildRequest(Vulnerability $vulnerability, string $codeContext): array
+    private function buildRequest(PendingReview $pendingReview): array
     {
         return [
             'system' => $this->reviewerPromptBuilder->buildSystemPrompt(),
-            'user' => $this->reviewerPromptBuilder->buildUserMessage($vulnerability, $codeContext),
+            'user' => $this->reviewerPromptBuilder->buildUserMessage($pendingReview->vulnerability, $pendingReview->codeContext),
         ];
     }
 
     /**
-     * Applies each window's verdicts before dispatching the next.
+     * Builds and applies each window's requests before dispatching the next,
+     * so only one window's prompts are held at a time.
      *
-     * @param list<array{system: string, user: string}> $requests
-     * @param list<PendingReview>                       $pending
+     * @param list<PendingReview> $pending
      *
      * @return array<int, Vulnerability>
      *
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
-    private function dispatchPending(array $requests, array $pending, CoverageRecorderInterface $coverageRecorder): array
+    private function dispatchPending(array $pending, CoverageRecorderInterface $coverageRecorder): array
     {
-        $windowSize = max(1, $this->maxConcurrent);
-        $requestWindows = array_chunk($requests, $windowSize);
-        $pendingWindows = array_chunk($pending, $windowSize);
+        $pendingWindows = array_chunk($pending, max(1, $this->maxConcurrent));
 
         $reviewed = [];
-        foreach ($requestWindows as $windowNumber => $requestWindow) {
+        foreach ($pendingWindows as $windowNumber => $pendingWindow) {
             try {
-                $reviewed += $this->dispatchWindow($requestWindow, $pendingWindows[$windowNumber], $coverageRecorder);
+                $reviewed += $this->dispatchWindow(array_map($this->buildRequest(...), $pendingWindow), $pendingWindow, $coverageRecorder);
             } catch (BudgetExceededException $budgetExceededException) {
                 $this->failRemainingWindows($pendingWindows, $windowNumber, 'aborted', $coverageRecorder);
 
