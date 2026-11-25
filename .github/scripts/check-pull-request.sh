@@ -193,9 +193,9 @@ function check_summary(   length_in_characters) {
   sub(/[ \t\n]+$/, "", summary)
   length_in_characters = characters(summary)
   if (length_in_characters == 0) {
-    fail("Fill in '\''## Summary'\'': the user-visible outcome, in 500 characters or fewer.")
-  } else if (length_in_characters > 500) {
-    fail("'\''## Summary'\'' is " length_in_characters " characters; keep it to 500 or fewer and let the CHANGELOG entry carry the details.")
+    fail("Fill in '\''## Summary'\'': the user-visible outcome, in 750 characters or fewer.")
+  } else if (length_in_characters > 750) {
+    fail("'\''## Summary'\'' is " length_in_characters " characters; keep it to 750 or fewer and let the CHANGELOG entry carry the details.")
   }
 }
 

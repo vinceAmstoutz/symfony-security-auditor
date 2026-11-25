@@ -235,7 +235,7 @@ A custom LLM client, advisory source or provider is wired in the audited applica
 6. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md):
    - a title of 50 characters or fewer, in the [commit format](#commit-style);
    - only its four sections, in order: `## Summary`, `## Type of change`, `## Target branch`, `## Checklist`;
-   - a Summary of 500 characters or fewer, then a `Closes #N` or `Refs #N` line when an issue is involved;
+   - a Summary of 750 characters or fewer, then a `Closes #N` or `Refs #N` line when an issue is involved;
    - only the boxes you tick (the license box always) and no leftover template text.
 7. Run the `Pull request target` check before you open it:
 
