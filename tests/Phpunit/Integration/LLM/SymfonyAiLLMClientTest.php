@@ -21,6 +21,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use Symfony\AI\Platform\Exception\ModelNotFoundException;
 use Symfony\AI\Platform\Exception\RateLimitExceededException;
 use Symfony\AI\Platform\FinishReason\FinishReason;
 use Symfony\AI\Platform\FinishReason\FinishReasonCase;
@@ -2535,6 +2536,42 @@ final class SymfonyAiLLMClientTest extends TestCase
             self::assertSame(1, $warnings[0][1]['attempt']);
             self::assertSame(2, $warnings[1][1]['attempt']);
         }
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
+     */
+    #[DataProvider('unknownModelFailures')]
+    public function test_a_model_the_provider_does_not_know_is_named_with_the_setting_that_fixes_it(RuntimeException $failure): void
+    {
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($this->flakyPlatform([$failure]), 'qwen9', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 5), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper()),
+        );
+
+        $this->expectException(NonTransientLLMFailureException::class);
+        $this->expectExceptionMessage(\sprintf('The provider does not know the model "qwen9": %s. Set model: in the standalone config.yaml or run init --model=<model id>, or set symfony_security_auditor.model in a Symfony application.', $failure->getMessage()));
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+    }
+
+    /**
+     * @return iterable<string, array{RuntimeException}>
+     */
+    public static function unknownModelFailures(): iterable
+    {
+        yield 'OpenAI' => [new RuntimeException('HTTP 404: {"error":{"message":"The model `qwen9` does not exist or you do not have access to it.","code":"model_not_found"}}')];
+        yield 'Anthropic' => [new RuntimeException('HTTP 404: {"type":"error","error":{"type":"not_found_error","message":"model: qwen9"}}')];
+        yield 'Ollama' => [new RuntimeException('model "qwen9" not found, try pulling it first')];
+        yield 'Gemini' => [new RuntimeException('HTTP 404: models/qwen9 is not found for API version v1beta')];
+        yield 'a catalog that does not list it' => [new RuntimeException('Catalog lookup failed', 0, new ModelNotFoundException('qwen9'))];
     }
 
     /**

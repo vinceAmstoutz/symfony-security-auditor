@@ -131,6 +131,22 @@ final class TransientFailureClassifierTest extends TestCase
         self::assertFalse((new TransientFailureClassifier())->isTransient($throwable));
     }
 
+    #[DataProvider('failuresNamingNoUnknownModel')]
+    public function test_it_tells_no_unknown_model_in_a_failure_that_names_none(Throwable $throwable): void
+    {
+        self::assertFalse((new TransientFailureClassifier())->isUnknownModel($throwable));
+    }
+
+    /** @return iterable<string, array{Throwable}> */
+    public static function failuresNamingNoUnknownModel(): iterable
+    {
+        yield 'a route the gateway does not serve' => [new RuntimeException('HTTP 404 Not Found: /v1/chat/completions')];
+        yield 'a model word inside another word' => [new RuntimeException('remodeling: resource not found')];
+        yield 'a model found on another line' => [new RuntimeException("model qwen9\nresource not found")];
+        yield 'a path Anthropic does not serve' => [new RuntimeException('HTTP 404: {"type":"error","error":{"type":"not_found_error","message":"Not Found"}}')];
+        yield 'a not_found_error about a modeling job' => [new RuntimeException('not_found_error: modeling job 7')];
+    }
+
     #[DataProvider('hyphenatedIdentifierCases')]
     public function test_it_does_not_mistake_a_status_like_number_embedded_in_a_hyphenated_identifier_for_a_real_status_code(Throwable $throwable): void
     {

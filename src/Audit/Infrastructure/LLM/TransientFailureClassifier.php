@@ -18,6 +18,7 @@ use Symfony\AI\Platform\Exception\ExceedContextSizeException;
 use Symfony\AI\Platform\Exception\IncompleteStreamException;
 use Symfony\AI\Platform\Exception\MalformedToolCallException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
+use Symfony\AI\Platform\Exception\ModelNotFoundException;
 use Symfony\AI\Platform\Exception\RetryableExceptionInterface;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientHttpStatusException;
@@ -127,6 +128,8 @@ final readonly class TransientFailureClassifier
         'payload too large',
         'request entity too large',
     ];
+
+    private const string UNKNOWN_MODEL_PATTERN = '/model_not_found|not_found_error.*\bmodel\b|\bmodel.*(?:not found|does not exist)/';
 
     /** @var list<string> */
     private const array RATE_LIMIT_HINTS = [
@@ -287,6 +290,16 @@ final readonly class TransientFailureClassifier
 
         return u($joined)->containsAny(self::REQUEST_TOO_LARGE_HINTS)
             || (!$this->isRateLimit($throwable) && !$this->isConnectionCut($throwable) && $this->containsStatusCode($joined, self::REQUEST_TOO_LARGE_STATUS_CODES));
+    }
+
+    /**
+     * Returns true when the provider, or the platform's model catalog, does not
+     * know the model the call names.
+     */
+    public function isUnknownModel(Throwable $throwable): bool
+    {
+        return $this->hasInChain($throwable, ModelNotFoundException::class)
+            || 1 === preg_match(self::UNKNOWN_MODEL_PATTERN, $this->joinMessages($throwable));
     }
 
     public function isRateLimit(Throwable $throwable): bool
