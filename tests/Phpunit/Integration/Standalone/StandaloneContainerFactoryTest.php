@@ -857,7 +857,7 @@ final class StandaloneContainerFactoryTest extends TestCase
     public function test_a_cli_agent_whose_bridge_is_not_installed_is_answered_with_the_init_command(string $cliAgent, string $package): void
     {
         $this->expectException(ProviderBridgeException::class);
-        $this->expectExceptionMessage(\sprintf('The "%1$s" provider bridge (%2$s) is not installed under the standalone data directory. Run "symfony-security-auditor init --provider=%1$s" to download it;', $cliAgent, $package));
+        $this->expectExceptionMessageContaining(\sprintf('The "%1$s" provider bridge (%2$s) is not installed under the standalone data directory. Run "symfony-security-auditor init --provider=%1$s" to download it;', $cliAgent, $package));
 
         (new StandaloneContainerFactory(cliAgentFactories: [$cliAgent => 'Missing\\CliAgent\\Factory']))->create(
             new StandaloneConfig([], new StandalonePlatformConfig([$cliAgent => []], $cliAgent)),

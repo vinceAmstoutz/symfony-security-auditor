@@ -362,7 +362,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     public function test_an_offline_only_run_refuses_the_cli_agent_its_configuration_names(): void
     {
         $this->expectException(NonLocalPlatformEndpointException::class);
-        $this->expectExceptionMessage('privacy.offline_only is enabled, but "codex" runs a coding agent\'s CLI');
+        $this->expectExceptionMessageContaining('privacy.offline_only is enabled, but "codex" runs a coding agent\'s CLI');
 
         $this->boot(['model' => 'opus', 'privacy' => ['offline_only' => true], 'cli_agent' => ['platform' => 'codex', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
     }
