@@ -113,7 +113,8 @@ final readonly class InitCommand
         }
 
         $initModelQuestion = new InitModelQuestion($this->pricedModelList, $this->pulledModelList, $interactive);
-        $model = b($initCommandInput->model ?? $initModelQuestion->ask($symfonyStyle, $providerKey, $platformConnection->endpoint))->trim()->toString();
+        $chosenModel = $initCommandInput->model ?? $initModelQuestion->ask($symfonyStyle, $providerKey, $platformConnection->endpoint);
+        $model = b(PlaceholderModel::or($chosenModel))->trim()->toString();
 
         $reviewerModel = $initCommandInput->reviewerModel ?? $initModelQuestion->askReviewer($symfonyStyle, $providerKey);
         $reviewerModel = null === $reviewerModel ? null : b($reviewerModel)->trim()->toString();
@@ -137,7 +138,8 @@ final readonly class InitCommand
         }
 
         $this->installBridges($symfonyStyle, $provider, $providerKey, $model);
-        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $platformConnection, $reviewerModel));
+        $this->standaloneConfigWriter->write($configFile, $this->standaloneConfigFactory->create($provider, $model, $envVar, $platformConnection, $reviewerModel), PlaceholderModel::comments($chosenModel));
+        PlaceholderModel::announce($symfonyStyle, $chosenModel);
 
         $this->reportWritten($symfonyStyle, $configFile, $provider, $model, $envVar);
         ConnectionTestOffer::make($this->connectionTestRunner, $symfonyStyle, $interactive);

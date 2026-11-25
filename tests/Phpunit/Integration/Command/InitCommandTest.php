@@ -459,6 +459,20 @@ final class InitCommandTest extends TestCase
         );
     }
 
+    public function test_without_interaction_it_marks_a_placeholder_model_in_the_written_configuration(): void
+    {
+        $this->commandTester()->execute(['--provider' => 'generic.gw', '--base-url' => 'https://gateway.example'], ['interactive' => false]);
+
+        self::assertStringContainsString("\n# A placeholder: replace it with a model the provider serves.\nmodel: claude-opus-5-5\n", "\n".file_get_contents($this->configFile()));
+    }
+
+    public function test_it_marks_no_model_it_did_not_write_as_a_placeholder(): void
+    {
+        $this->commandTester()->execute(['--provider' => 'generic.gw', '--base-url' => 'https://gateway.example', '--model' => 'claude-opus-5-5'], ['interactive' => false]);
+
+        self::assertStringNotContainsString('# A placeholder', (string) file_get_contents($this->configFile()));
+    }
+
     public function test_without_interaction_it_writes_the_model_ollama_lists_first(): void
     {
         $commandTester = $this->commandTester(pulledModels: ['qwen3', 'llama3.3']);
