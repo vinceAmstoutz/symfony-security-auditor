@@ -65,6 +65,8 @@ final class ReviewerAgentFileGroupTest extends TestCase
             [$this->findingAt('src/A.php', 1), $this->findingAt('src/B.php', 1), $this->findingAt('src/A.php', 2)],
             [ProjectFile::create('src/A.php', '/app/src/A.php', "<?php\n// UNIQUE-A-SOURCE\n"), ProjectFile::create('src/B.php', '/app/src/B.php', '<?php')],
             AuditContext::forProject(sys_get_temp_dir()),
+            false,
+            null,
         );
 
         self::assertCount(2, $userMessages);
@@ -88,7 +90,7 @@ final class ReviewerAgentFileGroupTest extends TestCase
         $llmClient->method('complete')->willReturnCallback(static fn (string $system, string $user): LLMResponse => self::verdicts($user, str_contains($user, 'src/A.php')));
         $findings = [$this->findingAt('src/A.php', 1), $this->findingAt('src/B.php', 1), $this->findingAt('src/A.php', 2), $this->findingAt('src/B.php', 2)];
 
-        $reviewed = ReviewerAgentHarness::reviewerAgent($llmClient)->reviewByFile($findings, [], AuditContext::forProject(sys_get_temp_dir()));
+        $reviewed = ReviewerAgentHarness::reviewerAgent($llmClient)->reviewByFile($findings, [], AuditContext::forProject(sys_get_temp_dir()), false, null);
 
         self::assertSame(
             [['src/A.php', 1, true], ['src/B.php', 1, false], ['src/A.php', 2, true], ['src/B.php', 2, false]],
@@ -120,6 +122,8 @@ final class ReviewerAgentFileGroupTest extends TestCase
             array_map(fn (int $line): Vulnerability => $this->findingAt('src/A.php', $line), range(1, 21)),
             [],
             AuditContext::forProject(sys_get_temp_dir()),
+            false,
+            null,
         );
 
         self::assertSame(2, $calls);
@@ -145,6 +149,8 @@ final class ReviewerAgentFileGroupTest extends TestCase
                 [$this->findingAt('src/C.php', 1), $this->findingAt('src/A.php', 1), $this->findingAt('src/A.php', 2)],
                 [],
                 $auditContext,
+                false,
+                null,
             );
         } catch (BudgetExceededException|LLMProviderException) {
             $aborted = true;

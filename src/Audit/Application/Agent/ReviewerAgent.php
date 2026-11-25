@@ -224,7 +224,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
      * @throws InvalidToolRegistryException
      */
     #[Override]
-    public function reviewByFile(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache = false, ?array $toolFiles = null): array
+    public function reviewByFile(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache, ?array $toolFiles): array
     {
         [$alone, $grouped] = $this->splitByFileGroup($vulnerabilities);
 
