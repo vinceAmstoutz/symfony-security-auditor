@@ -46,6 +46,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - OpenAI cached input is billed at the cache rate again and its cache writes are no longer billed on top of the full prompt, so `estimated_cost_usd` and `audit.budget.max_cost_usd` stop running up to 3x high and `audit.rate_limit.input_tokens_per_minute` counts each prompt once (thanks @JerritEic) ([#701](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/701))
 - `doctor --check-connection` and the test request `init` offers to send no longer run out of memory under PHP's default 128 MB limit: the pricing catalog now keeps only the model details the auditor reads, about a quarter of the memory it took ([#709](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/709))
 - `auth:status`, `auth:set` and `auth:remove` say the configured platform needs no API key when the audit runs on a Claude or ChatGPT subscription or another platform without a key, instead of asking to run `init` again; `auth:status` and `auth:remove` exit `0` then ([#713](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/713))
+- A standalone configuration file that reuses YAML anchors many times is read again with `symfony/yaml` 7.4.24 or later. One whose aliases expand past 10,000 values is refused with the auditor's own message, not the parser's ([#725](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/725))
 
 ### Core 🧱
 
