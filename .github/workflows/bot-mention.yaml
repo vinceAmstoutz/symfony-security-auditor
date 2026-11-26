@@ -19,7 +19,7 @@ jobs:
         env:
           BODY: ${{ github.event.comment.body }}
         run: |
-          if printf '%s\n' "$BODY" | grep -Eq '(^|[[:space:]])/bot([[:space:]]|$)' || printf '%s\n' "$BODY" | grep -Fq '@vinceamstoutz-github-ai-bot'; then
+          if printf '%s\n' "$BODY" | grep -Eq '(^|[[:space:]])/bot([[:space:]]|$)' || printf '%s\n' "$BODY" | grep -Fiq '@vinceamstoutz-github-ai-bot'; then
             echo "asked=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Start the bot's mentions workflow for this comment
