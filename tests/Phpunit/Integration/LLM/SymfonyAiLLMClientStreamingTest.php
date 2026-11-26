@@ -291,6 +291,35 @@ final class SymfonyAiLLMClientStreamingTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws TransientLLMFailureException
      */
+    public function test_a_rate_limited_streamed_call_a_debug_kernel_traces_waits_and_is_streamed_again(): void
+    {
+        $answers = [$this->rateLimited()];
+        $streamed = [];
+        $platform = new TraceablePlatform(Factory::createPlatform('sk-test', new MockHttpClient(static function (string $method, string $url, array $options) use (&$answers, &$streamed): MockResponse {
+            $streamed[] = str_contains(self::requestBody($options), '"stream":true');
+
+            return array_shift($answers) ?? self::answerFor($options, 'Hello');
+        })));
+        $fakeSleeper = new FakeSleeper();
+
+        $llmResponse = (new SymfonyAiLLMClient(
+            new PlatformBinding(new StreamingPlatform($platform), self::MODEL, new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(sleeper: $fakeSleeper),
+        ))->complete('system', 'user');
+
+        self::assertSame(['Hello', [true, true], 1], [$llmResponse->content(), $streamed, \count($fakeSleeper->durations)]);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidTokenUsageException
+     * @throws LLMRequestTooLargeException
+     * @throws MissingAiPlatformException
+     * @throws NegativeTokenCountException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     */
     public function test_a_rate_limited_streamed_call_a_debug_kernel_traces_is_sent_again_and_keeps_its_answer(): void
     {
         $answers = [$this->rateLimited()];

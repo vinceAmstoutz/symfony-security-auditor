@@ -37,8 +37,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Unme
  * Returns a streamed answer, read to its end, as the result a buffered call
  * gives, with the stream's finish reason; its usage comes once, through
  * StreamedTokenUsageExtractor. An answer sent unstreamed goes through the
- * bridge's own converter; when the platform hands it back unread, the call
- * is sent again unstreamed through BufferedResend.
+ * bridge's own converter. When the platform hands it back unread, it is read
+ * first: an HTTP error fails as it does unstreamed. A successful answer is
+ * sent again unstreamed through BufferedResend.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -96,10 +97,22 @@ final readonly class StreamedResultConverter implements ResultConverterInterface
     private function unstreamedResult(array $options): ResultInterface
     {
         $answer = $this->streamedResult->getResultConverter()->convert($this->streamedResult->getRawResult(), $options);
-        $unstreamedAnswer = $answer instanceof StreamResult ? $this->bufferedResend->resent()->getResult() : $answer;
+        $unstreamedAnswer = $answer instanceof StreamResult ? $this->resentAnswer($answer) : $answer;
         $this->streamMetering->stopStreaming();
 
         return $unstreamedAnswer;
+    }
+
+    /**
+     * Reads the answer the platform handed back unread first, so the bridge
+     * throws the failure an HTTP error stands for as it does unstreamed. Only
+     * a successful answer is sent again.
+     */
+    private function resentAnswer(StreamResult $unreadAnswer): ResultInterface
+    {
+        iterator_to_array($unreadAnswer->getContent());
+
+        return $this->bufferedResend->resent()->getResult();
     }
 
     /**
