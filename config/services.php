@@ -529,6 +529,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->args([
             service('logger'),
             param('symfony_security_auditor.audit.since_closure'),
+            service(CandidateFindingSource::class),
+            service(ProgressReporterInterface::class),
         ]);
 
     $defaultsConfigurator->set(SinceClosurePreview::class)

@@ -19,6 +19,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\Mappin
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\SinceClosurePreview;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CandidateFindingSourceInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserVoterCapabilityParser;
@@ -82,11 +83,11 @@ final class SinceClosureFixture
         ];
     }
 
-    public static function preview(string $sinceClosure): SinceClosurePreview
+    public static function preview(string $sinceClosure, ?CandidateFindingSourceInterface $candidateFindingSource = null): SinceClosurePreview
     {
         return new SinceClosurePreview(
             new MappingStage(new NullLogger(), new PhpParserControllerAccessControlParser(), new PhpParserVoterCapabilityParser(), new PhpParserFormBindingParser(), new SymfonyYamlSecurityConfigParser(new NullLogger())),
-            new DependencyExpansionStage(new NullLogger(), $sinceClosure),
+            new DependencyExpansionStage(new NullLogger(), $sinceClosure, $candidateFindingSource),
         );
     }
 }

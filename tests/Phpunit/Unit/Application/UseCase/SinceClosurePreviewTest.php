@@ -21,6 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCont
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CandidateFindingSourceInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\UseCase\Fixture\SinceClosureFixture;
 
 final class SinceClosurePreviewTest extends TestCase
@@ -39,6 +40,19 @@ final class SinceClosurePreviewTest extends TestCase
             ['src/Security/PostVoter.php', 'src/Controller/PostController.php'],
             array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditedFiles),
         );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws InvalidAuditContextException
+     */
+    public function test_it_searches_the_controllers_it_adds_for_no_static_finding(): void
+    {
+        $files = SinceClosureFixture::files();
+        $candidateFindingSource = $this->createMock(CandidateFindingSourceInterface::class);
+        $candidateFindingSource->expects(self::never())->method('candidatesIn');
+
+        SinceClosureFixture::preview('direct', $candidateFindingSource)->auditedFiles(sys_get_temp_dir(), [], 'main', [$files[2]], $files);
     }
 
     /**

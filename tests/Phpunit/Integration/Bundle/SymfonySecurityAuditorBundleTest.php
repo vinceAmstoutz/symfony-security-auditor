@@ -62,6 +62,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\CandidateFindingSource;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\DependencyExpansionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
@@ -1945,6 +1946,15 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['since_closure' => 'direct']]);
 
         self::assertSame('direct', $containerBuilder->getParameter('symfony_security_auditor.audit.since_closure'));
+    }
+
+    public function test_bundle_searches_the_files_the_since_closure_adds_for_static_findings(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        $candidateFindingSource = $containerBuilder->getDefinition(DependencyExpansionStage::class)->getArgument(2);
+        self::assertInstanceOf(Reference::class, $candidateFindingSource);
+        self::assertSame(CandidateFindingSource::class, (string) $candidateFindingSource);
     }
 
     public function test_bundle_accepts_an_explicit_none_since_closure(): void

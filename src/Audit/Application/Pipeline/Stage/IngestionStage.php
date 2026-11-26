@@ -15,7 +15,6 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage;
 
 use Override;
 use Psr\Log\LoggerInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\ChunkFindingProgress;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScopedScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\BuiltInStageName;
@@ -71,7 +70,7 @@ final readonly class IngestionStage implements StageInterface
         $auditContext->setFilesDiscovered(\count($scannedFiles));
         $auditContext->setMappingFiles($scopedScanResult->mappingFiles);
         $this->recordWithheldFiles($files, $auditContext);
-        $this->queueCandidates($files, $auditContext);
+        StaticCandidateQueue::queue($files, $auditContext, $this->candidateFindingSource, $this->progressReporter);
         $this->recordSkippedFiles($projectFileScan->skippedFiles, $auditContext, $changed);
         $auditContext->setMeta('ingestion.file_count', \count($files));
         $auditContext->setMeta('ingestion.total_lines', array_sum(
@@ -82,28 +81,6 @@ final readonly class IngestionStage implements StageInterface
             'files' => \count($files),
             'lines' => $auditContext->getMeta('ingestion.total_lines'),
         ]);
-    }
-
-    /**
-     * Queues and announces what the scrubber redacted and the static pre-scan
-     * matched as candidate findings for the reviewer.
-     *
-     * @param list<ProjectFile> $files
-     */
-    private function queueCandidates(array $files, AuditContext $auditContext): void
-    {
-        if ($auditContext->isCostEstimate() || !$this->candidateFindingSource instanceof CandidateFindingSourceInterface) {
-            return;
-        }
-
-        $candidates = $this->candidateFindingSource->candidatesIn($files);
-        foreach ($candidates as $candidate) {
-            $auditContext->addStaticCandidate($candidate);
-        }
-
-        if ($this->progressReporter instanceof ProgressReporterInterface) {
-            ChunkFindingProgress::report($this->progressReporter, $candidates);
-        }
     }
 
     /**

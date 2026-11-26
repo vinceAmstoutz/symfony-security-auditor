@@ -23,12 +23,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RouteAccessControl;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VoterCapability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CandidateFindingSourceInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 
 /**
  * With `audit.since_closure: direct`, adds to a `--since` run the controllers
  * guarded by an attribute a changed voter supports (through `#[IsGranted]` on
  * the method or class, or a `denyAccessUnlessGranted()` or `isGranted()`
- * call), within the run's `--path` scope. Runs after `MappingStage`, whose
+ * call), within the run's `--path` scope. Queues the static candidates of
+ * those it adds for review. Runs after `MappingStage`, whose
  * `AccessControlMap` covers the whole project.
  *
  * @internal not part of the BC promise, see docs/versioning.md
@@ -40,6 +43,8 @@ final readonly class DependencyExpansionStage implements StageInterface
     public function __construct(
         private LoggerInterface $logger,
         private string $sinceClosure = 'none',
+        private ?CandidateFindingSourceInterface $candidateFindingSource = null,
+        private ?ProgressReporterInterface $progressReporter = null,
     ) {}
 
     #[Override]
@@ -74,6 +79,7 @@ final readonly class DependencyExpansionStage implements StageInterface
 
         $auditContext->setProjectFiles([...$projectFiles, ...$added]);
         $auditContext->setMeta('dependency_expansion.files_added', \count($added));
+        StaticCandidateQueue::queue($added, $auditContext, $this->candidateFindingSource, $this->progressReporter);
 
         $this->logger->info('Dependency expansion complete', [
             'changed_voter_attributes' => $changedVoterAttributes,

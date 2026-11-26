@@ -49,6 +49,7 @@ final readonly class SinceClosurePreview
         }
 
         $auditContext = AuditContext::forProject($projectPath, $scanPaths, diffSinceRef: $diffSinceRef);
+        $auditContext->markAsCostEstimate();
         $auditContext->setProjectFiles($changedFiles);
         $auditContext->setMappingFiles($mappingFiles);
 
