@@ -26,6 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabi
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\TokenUsageSnapshot;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
@@ -197,6 +198,76 @@ final class AuditOrchestratorStaticCandidateTest extends TestCase
 
         self::assertSame(1, $auditContext->getMeta('audit.iterations'));
         self::assertSame(['Static analysis: native query concat'], $this->validatedTitles($auditContext));
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_an_attacker_finding_sharing_the_id_of_a_static_candidate_starts_another_attacker_iteration(): void
+    {
+        $attackerLlm = $this->createMock(LLMClientInterface::class);
+        $attackerLlm->expects(self::exactly(2))->method('complete')->willReturnOnConsecutiveCalls(
+            AuditOrchestratorHarness::attackerResponse([AuditOrchestratorHarness::vulnerabilityPayload(title: 'Order id concatenated into native SQL', lineStart: 10, lineEnd: 12)]),
+            AuditOrchestratorHarness::attackerResponse([]),
+        );
+        $reviewerLlm = self::createStub(LLMClientInterface::class);
+        $reviewerLlm->method('complete')->willReturn(AuditOrchestratorHarness::reviewerAcceptResponse());
+
+        $auditContext = $this->contextWith([$this->staticCandidate(10)]);
+        AuditOrchestratorHarness::orchestrator($attackerLlm, $reviewerLlm)->orchestrate($auditContext);
+
+        self::assertSame(2, $auditContext->getMeta('audit.iterations'));
+        self::assertSame(['Order id concatenated into native SQL'], $this->validatedTitles($auditContext));
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     * @throws LLMProviderException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_an_attacker_finding_recovered_from_an_abort_is_reviewed_apart_from_the_static_candidates_of_its_file_when_it_shares_the_id_of_one(): void
+    {
+        $attackerCalls = 0;
+        $attackerLlm = self::createStub(LLMClientInterface::class);
+        $attackerLlm->method('complete')->willReturnCallback(static function () use (&$attackerCalls): LLMResponse {
+            if (2 === ++$attackerCalls) {
+                throw BudgetExceededException::forTokens(500, 100);
+            }
+
+            return AuditOrchestratorHarness::attackerResponse([AuditOrchestratorHarness::vulnerabilityPayload(title: 'Order id concatenated into native SQL', lineStart: 10, lineEnd: 12)]);
+        });
+        $reviewerLlm = $this->createMock(LLMClientInterface::class);
+        $reviewerLlm->expects(self::exactly(2))->method('complete')->willReturn(AuditOrchestratorHarness::reviewerAcceptResponse());
+
+        $auditContext = $this->contextWith([
+            $this->staticCandidate(10),
+            $this->staticCandidate(20, 'Static analysis: unserialize call', vulnerabilityType: VulnerabilityType::INSECURE_DESERIALIZATION),
+        ]);
+        $auditContext->setProjectFiles(array_map(
+            static fn (int $index): ProjectFile => ProjectFile::create(\sprintf('src/Service/Service%d.php', $index), \sprintf('/app/src/Service/Service%d.php', $index), '<?php'),
+            range(1, 11),
+        ));
+
+        $budgetExceeded = false;
+        try {
+            AuditOrchestratorHarness::orchestrator($attackerLlm, $reviewerLlm, ['maxIterations' => 1])->orchestrate($auditContext);
+        } catch (BudgetExceededException) {
+            $budgetExceeded = true;
+        }
+
+        self::assertTrue($budgetExceeded, 'The orchestrator must rethrow BudgetExceededException.');
+        self::assertEqualsCanonicalizing(['Order id concatenated into native SQL', 'Static analysis: unserialize call'], $this->validatedTitles($auditContext));
     }
 
     /**
