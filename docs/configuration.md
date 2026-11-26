@@ -1058,7 +1058,7 @@ _Since 1.23._ `doctor --check-connection` also sends one short request to the pr
 The binary completes its commands, options and arguments in bash, zsh and fish. `completion` prints the script for your shell and, _since 1.23_, stays out of the command list. Write it once to the directory your shell loads completions from:
 
 ```bash
-# bash (needs the bash-completion package, which loads it on first use)
+# bash (needs bash-completion 2.x, which loads it on first use)
 mkdir -p ~/.local/share/bash-completion/completions
 symfony-security-auditor completion bash > ~/.local/share/bash-completion/completions/symfony-security-auditor
 
@@ -1071,11 +1071,11 @@ mkdir -p ~/.config/fish/completions
 symfony-security-auditor completion fish > ~/.config/fish/completions/symfony-security-auditor.fish
 ```
 
-Then open a new shell. For zsh, `~/.zfunc` must be on your `fpath` before `compinit` runs: add `fpath=(~/.zfunc $fpath)` to `~/.zshrc` above `compinit`, or above the `source $ZSH/oh-my-zsh.sh` line with Oh My Zsh. If completion still does not show up, delete zsh's cache with `rm -f ~/.zcompdump*` and open a new shell.
+Then open a new shell. bash-completion 1.x, the version Homebrew installs for the bash 3.2 macOS ships, never reads that directory: add `source ~/.local/share/bash-completion/completions/symfony-security-auditor` to `~/.bashrc` instead. For zsh, `~/.zfunc` must be on your `fpath` before `compinit` runs: add `fpath=(~/.zfunc $fpath)` to `~/.zshrc` above `compinit`, or above the `source $ZSH/oh-my-zsh.sh` line with Oh My Zsh. If completion still does not show up, delete zsh's cache with `rm -f ~/.zcompdump*` and open a new shell.
 
 Loading the script from your startup file works too (`eval "$(symfony-security-auditor completion bash)"`), but it starts the binary every time a shell opens.
 
-The script asks the installed binary for its completions on every <kbd>Tab</kbd>, so you do not need to write it again after a `self-update`. It completes the command name `symfony-security-auditor`: run the binary through a path such as `./symfony-security-auditor` and the shell does not use it. In a Symfony application, `bin/console completion` sets up the bundle's commands the same way.
+The script asks the installed binary for its completions on every <kbd>Tab</kbd>, so you do not need to write it again after a `self-update`. It is registered for the command name `symfony-security-auditor`, so a copy of the binary renamed to anything else gets no completion. In a Symfony application, `bin/console completion` sets up the bundle's commands the same way.
 
 ### Update notifications
 
