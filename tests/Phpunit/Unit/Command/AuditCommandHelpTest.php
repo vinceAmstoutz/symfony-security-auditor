@@ -16,22 +16,24 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
-use ReflectionProperty;
-use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandHelp;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandInput;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 
 final class AuditCommandHelpTest extends TestCase
 {
     private const string BUNDLE_CONFIGURATION = 'via <info>config/packages/symfony_security_auditor.yaml</info>.';
 
-    private const string STANDALONE_CONFIGURATION = "via the <info>config.yaml</info> that <info>init</info> writes to your user configuration directory, and a\n<info>.symfony-security-auditor.yaml</info> in the folder you run from or in the audited project.";
+    private const string STANDALONE_CONFIGURATION = 'via the <info>config.yaml</info> <info>init</info> writes, or a <info>.symfony-security-auditor.yaml</info> in the project.';
 
     private const string CONFIGURATION = '<configuration>';
+
+    private const int HELP_LINE_DESCRIPTION_WIDTH = 70;
+
+    private const int HELP_LINE_WIDTH = 100;
 
     #[DataProvider('outputFormats')]
     public function test_the_help_lists_every_output_format(OutputFormat $outputFormat): void
@@ -39,38 +41,29 @@ final class AuditCommandHelpTest extends TestCase
         self::assertMatchesRegularExpression($this->standaloneWord($outputFormat), AuditCommandHelp::HELP);
     }
 
-    #[DataProvider('outputFormats')]
-    public function test_the_format_option_description_names_every_output_format(OutputFormat $outputFormat): void
-    {
-        $option = (new ReflectionProperty(AuditCommandInput::class, 'givenFormat'))->getAttributes(Option::class)[0]->newInstance();
-
-        self::assertMatchesRegularExpression($this->standaloneWord($outputFormat), $option->description);
-    }
-
     public function test_exit_code_two_documentation_covers_the_preflight_unpriced_model_abort_with_no_report_emitted(): void
     {
-        self::assertStringContainsString('an unpriced model', AuditCommandHelp::HELP);
-        self::assertStringContainsString('no report emitted in that case', AuditCommandHelp::HELP);
+        self::assertStringContainsString('or an unpriced model made the cost budget unenforceable and the run never started (no report)', $this->flattened());
     }
 
     public function test_exit_code_two_documentation_still_covers_the_mid_run_budget_abort_with_a_partial_report(): void
     {
-        self::assertStringContainsString('partial report still emitted', AuditCommandHelp::HELP);
+        self::assertStringContainsString('2 a token or cost budget stopped the run (partial report)', $this->flattened());
     }
 
     public function test_exit_code_one_documentation_covers_a_run_with_no_verdict(): void
     {
-        self::assertStringContainsString('or the run reached no verdict (its scan found no file, or it analyzed none and found nothing)', $this->flattened());
+        self::assertStringContainsString('or no verdict: no file found, or none analyzed and no finding', $this->flattened());
     }
 
     public function test_exit_code_three_documentation_does_not_claim_a_run_with_no_verdict_passes_without_the_option(): void
     {
-        self::assertStringContainsString('without the option, a run that analyzed some of its files or holds a finding keeps the code its gates earn and prints a warning', $this->flattened());
+        self::assertStringContainsString('3 --fail-on-incomplete and some file could not be fully analyzed; without it, a warning', $this->flattened());
     }
 
     public function test_the_output_documentation_names_the_flag_that_prints_a_configured_report(): void
     {
-        self::assertStringContainsString('switched off for one run by --no-output, which prints the report', $this->flattened());
+        self::assertStringContainsString('--no-output prints the report when audit.output names a file', $this->flattened());
     }
 
     public function test_the_format_option_shows_no_default_of_its_own_since_audit_format_supplies_it(): void
@@ -78,17 +71,17 @@ final class AuditCommandHelpTest extends TestCase
         $inputOption = $this->auditCommandOption('format');
 
         self::assertNull($inputOption->getDefault());
-        self::assertStringEndsWith('Defaults to the audit.format config key, console when it is unset.', $inputOption->getDescription());
+        self::assertStringEndsWith('(default: audit.format, else console)', $inputOption->getDescription());
     }
 
     public function test_the_min_score_option_names_the_configuration_key_it_overrides(): void
     {
-        self::assertStringEndsWith('Overrides the audit.min_score config key for this run; with neither, the risk level alone gates.', $this->auditCommandOption('min-score')->getDescription());
+        self::assertStringEndsWith('(overrides audit.min_score)', $this->auditCommandOption('min-score')->getDescription());
     }
 
     public function test_the_output_option_names_the_configuration_key_it_overrides(): void
     {
-        self::assertSame('Output file path (any format). Overrides the audit.output config key for this run.', $this->auditCommandOption('output')->getDescription());
+        self::assertSame('Write the report to this file (overrides audit.output)', $this->auditCommandOption('output')->getDescription());
     }
 
     public function test_the_bundle_help_names_the_bundle_configuration_file(): void
@@ -100,6 +93,24 @@ final class AuditCommandHelpTest extends TestCase
     {
         self::assertStringContainsString(self::STANDALONE_CONFIGURATION, AuditCommandHelp::standalone());
         self::assertStringNotContainsString('config/packages/', AuditCommandHelp::standalone());
+    }
+
+    public function test_every_argument_and_option_of_its_own_fits_one_help_line(): void
+    {
+        $inputDefinition = (new Command(null, (new ReflectionClass(AuditCommand::class))->newInstanceWithoutConstructor()))->getDefinition();
+        $descriptions = array_map(
+            static fn (InputArgument|InputOption $input): string => $input->getDescription(),
+            [...$inputDefinition->getArguments(), ...$inputDefinition->getOptions()],
+        );
+
+        self::assertSame([], array_filter($descriptions, static fn (string $description): bool => mb_strlen($description) > self::HELP_LINE_DESCRIPTION_WIDTH));
+    }
+
+    public function test_no_line_of_the_help_is_wider_than_a_terminal(): void
+    {
+        $lines = explode("\n", strip_tags(AuditCommandHelp::standalone()));
+
+        self::assertSame([], array_filter($lines, static fn (string $line): bool => mb_strlen($line) > self::HELP_LINE_WIDTH));
     }
 
     public function test_the_standalone_help_is_the_bundle_help_with_only_the_configuration_files_swapped(): void

@@ -21,58 +21,43 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 final readonly class AuditCommandHelp
 {
     public const string HELP = <<<'HELP'
-        The <info>%command.name%</info> command runs a multi-agent LLM security audit against a Symfony project.
-        By default it audits the current working directory; pass a path to audit a different project (e.g. <info>%command.full_name% /path/to/project</info>).
+        The <info>%command.name%</info> command audits the project in the current directory, or the one you name:
+          <info>%command.full_name% /path/to/project</info>
+        A folder inside a Composer project audits that project, narrowed to the folder.
 
-        Output formats (<info>--format</info>, <info>-f</info>):
-          <info>console</info>  human-readable summary (default)
-          <info>executive</info> stakeholder summary — risk level, business impact, severity/type/hotspot distributions, no per-finding detail
-          <info>json</info>     machine-readable report
-          <info>sarif</info>    SARIF 2.1.0 for GitHub Code Scanning / GitLab Security Dashboard
-          <info>html</info>     self-contained HTML report for sharing or archiving
-          <info>markdown</info> Markdown report for a PR comment or GitHub step summary
-          <info>junit</info>    JUnit XML — findings as failed test cases for CI test-report panels (e.g. GitLab free-tier MR widgets)
-          <info>github</info>   GitHub Actions workflow-command annotations — inline findings on the PR's Files Changed view
-          <info>github-comment</info> pull-request comment body — grade, score and the most severe findings, with a marker a workflow can use to update its own comment
+        Formats (<info>--format</info>, <info>-f</info>):
+          <info>console</info>         summary in the terminal (default)
+          <info>executive</info>       risk overview for stakeholders, without per-finding detail
+          <info>json</info>            machine-readable report
+          <info>sarif</info>           SARIF 2.1.0 for GitHub Code Scanning or the GitLab Security Dashboard
+          <info>html</info>            self-contained page to share or archive
+          <info>markdown</info>        report for a pull-request comment or a GitHub step summary
+          <info>junit</info>           findings as failed tests, for CI test-report panels
+          <info>github</info>          inline annotations on the pull request's changed files
+          <info>github-comment</info>  pull-request comment a workflow can keep up to date
 
-        Use <info>--output</info> (<info>-o</info>) to write the report to a file:
-          <info>%command.full_name% --format=sarif --output=report.sarif</info>
-          <info>%command.full_name% --format=html --output=report.html</info>
-        A report path set in <info>audit.output</info> is replaced by <info>--output</info>, or switched off for one run by <info>--no-output</info>, which prints the report.
+        Examples:
+          <info>%command.full_name% --dry-run</info>                          estimate the cost first
+          <info>%command.full_name% -f sarif -o report.sarif</info>           write a SARIF report
+          <info>%command.full_name% --generate-baseline=baseline.json</info>  accept the current findings
+          <info>%command.full_name% --baseline=baseline.json</info>           then report only new ones
+        <info>--no-output</info> prints the report when <info>audit.output</info> names a file.
 
-        Baseline (suppress accepted findings):
-          <info>%command.full_name% --generate-baseline=.security-baseline.json</info>  accept current findings
-          <info>%command.full_name% --baseline=.security-baseline.json</info>           suppress them on later runs
-        Baselined findings are dropped from the report and do not affect the exit code.
+        Exit codes:
+          <info>0</info>  risk below <info>--fail-on</info> (default <info>critical</info>) and score at or above <info>--min-score</info>
+          <info>1</info>  a gate tripped, the audit failed, or no verdict: no file found, or none analyzed and no finding
+          <info>2</info>  a token or cost budget stopped the run (partial report), or an unpriced model
+             made the cost budget unenforceable and the run never started (no report)
+          <info>3</info>  <info>--fail-on-incomplete</info> and some file could not be fully analyzed; without it, a warning
 
-        Exit codes (the failure threshold is configurable via <info>audit.fail_on</info> / <info>--fail-on</info>, default <info>critical</info>;
-        <info>--min-score</info> adds a second, independent gate — the audit fails when either one trips):
-          <info>0</info>  audit completed; risk level is below the fail-on threshold and the score is at or above --min-score
-          <info>1</info>  audit completed with risk level at or above the fail-on threshold, or a score below --min-score, or the audit itself failed,
-                or the run reached no verdict (its scan found no file, or it analyzed none and found nothing)
-          <info>2</info>  audit budget could not be honored: it aborted mid-run because the configured token or cost budget was
-                exceeded (partial report still emitted), or it never started because an unpriced model makes the cost
-                budget unenforceable and the run was declined or non-interactive (no report emitted in that case)
-          <info>3</info>  <info>--fail-on-incomplete</info> is set and some file could not be fully analyzed (a tripped gate still exits 1);
-                without the option, a run that analyzed some of its files or holds a finding keeps the code its gates earn
-                and prints a warning
-
-        Cost & duration: a typical Symfony project (~150 files) takes minutes, not seconds,
-        and costs a few cents to a few dollars depending on the selected model. Configure
-        via <info>config/packages/symfony_security_auditor.yaml</info>.
-
-        Documentation:
-          Configuration : <info>docs/configuration.md</info>
-          CI integration: <info>docs/ci.md</info>
-          Versioning    : <info>docs/versioning.md</info>
+        An audit takes minutes and costs cents to a few dollars, depending on the model.
+        Configure it via <info>config/packages/symfony_security_auditor.yaml</info>.
+        Docs: <info>https://github.com/vinceAmstoutz/symfony-security-auditor/tree/main/docs</info>
         HELP;
 
     private const string BUNDLE_CONFIGURATION = 'via <info>config/packages/symfony_security_auditor.yaml</info>.';
 
-    private const string STANDALONE_CONFIGURATION = <<<'TEXT'
-        via the <info>config.yaml</info> that <info>init</info> writes to your user configuration directory, and a
-        <info>.symfony-security-auditor.yaml</info> in the folder you run from or in the audited project.
-        TEXT;
+    private const string STANDALONE_CONFIGURATION = 'via the <info>config.yaml</info> <info>init</info> writes, or a <info>.symfony-security-auditor.yaml</info> in the project.';
 
     /**
      * Names the files the binary reads in place of `config/packages/`.

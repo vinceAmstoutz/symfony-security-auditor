@@ -971,9 +971,9 @@ final class StandaloneApplicationFactoryTest extends TestCase
         yield 'mcp:serve -h' => [['command' => McpServeCommand::NAME, '-h' => true], McpServeCommand::DESCRIPTION];
         yield 'help mcp:serve' => [['command' => 'help', 'command_name' => McpServeCommand::NAME], McpServeCommand::DESCRIPTION];
         yield 'audit --help' => [['command' => AuditCommand::ALIAS, '--help' => true], '--dry-run'];
-        yield 'help audit' => [['command' => 'help', 'command_name' => AuditCommand::ALIAS], 'runs a multi-agent LLM security audit against a Symfony project'];
+        yield 'help audit' => [['command' => 'help', 'command_name' => AuditCommand::ALIAS], 'command audits the project in the current directory'];
         yield 'list --format=json' => [['command' => 'list', '--format' => 'json'], '"name":"mcp:serve"'];
-        yield 'an abbreviated help audit' => [['command' => 'hel', 'command_name' => AuditCommand::ALIAS], 'runs a multi-agent LLM security audit against a Symfony project'];
+        yield 'an abbreviated help audit' => [['command' => 'hel', 'command_name' => AuditCommand::ALIAS], 'command audits the project in the current directory'];
         yield 'an abbreviated list --format=json' => [['command' => 'li', '--format' => 'json'], '"name":"mcp:serve"'];
         yield 'an abbreviated list in capitals' => [['command' => 'LI', '--format' => 'json'], '"name":"mcp:serve"'];
         yield 'the default command as json' => [['--format' => 'json'], '"name":"audit:run"'];
@@ -989,7 +989,7 @@ final class StandaloneApplicationFactoryTest extends TestCase
         $display = (string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay());
         self::assertSame(
             [true, false, false],
-            [str_contains($display, '.symfony-security-auditor.yaml in the folder you run from'), str_contains($display, 'config/packages/'), str_contains($display, '[default: "console"]')],
+            [str_contains($display, 'or a .symfony-security-auditor.yaml in the project'), str_contains($display, 'config/packages/'), str_contains($display, '[default: "console"]')],
             $display,
         );
     }

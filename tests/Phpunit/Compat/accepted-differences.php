@@ -256,4 +256,11 @@ return [
         'reason' => 'auth:status first names the provider, the models and what each call bills.',
         'changelog' => '#724',
     ],
+    [
+        'scenarios' => ['standalone/help-audit'],
+        'path' => 'runs.0.stdout.lines',
+        'match' => '/^[-+](?: |$)/',
+        'reason' => 'audit:run --help describes each argument and option in one short line and rewrites its help text to fit 100 columns.',
+        'changelog' => '#755',
+    ],
 ];
