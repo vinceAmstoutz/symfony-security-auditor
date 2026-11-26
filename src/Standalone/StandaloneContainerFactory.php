@@ -44,6 +44,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PulledModel
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnobtainableIdentityTokenException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ProcessCliAgentAccountProbe;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionCliInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionClis;
@@ -85,17 +86,18 @@ final readonly class StandaloneContainerFactory
         private OfflineOnlyPlatformGuard $offlineOnlyPlatformGuard = new OfflineOnlyPlatformGuard(),
         private ?Closure $advisoryProcessBuilder = null,
         private array $cliAgentFactories = CliAgentPlatforms::FACTORIES,
+        private ?FederatedAnthropicAccess $federatedAnthropicAccess = null,
     ) {}
 
     /**
      * Audits advisories with the Composer this binary bundles, unpacked in the
      * data directory, or with `composer` on `PATH` when it bundles none.
      */
-    public static function withEmbeddedComposer(?EmbeddedComposer $embeddedComposer, XdgConfigPathResolver $xdgConfigPathResolver): self
+    public static function withEmbeddedComposer(?EmbeddedComposer $embeddedComposer, XdgConfigPathResolver $xdgConfigPathResolver, ?FederatedAnthropicAccess $federatedAnthropicAccess = null): self
     {
         return $embeddedComposer instanceof EmbeddedComposer
-            ? new self(advisoryProcessBuilder: SymfonyProcessComposerAuditRunner::embeddedProcessBuilder($embeddedComposer, $xdgConfigPathResolver))
-            : new self();
+            ? new self(advisoryProcessBuilder: SymfonyProcessComposerAuditRunner::embeddedProcessBuilder($embeddedComposer, $xdgConfigPathResolver), federatedAnthropicAccess: $federatedAnthropicAccess)
+            : new self(federatedAnthropicAccess: $federatedAnthropicAccess);
     }
 
     /**
@@ -120,7 +122,7 @@ final readonly class StandaloneContainerFactory
             ->setArguments([$this->httpClientOptions($standaloneConfig)]);
 
         try {
-            $this->bundleExtensionLoader->load(new AiBundle(), $standaloneConfig->platform->toAiConfig(), $containerBuilder);
+            $this->bundleExtensionLoader->load(new AiBundle(), $this->aiConfigFor($standaloneConfig, $containerBuilder), $containerBuilder);
             CliAgentPlatforms::register($containerBuilder, $standaloneConfig->platform->platform, $this->cliAgentFactories);
         } catch (RuntimeException $runtimeException) {
             throw ProviderBridgeException::forBundleFailure($runtimeException) ?? $runtimeException;
@@ -145,6 +147,20 @@ final readonly class StandaloneContainerFactory
         $containerBuilder->compile(true);
 
         return $containerBuilder;
+    }
+
+    /**
+     * @return array{platform: array<array-key, mixed>}
+     *
+     * @throws UnobtainableIdentityTokenException
+     */
+    private function aiConfigFor(StandaloneConfig $standaloneConfig, ContainerBuilder $containerBuilder): array
+    {
+        $aiConfig = $standaloneConfig->platform->toAiConfig();
+
+        return $this->federatedAnthropicAccess instanceof FederatedAnthropicAccess
+            ? $this->federatedAnthropicAccess->configure($aiConfig, $containerBuilder)
+            : $aiConfig;
     }
 
     private function auditAdvisoriesWithEmbeddedComposer(ContainerBuilder $containerBuilder): void
@@ -241,7 +257,7 @@ final readonly class StandaloneContainerFactory
     {
         $credentialIdentity = $standalonePlatformConfig->credentialIdentity();
 
-        if (!$credentialIdentity instanceof CredentialIdentity) {
+        if (!$credentialIdentity instanceof CredentialIdentity || $this->standsInForFederation($credentialIdentity)) {
             $containerBuilder->register(ConsoleBannerInterface::class, NullConsoleBanner::class);
 
             return;
@@ -249,6 +265,12 @@ final readonly class StandaloneContainerFactory
 
         $containerBuilder->register(ConsoleBannerInterface::class, CredentialConsoleBanner::class)
             ->setArguments([ContainerParameterSyntax::escape($credentialIdentity->maskedPreview)]);
+    }
+
+    private function standsInForFederation(CredentialIdentity $credentialIdentity): bool
+    {
+        return $this->federatedAnthropicAccess instanceof FederatedAnthropicAccess
+            && CredentialIdentity::of(FederatedAnthropicAccess::API_KEY_PLACEHOLDER)->fingerprint === $credentialIdentity->fingerprint;
     }
 
     /**

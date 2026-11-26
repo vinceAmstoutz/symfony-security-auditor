@@ -47,12 +47,17 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneP
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatform;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnobtainableIdentityTokenException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelNotice;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\CredentialConsoleBanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\NullConsoleBanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\ProviderBridgeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\FederatedAnthropicAccess;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneContainerFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
@@ -72,6 +77,65 @@ final class StandaloneContainerFactoryTest extends TestCase
     protected function tearDown(): void
     {
         (new Filesystem())->remove($this->cacheDir);
+    }
+
+    /**
+     * @param class-string $banner
+     *
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     * @throws UnobtainableIdentityTokenException
+     */
+    #[DataProvider('apiKeysUnderFederation')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_audit_header_names_no_api_key_when_federation_stands_in_for_it(string $apiKey, string $banner): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory(federatedAnthropicAccess: FederatedAnthropicAccess::fromEnvironment([
+            'ANTHROPIC_FEDERATION_RULE_ID' => 'fdrl_rule',
+            'ANTHROPIC_ORGANIZATION_ID' => 'org-uuid',
+            'ACTIONS_ID_TOKEN_REQUEST_URL' => 'https://pipelines.actions.githubusercontent.com/abc/idtoken',
+            'ACTIONS_ID_TOKEN_REQUEST_TOKEN' => 'request-token',
+        ])))->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost', 'api_key' => $apiKey]]])),
+            $this->cacheDir,
+        );
+
+        $auditPresenter = (new ReflectionProperty(AuditCommand::class, 'auditPresenter'))->getValue($containerBuilder->get(AuditCommand::class));
+        self::assertInstanceOf(AuditPresenter::class, $auditPresenter);
+
+        self::assertInstanceOf($banner, (new ReflectionProperty(AuditPresenter::class, 'consoleBanner'))->getValue($auditPresenter));
+    }
+
+    /**
+     * @return iterable<string, array{string, class-string}>
+     */
+    public static function apiKeysUnderFederation(): iterable
+    {
+        yield 'the federation placeholder' => [FederatedAnthropicAccess::API_KEY_PLACEHOLDER, NullConsoleBanner::class];
+        yield 'a real API key' => ['sk-ant-api03-real', CredentialConsoleBanner::class];
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     * @throws UnobtainableIdentityTokenException
+     */
+    public function test_federation_configures_the_anthropic_platform_before_its_bridge_loads(): void
+    {
+        $this->expectException(UnobtainableIdentityTokenException::class);
+        $this->expectExceptionMessageContaining('run in a job with the "id-token: write" permission');
+
+        (new StandaloneContainerFactory(federatedAnthropicAccess: FederatedAnthropicAccess::fromEnvironment(['ANTHROPIC_FEDERATION_RULE_ID' => 'fdrl_rule', 'ANTHROPIC_ORGANIZATION_ID' => 'org-uuid'])))->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(['anthropic' => ['api_key' => FederatedAnthropicAccess::API_KEY_PLACEHOLDER]])),
+            $this->cacheDir,
+        );
     }
 
     /**
