@@ -82,6 +82,14 @@ final class ConfiguredModelCheckTest extends TestCase
         );
     }
 
+    public function test_it_asks_an_ollama_server_that_lists_no_model_once(): void
+    {
+        $pulledModelList = $this->createMock(PulledModelListInterface::class);
+        $pulledModelList->expects(self::once())->method('pulledModels')->with('http://10.0.0.9:11434')->willReturn([]);
+
+        (new ConfiguredModelCheck(self::createStub(PricedModelListInterface::class), $pulledModelList))->check($this->configuration(['ollama' => ['endpoint' => 'http://10.0.0.9:11434']], 'ollama', ['model' => 'claude-opus-5-5']));
+    }
+
     private function check(): ConfiguredModelCheck
     {
         $pricedModelList = self::createStub(PricedModelListInterface::class);
