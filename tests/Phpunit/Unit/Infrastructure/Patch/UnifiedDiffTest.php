@@ -74,6 +74,8 @@ final class UnifiedDiffTest extends TestCase
         yield 'a removed line after the no newline marker' => ["--- a/x.php\n+++ b/x.php\n@@ -1 +1 @@\n-a\n+b\n\\ No newline at end of file\n-c"];
         yield 'an added line right after a hunk holding an empty line, before a note' => ["--- a/x.php\n+++ b/x.php\n@@ -1,3 +1,3 @@\n-a\n+b\n\n c\n+d\n\nThat is all."];
         yield 'prose inside a hunk' => ["--- a/x.php\n+++ b/x.php\n@@ -1,2 +1,2 @@\n a\nThen change b:\n-b\n+c"];
+        yield 'a hunk one line shorter than its header says, before a blank line and a note' => ["--- a/x.php\n+++ b/x.php\n@@ -1,3 +1,3 @@\n a\n-b\n+c\n\nThat is all."];
+        yield 'a fenced hunk one line shorter than its header says, before a blank line' => ["```diff\n--- a/x.php\n+++ b/x.php\n@@ -1,3 +1,3 @@\n a\n-b\n+c\n\n```"];
     }
 
     /**

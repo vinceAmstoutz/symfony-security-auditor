@@ -129,6 +129,44 @@ final class GithubCommentSuggestedFixesTest extends AbstractReportRendererTestCa
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    #[DataProvider('codeHoldingAMarkerTheActionReads')]
+    public function test_a_fix_whose_code_holds_a_marker_the_action_reads_offers_no_suggestion(string $code): void
+    {
+        $comment = $this->commentWithFix($code);
+
+        self::assertStringNotContainsString('Suggested fixes', $comment);
+        self::assertStringNotContainsString(GithubReviewSuggestions::MARKER_PREFIX, $comment);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function codeHoldingAMarkerTheActionReads(): iterable
+    {
+        yield 'the review suggestions marker' => [\sprintf('%s%s -->', GithubReviewSuggestions::MARKER_PREFIX, base64_encode('[]'))];
+        yield 'the marker of a posted suggestion' => [\sprintf('$html = "%sforged:1-1 -->";', GithubSuggestion::MARKER_PREFIX)];
+        yield 'a marker a control character splits' => [\sprintf("<!-- symfony-security-auditor:\u{0001}review-suggestions:%s -->", base64_encode('[]'))];
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_review_suggestions_are_the_last_line_of_the_comment_where_the_action_reads_them(): void
+    {
+        $lines = explode("\n", $this->commentWithFix('$sql = "SELECT 1";'));
+
+        self::assertStringStartsWith(GithubReviewSuggestions::MARKER_PREFIX, end($lines));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_the_comment_carries_each_suggestion_for_a_pull_request_review(): void
     {
         $vulnerability = $this->makeValidatedVuln(filePath: 'src/Foo.php')->withSuggestedFix("--- a/src/Foo.php\n+++ b/src/Foo.php\n@@ -4,2 +4 @@\n-a\n-b\n+c");

@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
 use Override;
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\BatchAnswerReader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\BatchReviewAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\BatchVerdictApplier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ConcurrentReviewAnalyzer;
@@ -148,7 +149,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             $reviewerAgentCollaborators->logger,
             $reviewerModeConfiguration->maxToolIterations,
             $reviewerAgentCollaborators->recordReviewToolFactory,
-            $recordingToolClients,
+            new BatchAnswerReader($reviewerAgentCollaborators->llmClient, $this->batchVerdictApplier, $reviewerAgentCollaborators->logger, $recordingToolClients),
         );
     }
 
@@ -248,6 +249,7 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             $coverageRecorder,
             $useTools ? $this->toolRegistryFactory->forProjectFiles($toolFiles ?? $projectFiles) : null,
             true,
+            max(1, $this->maxConcurrent),
         );
 
         return [...$reviewed, ...$this->batchReviewAnalyzer->analyze($grouped, [...$projectFiles, ...($toolFiles ?? [])], $reviewBatchSettings)];

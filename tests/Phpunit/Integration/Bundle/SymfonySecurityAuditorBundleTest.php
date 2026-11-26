@@ -62,6 +62,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\CandidateFindingSource;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\DependencyExpansionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
@@ -131,6 +132,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleRepo
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\MemoizedStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NestingDepthGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
@@ -1514,6 +1516,23 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertInstanceOf(RegexStaticPreScanner::class, $this->getPrivateService($kernel, StaticPreScannerInterface::class));
     }
 
+    public function test_bundle_shares_one_memoized_pre_scan_between_the_attacker_and_the_static_findings(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        $decorated = $containerBuilder->getDefinition(MemoizedStaticPreScanner::class)->getArgument(0);
+        self::assertInstanceOf(Reference::class, $decorated);
+        self::assertSame(StaticPreScannerInterface::class, (string) $decorated);
+        $candidatePreScanner = $containerBuilder->getDefinition(CandidateFindingSource::class)->getArgument(0);
+        self::assertInstanceOf(Reference::class, $candidatePreScanner);
+        self::assertSame(MemoizedStaticPreScanner::class, (string) $candidatePreScanner);
+        $attackerScanCollaborators = $containerBuilder->getDefinition(AttackerAgent::class)->getArgument(1);
+        self::assertInstanceOf(Definition::class, $attackerScanCollaborators);
+        $attackerPreScanner = $attackerScanCollaborators->getArgument(1);
+        self::assertInstanceOf(Reference::class, $attackerPreScanner);
+        self::assertSame(MemoizedStaticPreScanner::class, (string) $attackerPreScanner);
+    }
+
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
     public function test_bundle_wires_null_static_pre_scanner_when_disabled(): void
@@ -2013,6 +2032,15 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['since_closure' => 'direct']]);
 
         self::assertSame('direct', $containerBuilder->getParameter('symfony_security_auditor.audit.since_closure'));
+    }
+
+    public function test_bundle_searches_the_files_the_since_closure_adds_for_static_findings(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        $candidateFindingSource = $containerBuilder->getDefinition(DependencyExpansionStage::class)->getArgument(2);
+        self::assertInstanceOf(Reference::class, $candidateFindingSource);
+        self::assertSame(CandidateFindingSource::class, (string) $candidateFindingSource);
     }
 
     public function test_bundle_accepts_an_explicit_none_since_closure(): void

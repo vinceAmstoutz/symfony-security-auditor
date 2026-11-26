@@ -21,8 +21,18 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\Depend
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\IngestionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CandidateFindingSourceInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
@@ -50,6 +60,45 @@ final class SinceClosureIntegrationTest extends TestCase
         self::assertSame(
             ['src/Security/PostVoter.php', 'src/Controller/CommentController.php', 'src/Controller/LitController.php', 'src/Controller/PostController.php'],
             array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $auditContext->projectFiles()),
+        );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_the_controllers_a_changed_voter_pulls_in_are_searched_for_static_findings(): void
+    {
+        $gitChangedFilesResolver = self::createStub(GitChangedFilesResolverInterface::class);
+        $gitChangedFilesResolver->method('changedSince')->willReturn(['src/Security/PostVoter.php']);
+        $candidateFindingSource = new class implements CandidateFindingSourceInterface {
+            /**
+             * @throws InvalidCodeLocationException
+             * @throws InvalidVulnerabilityClassificationException
+             * @throws InvalidVulnerabilityNarrativeException
+             */
+            #[Override]
+            public function candidatesIn(array $files): array
+            {
+                return array_map(
+                    static fn (ProjectFile $projectFile): Vulnerability => Vulnerability::of(
+                        new VulnerabilityClassification(VulnerabilityType::HARDCODED_SECRET, VulnerabilitySeverity::HIGH, 'Static analysis: credential', 0.8),
+                        new CodeLocation($projectFile->relativePath(), 1, 1),
+                        new VulnerabilityNarrative('d', 'a', 'p', 'r'),
+                        'c',
+                    ),
+                    $files,
+                );
+            }
+        };
+        $auditContext = AuditContext::forProject($this->tmpDir, diffSinceRef: 'main');
+
+        (new IngestionStage(new ProjectFileScanner(new NullLogger()), new NullLogger(), $gitChangedFilesResolver, $candidateFindingSource))->process($auditContext);
+        (new MappingStage(new NullLogger(), new PhpParserControllerAccessControlParser(), new PhpParserVoterCapabilityParser(), new PhpParserFormBindingParser(), new SymfonyYamlSecurityConfigParser(new NullLogger())))->process($auditContext);
+        (new DependencyExpansionStage(new NullLogger(), 'direct', $candidateFindingSource))->process($auditContext);
+
+        self::assertSame(
+            ['src/Security/PostVoter.php', 'src/Controller/CommentController.php', 'src/Controller/LitController.php', 'src/Controller/PostController.php'],
+            array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->filePath(), $auditContext->drainStaticCandidates()),
         );
     }
 

@@ -136,7 +136,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             'findings' => \count($reviewCandidates),
         ]);
 
-        $staticCandidatesById = $this->byId($staticCandidates);
+        $staticCandidatesById = $this->unreplacedStaticCandidatesById($staticCandidates, $attackerFindings);
         $reviewed = $this->reviewPersistingOnAbort($reviewCandidates, $staticCandidatesById, $files, $auditContext);
         $newFindings = $this->persistReviewedFindings($this->mergeRecoveredFindings($reviewed, $auditContext->drainReviewedFindings()), $auditContext, $staticCandidatesById);
 
@@ -178,6 +178,21 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
             ...FindingOverlap::outside($pendingStaticCandidates, $attackerFindings),
             ...$this->withoutBaselineAccepted(FindingOverlap::outside($attackerFindings, $acceptedStaticCandidates), $auditContext),
         ];
+    }
+
+    /**
+     * Returns by id the static candidates no attacker finding replaces, so an
+     * attacker finding that shares the id of the candidate it replaces is
+     * reviewed and counted as the attacker's.
+     *
+     * @param list<Vulnerability> $staticCandidates one per id
+     * @param list<Vulnerability> $attackerFindings
+     *
+     * @return array<string, Vulnerability>
+     */
+    private function unreplacedStaticCandidatesById(array $staticCandidates, array $attackerFindings): array
+    {
+        return $this->byId(FindingOverlap::outside($staticCandidates, $attackerFindings));
     }
 
     /**
@@ -317,7 +332,8 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
      */
     private function reviewRecoveredFindings(array $staticCandidates, array $rawFindings, array $files, AuditContext $auditContext): void
     {
-        $filtered = $this->reviewCandidates($staticCandidates, $this->filterByConfidence($rawFindings), $auditContext);
+        $attackerFindings = $this->filterByConfidence($rawFindings);
+        $filtered = $this->reviewCandidates($staticCandidates, $attackerFindings, $auditContext);
 
         if ([] === $filtered) {
             $this->progressReporter->report(ProgressEvent::ReviewSkipped->value, ['reason' => 'nothing_recovered']);
@@ -330,7 +346,7 @@ final readonly class AuditOrchestrator implements AuditOrchestratorInterface
         ]);
 
         try {
-            $reviewed = $this->review($filtered, $this->byId($staticCandidates), $files, $auditContext);
+            $reviewed = $this->review($filtered, $this->unreplacedStaticCandidatesById($staticCandidates, $attackerFindings), $files, $auditContext);
         } catch (BudgetExceededException|LLMProviderException) {
             $this->persistReviewedFindings($auditContext->drainReviewedFindings(), $auditContext);
 
