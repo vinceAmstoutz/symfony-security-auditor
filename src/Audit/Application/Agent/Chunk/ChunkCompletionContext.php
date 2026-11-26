@@ -37,6 +37,10 @@ final readonly class ChunkCompletionContext
             'elapsed_seconds' => $elapsedSeconds,
             'status' => $statusTrackingCoverageRecorder->chunkStatus($chunk),
         ];
+        $unanalyzedFiles = $statusTrackingCoverageRecorder->unanalyzedFiles($chunk);
+        if ([] !== $unanalyzedFiles) {
+            $context['files'] = $unanalyzedFiles;
+        }
 
         $reason = $statusTrackingCoverageRecorder->chunkFailureReason($chunk);
 

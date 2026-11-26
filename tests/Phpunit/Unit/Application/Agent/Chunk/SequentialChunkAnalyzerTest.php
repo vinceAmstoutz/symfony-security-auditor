@@ -167,6 +167,25 @@ final class SequentialChunkAnalyzerTest extends TestCase
      * @throws LLMProviderException
      * @throws InvalidToolRegistryException
      */
+    public function test_a_failed_chunk_names_the_files_it_left_unanalyzed(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willThrowException(new LLMRequestTooLargeException('prompt is too long'));
+        $attackerCache = self::createStub(AttackerCacheInterface::class);
+        $attackerCache->method('get')->willReturn(null);
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $this->analyzer($llmClient, $attackerCache, false, progressReporter: $recordingProgressReporter)->analyze([[$this->makeFileOfSize('src/Huge.php', 16384)]], $this->request(), new RecordingCoverageRecorder(), null, new RiskMarkerIndex([]));
+
+        self::assertSame(['src/Huge.php'], $recordingProgressReporter->eventsNamed('attacker.chunk.completed')[0]['files']);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
     public function test_a_single_file_the_model_cannot_fit_reports_that_as_the_reason_its_chunk_failed(): void
     {
         $llmClient = self::createStub(LLMClientInterface::class);
@@ -177,7 +196,7 @@ final class SequentialChunkAnalyzerTest extends TestCase
 
         $this->analyzer($llmClient, $attackerCache, false, progressReporter: $recordingProgressReporter)->analyze([[$this->makeFileOfSize('src/A.php', 16384)]], $this->request(), new RecordingCoverageRecorder(), null, new RiskMarkerIndex([]));
 
-        self::assertSame('the file is too large for the model input limit', $recordingProgressReporter->eventsNamed('attacker.chunk.completed')[0]['reason']);
+        self::assertSame('the file is too large for the model input limit: turn on audit.code_slicing.enabled, skip it with a lower scan.max_file_size_kb or use a model with a larger context window', $recordingProgressReporter->eventsNamed('attacker.chunk.completed')[0]['reason']);
     }
 
     private function vulnerabilityFactory(): VulnerabilityFactory

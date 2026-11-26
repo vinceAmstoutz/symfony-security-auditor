@@ -59,16 +59,21 @@ final readonly class ProgressContext
     }
 
     /**
-     * Returns the reason a chunk failed as a one-line suffix, empty when the
-     * event names none.
+     * Returns the files a chunk left unanalyzed and the reason it failed as a
+     * one-line suffix, empty when the event names neither.
      *
      * @param array<string, mixed> $context
      */
     public static function failureReasonSuffix(array $context): string
     {
-        $reason = trim(TerminalTextSanitizer::collapseToSingleLine(self::string($context, 'reason')));
+        $files = $context['files'] ?? [];
+        $named = array_filter([
+            implode(', ', \is_array($files) ? array_filter($files, \is_string(...)) : []),
+            self::string($context, 'reason'),
+        ], static fn (string $part): bool => '' !== $part);
+        $suffix = trim(TerminalTextSanitizer::collapseToSingleLine(implode(': ', $named)));
 
-        return '' === $reason ? '' : \sprintf(' — %s', $reason);
+        return '' === $suffix ? '' : \sprintf(' — %s', $suffix);
     }
 
     /**

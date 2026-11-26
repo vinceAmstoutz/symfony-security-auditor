@@ -26,7 +26,7 @@ final readonly class ChunkFailureReason
 {
     public const string NOT_JSON = 'the answer was not valid JSON';
 
-    public const string FILE_TOO_LARGE = 'the file is too large for the model input limit';
+    public const string FILE_TOO_LARGE = 'the file is too large for the model input limit: turn on audit.code_slicing.enabled, skip it with a lower scan.max_file_size_kb or use a model with a larger context window';
 
     public const string RECORDING_REFUSED = 'a finding the record tool refused was never recorded again';
 

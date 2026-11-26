@@ -256,4 +256,11 @@ return [
         'reason' => 'auth:status first names the provider, the models and what each call bills.',
         'changelog' => '#724',
     ],
+    [
+        'scenarios' => ['format/github-incomplete-run', 'format/sarif-incomplete-run', 'gate/incomplete-run', 'gate/incomplete-run-config-fail-on-incomplete', 'gate/incomplete-run-fail-on-incomplete', 'run/reviewer-accepted-spellings', 'run/reviewer-accepted-spellings-batch', 'run/reviewer-accepted-spellings-fail-on-incomplete', 'run/sloppy-findings-fail-on-incomplete', 'run/sloppy-findings-json', 'run/sloppy-findings-structured'],
+        'path' => 'runs.0.stderr.lines',
+        'match' => '#^[-+] (?:\\[(?:WARNING|ERROR)\\] Audit incomplete: \\d+ file\\(s\\) could not be fully analyzed| +(?:src/Controller/|findings there proves nothing|there proves nothing|Risk: |(?:SAFE|LOW|MEDIUM|HIGH|CRITICAL) \\| Vulnerabilities: |when this happens\\.|is set\\.|set\\.))#',
+        'reason' => 'The incomplete-audit warning names the files it could not fully analyze, the first five and then a count, which rewraps it.',
+        'changelog' => '#756',
+    ],
 ];
