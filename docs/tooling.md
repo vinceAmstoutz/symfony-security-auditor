@@ -1,6 +1,6 @@
 # Tooling and Security Posture
 
-Reference moved out of `CLAUDE.md` to keep that file short. Keep it in sync with the tool configuration.
+Reference for the project tooling and security posture. Keep it in sync with the tool configuration.
 
 ## Tech stack
 

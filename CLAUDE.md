@@ -14,12 +14,7 @@ Update the relevant section in the same commit/PR whenever the project evolves. 
 
 ## Tech Stack
 
-PHP and Symfony (versions in `composer.json`), LLM access through provider-agnostic `symfony/ai`, packaged as a Symfony bundle plus a standalone native binary. Full tool-by-tool reference with rationale: [`docs/tooling.md`](docs/tooling.md).
-
-- Tests: PHPUnit (Unit / Integration / EndToEnd) with 100% line coverage, plus the compatibility checks (`phpunit.compat.xml`).
-- Mutation: Infection with 100% MSI.
-- Static analysis: PHPStan max with custom rules in `tools/PHPStan/`, Rector, deptrac, PHP CS Fixer, Prettier for Markdown (one line per paragraph, never hard-wrapped).
-- API compatibility: roave/backward-compatibility-check; CI security: zizmor.
+PHP and Symfony (versions in `composer.json`), provider-agnostic `symfony/ai`, packaged as a Symfony bundle plus a standalone binary. Quality gates: PHPUnit 100% line coverage, Infection 100% MSI, PHPStan max, deptrac, Rector, PHP CS Fixer, Prettier. Tool-by-tool reference: [`docs/tooling.md`](docs/tooling.md).
 
 ## Build, Test & Lint Commands
 
@@ -35,7 +30,7 @@ bin/castor up
 | Lint + auto-fix | `bin/castor lint:fix` |
 | Markdown check only | `bin/castor lint:docs` (fast pre-push check) |
 | Run PHP tests | `docker compose exec php vendor/bin/phpunit` |
-| Run mutation tests | `bin/castor lint` (its Infection step mirrors CI's flags — see below) |
+| Run mutation tests | `bin/castor lint` (its Infection step mirrors CI's flags; see the rule below) |
 | Score detection quality | `bin/castor eval` (audits a ground-truth fixture, reports precision/recall) |
 | Run the compatibility checks | `docker compose exec php vendor/bin/phpunit -c phpunit.compat.xml` (see [CONTRIBUTING.md → Compatibility Checks](CONTRIBUTING.md#compatibility-checks)) |
 | Record their fixtures from a release | `bin/castor compat:record X.Y.Z` (checks the tag out under `var/compat/`, runs the recorders in `tools/Compat/`) |
@@ -66,18 +61,19 @@ src/Audit/
     UseCase/       #   RunAuditUseCase, EstimateAuditCostUseCase
     Scan/          #   scan-scope narrowing for `--path`
     Pipeline/      #   AuditPipeline and its stages
+    Budget/ Telemetry/  #   cost caps and usage accounting
     Agent/         #   AttackerAgent, ReviewerAgent, EscalatingAttackerAgent, AuditOrchestrator, synthesizers
   Infrastructure/  # I/O adapters implementing Domain ports
     LLM/           #   SymfonyAiLLMClient: the only place `symfony/ai` is used
     FileSystem/    #   project scanner, secret scrubbing
-    Scan/ Prompt/ Config/  # SymfonyProfile layer: Symfony-specific, portable Infrastructure may not depend on it
+    Prompt/, parts of Scan/ and Config/  # SymfonyProfile layer (see `deptrac.yaml`): portable Infrastructure may not depend on it
     Cache/ Advisory/ Pricing/ Progress/ Tool/ Report/ SelfUpdate/ Bridge/ Diff/
-src/Command/       # thin console adapters (audit:run, audit:diff, audit:trend, auth:*, init, mcp:serve)
+src/Command/       # thin console adapters (audit:run, audit:diff, audit:trend, audit:baseline, auth:*, init, doctor, mcp:serve)
 src/Standalone/    # standalone binary: application and container factories, bridge-tree loader
 tests/Phpunit/     # Unit, Integration, EndToEnd, Compat (`phpunit.compat.xml`, recorded release fixtures)
 tests/Shell/       # POSIX shell tests for install.sh and the CI scripts
 config/services.php  # DI wiring
-docs/              # architecture, configuration, tooling, pull-requests, versioning, ci, …
+docs/              # architecture, configuration, tooling, pull-requests, project-structure, versioning, ci, …
 ```
 
 ## Architecture: DDD Layers
@@ -104,13 +100,7 @@ symfony_security_auditor:
     profile: 'fast'
 ```
 
-Split-model (larger attacker, faster reviewer):
-
-```yaml
-symfony_security_auditor:
-    attacker_model: 'claude-opus-5'
-    reviewer_model: 'claude-haiku-5-5'
-```
+Split-model (`attacker_model` / `reviewer_model`) and the rest: see the reference below.
 
 Swapping LLM providers requires only `config/packages/ai.yaml` changes — no code changes.
 
@@ -120,17 +110,7 @@ Full reference: [`docs/configuration.md`](docs/configuration.md)
 
 Format: `<type>[optional scope]: <description>` — [Conventional Commits](https://www.conventionalcommits.org/)
 
-| Type       | When                    |
-| ---------- | ----------------------- |
-| `feat`     | New user-facing feature |
-| `fix`      | Bug fix                 |
-| `refactor` | Neither fix nor feature |
-| `test`     | Adding/fixing tests     |
-| `docs`     | Documentation only      |
-| `chore`    | Maintenance/tooling     |
-| `build`    | Build system/deps       |
-| `ci`       | CI configuration        |
-| `perf`     | Performance improvement |
+Types: `feat` (new user-facing feature), `fix`, `refactor`, `test`, `docs`, `chore`, `build`, `ci`, `perf`.
 
 Common scopes: `agent`, `pipeline`, `domain`, `llm`, `command`, `bundle`, `standalone`, `scan`, `deps`, `ci`, `rate-limit`, `release`. Breaking changes: `feat!:` with `BREAKING CHANGE:` footer.
 

@@ -1,6 +1,6 @@
 # Pull Requests
 
-Rules for opening and merging a pull request, moved out of `CLAUDE.md`.
+Rules for opening and merging a pull request; `CLAUDE.md` carries the short version.
 
 Fill in [`.github/PULL_REQUEST_TEMPLATE.md`](../.github/PULL_REQUEST_TEMPLATE.md) and keep the top of the PR short:
 
