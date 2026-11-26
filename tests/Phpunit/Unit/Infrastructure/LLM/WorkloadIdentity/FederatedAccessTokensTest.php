@@ -82,6 +82,22 @@ final class FederatedAccessTokensTest extends TestCase
      * @throws TransientHttpStatusException
      * @throws UnobtainableIdentityTokenException
      */
+    public function test_it_asks_for_the_oauth_and_federation_betas_on_the_exchange(): void
+    {
+        $mockResponse = new MockResponse('{"access_token":"sk-ant-oat01-first","expires_in":599}');
+
+        $this->exchangeAnswering($mockResponse)->accessToken();
+
+        $normalizedHeaders = $mockResponse->getRequestOptions()['normalized_headers'];
+        self::assertIsArray($normalizedHeaders);
+        self::assertSame(['anthropic-beta: oauth-2025-04-20,oidc-federation-2026-04-01'], $normalizedHeaders['anthropic-beta'] ?? null);
+    }
+
+    /**
+     * @throws RefusedTokenExchangeException
+     * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
+     */
     public function test_it_leaves_out_the_service_account_and_workspace_the_rule_does_not_name(): void
     {
         $mockResponse = new MockResponse('{"access_token":"sk-ant-oat01-first","expires_in":599}');
