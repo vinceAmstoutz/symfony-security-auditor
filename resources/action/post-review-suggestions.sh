@@ -9,6 +9,10 @@
 # script posted it. Nothing here fails the job: a review GitHub refuses is a
 # warning, and the summary comment still lists every suggestion.
 #
+# The report ends with the hidden list of suggestions and a posted suggestion
+# ends with its key, so only that end is read: a line above it, such as one of
+# a suggested fix, is never taken for either.
+#
 # Environment: SSA_COMMENT_FILE (the github-comment report), SSA_REPOSITORY
 # (owner/name), SSA_PULL_NUMBER, SSA_HEAD_SHA, and optionally SSA_BOT_LOGIN
 # (the account the job's token posts as, github-actions[bot] by default).
@@ -21,7 +25,7 @@ pull="repos/$SSA_REPOSITORY/pulls/$SSA_PULL_NUMBER"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-encoded=$(sed -n 's/^<!-- symfony-security-auditor:review-suggestions:\([A-Za-z0-9+/=]*\) -->$/\1/p' "$SSA_COMMENT_FILE" | head -n 1)
+encoded=$(tail -n 1 "$SSA_COMMENT_FILE" | sed -n 's/^<!-- symfony-security-auditor:review-suggestions:\([A-Za-z0-9+/=]*\) -->$/\1/p')
 if [ -z "$encoded" ]; then
   echo 'The report carries no suggested fix to post as a review.'
   exit 0
@@ -55,7 +59,7 @@ if ! gh api --paginate "$pull/comments" > "$work/comments-listed.json" 2> "$work
 fi
 
 jq -s --arg bot "$bot_login" '
-  add // [] | map(select(.user.login == $bot) | .body | capture("<!-- symfony-security-auditor:suggestion:(?<key>[^ ]+) -->") | .key)
+  add // [] | map(select(.user.login == $bot) | .body | capture("<!-- symfony-security-auditor:suggestion:(?<key>[^ ]+) -->\\s*$") | .key)
 ' "$work/comments-listed.json" > "$work/posted-keys.json"
 
 jq --slurpfile diff "$work/diff-lines.json" --slurpfile posted "$work/posted-keys.json" '
