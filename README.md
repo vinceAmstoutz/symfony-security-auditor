@@ -125,6 +125,10 @@ symfony-security-auditor self-update --check  # only report whether a newer vers
 
 `self-update` verifies the checksum before replacing the binary. See the [CLI reference](docs/configuration.md#self-update-updating-the-standalone-binary). `self-update --snapshot` (or `SSA_VERSION=snapshot` with the installers) installs the pre-release built from every push to the development branch; a plain `self-update` returns to the latest release.
 
+### 5. Shell completion (optional)
+
+`symfony-security-auditor completion bash|zsh|fish` prints a script that makes <kbd>Tab</kbd> complete commands, options and arguments. [Shell completion](docs/configuration.md#shell-completion) shows where each shell loads it from. You write it once: it keeps working after a `self-update`.
+
 ## Use it as a Symfony bundle
 
 ### 1. Install: Symfony Flex wires everything
