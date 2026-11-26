@@ -20,6 +20,7 @@ use RuntimeException;
 use Symfony\AI\Platform\Exception\BadRequestException;
 use Symfony\AI\Platform\Exception\ContentFilterException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
+use Symfony\AI\Platform\Exception\RateLimitExceededException;
 use Symfony\AI\Platform\PlatformOptions;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\Result\ToolCall;
@@ -240,6 +241,23 @@ final class SymfonyAiLLMClientOutputCapRaiseTest extends TestCase
         ))->completeWithTools('sys', 'usr', StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry, 3);
 
         self::assertSame([4096, 8192], array_column($scriptedTokenUsagePlatform->invokedOptions, 'max_tokens'));
+    }
+
+    /**
+     * @throws LLMProviderException
+     * @throws BudgetExceededException
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_tool_call_retried_after_a_rate_limit_keeps_its_cap(): void
+    {
+        $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform([new RateLimitExceededException(retryAfter: 1), new TextResult('done')], [new TokenUsage(), new TokenUsage()]);
+
+        $this->client($scriptedTokenUsagePlatform)->completeWithTools('sys', 'usr', $this->lookupTool(), 3);
+
+        self::assertSame([4096, 4096], array_column($scriptedTokenUsagePlatform->invokedOptions, PlatformOptions::MAX_OUTPUT_TOKENS));
     }
 
     /**

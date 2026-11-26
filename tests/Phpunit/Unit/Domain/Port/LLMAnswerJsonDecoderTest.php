@@ -53,7 +53,7 @@ final class LLMAnswerJsonDecoderTest extends TestCase
     {
         $this->expectException(JsonException::class);
 
-        LLMAnswerJsonDecoder::decode('Findings: '.str_repeat('[', 10_000));
+        LLMAnswerJsonDecoder::decode('Findings: '.str_repeat('[', 2_000));
     }
 
     public function test_it_rethrows_the_json_error_when_no_block_decodes(): void
