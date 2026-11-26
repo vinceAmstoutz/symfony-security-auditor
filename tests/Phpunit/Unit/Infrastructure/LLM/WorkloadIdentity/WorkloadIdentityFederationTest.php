@@ -32,6 +32,11 @@ final class WorkloadIdentityFederationTest extends TestCase
         );
     }
 
+    public function test_it_names_the_credential_by_its_rule_and_never_by_a_token(): void
+    {
+        self::assertSame('workload identity federation (rule fdrl_rule)', (new WorkloadIdentityFederation('fdrl_rule', 'org-uuid'))->credentialName());
+    }
+
     public function test_a_service_account_or_workspace_left_empty_is_not_named(): void
     {
         self::assertEquals(

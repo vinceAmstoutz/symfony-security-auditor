@@ -33,8 +33,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdenti
  */
 final readonly class FederatedAnthropicAccess
 {
-    /** Stands in for the API key the `anthropic` config reads; the federated client never sends it. */
-    public const string API_KEY_PLACEHOLDER = 'workload-identity-federation';
+    public const string API_KEY_PLACEHOLDER = WorkloadIdentityFederation::API_KEY_PLACEHOLDER;
 
     public const string HTTP_CLIENT_SERVICE = 'security_auditor.workload_identity_http_client';
 
@@ -45,7 +44,7 @@ final readonly class FederatedAnthropicAccess
     private const string ANTHROPIC = 'anthropic';
 
     private function __construct(
-        private WorkloadIdentityFederation $workloadIdentityFederation,
+        public WorkloadIdentityFederation $workloadIdentityFederation,
         private string $identityTokenRequestUrl,
         #[SensitiveParameter]
         private string $identityTokenRequestToken,

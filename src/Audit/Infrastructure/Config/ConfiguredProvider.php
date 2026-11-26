@@ -29,13 +29,15 @@ final readonly class ConfiguredProvider
         public ?string $cliBinary = null,
         public bool $takesApiKey = false,
         public ?string $apiKeyVariable = null,
+        public ?string $federatedCredential = null,
     ) {}
 
     /**
-     * @param array<array-key, mixed> $parsed   the user configuration
-     * @param array<array-key, mixed> $settings the block `platform:` holds for this provider
+     * @param array<array-key, mixed> $parsed              the user configuration
+     * @param array<array-key, mixed> $settings            the block `platform:` holds for this provider
+     * @param ?string                 $federatedCredential the credential the provider signs in with in place of an API key
      */
-    public static function of(string $name, array $parsed, array $settings): self
+    public static function of(string $name, array $parsed, array $settings, ?string $federatedCredential = null): self
     {
         $apiKey = PlatformApiKey::valueIn($settings);
 
@@ -47,6 +49,7 @@ final readonly class ConfiguredProvider
             self::text($settings['cli_binary'] ?? null),
             null !== $apiKey,
             null !== $apiKey ? EnvPlaceholder::in($apiKey)?->variableName : null,
+            $federatedCredential,
         );
     }
 

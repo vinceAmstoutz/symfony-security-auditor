@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\WorkloadIdentityFederation;
 
 /**
  * Which environment variable the user's configuration reads the API key from;
@@ -27,6 +28,7 @@ final readonly class ConfiguredCredentialVariable
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,
         private StandaloneConfigFileReader $standaloneConfigFileReader = new StandaloneConfigFileReader(),
+        private ?WorkloadIdentityFederation $workloadIdentityFederation = null,
     ) {}
 
     /**
@@ -76,7 +78,8 @@ final readonly class ConfiguredCredentialVariable
 
     /**
      * Returns the provider `provider:` selects, else the only platform the
-     * configuration declares, else null.
+     * configuration declares, else null. An `anthropic` provider names the
+     * workload identity federation it signs in with, when one is given.
      */
     public function provider(): ?ConfiguredProvider
     {
@@ -91,7 +94,12 @@ final readonly class ConfiguredCredentialVariable
             return null;
         }
 
-        return ConfiguredProvider::of($name, $parsed, PlatformApiKey::blockForProvider($platform, $name) ?? []);
+        return ConfiguredProvider::of(
+            $name,
+            $parsed,
+            PlatformApiKey::blockForProvider($platform, $name) ?? [],
+            WorkloadIdentityFederation::PLATFORM === $name ? $this->workloadIdentityFederation?->credentialName() : null,
+        );
     }
 
     /**

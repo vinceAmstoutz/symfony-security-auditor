@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\WorkloadIdentityFederation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModelListInterface;
@@ -37,6 +38,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\EnvironmentDoctor;
 
 final class EnvironmentDoctorTest extends TestCase
 {
+    private const string FEDERATION_PLACEHOLDER = 'workload-identity-federation';
+
     private string $configHome;
 
     private string $cacheHome;
@@ -70,6 +73,24 @@ final class EnvironmentDoctorTest extends TestCase
             new DoctorCheckResult('Provider bridge', DoctorCheckStatus::Ok, 'Installed and the audit boots with it.'),
             new DoctorCheckResult('Composer', DoctorCheckStatus::Ok, 'Available.'),
         ], \array_slice($results, 0, 3));
+    }
+
+    public function test_it_names_the_workload_identity_federation_an_anthropic_audit_signs_in_with_in_place_of_an_api_key(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\nmodel: claude-opus-5-5\n");
+
+        $results = $this->federatedDoctor()->diagnose();
+
+        self::assertEquals(new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and an audit signs in through workload identity federation (rule fdrl_rule), with no API key.'), $results[0]);
+    }
+
+    public function test_it_names_the_api_key_of_another_provider_selected_beside_an_anthropic_block_under_workload_identity_federation(): void
+    {
+        $this->writeConfig("provider: openai\nplatform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n    openai:\n        api_key: 'sk-test-0123456789abcdefghij'\nmodel: 'gpt-4'\n");
+
+        $results = $this->federatedDoctor()->diagnose();
+
+        self::assertSame('Config resolves and an API key is available: sk-tes…ghij (SHA256:2e9cd0e8ecfb255a). Run "auth:status" to see where it comes from.', $results[0]->detail);
     }
 
     public function test_it_reports_a_platform_that_needs_no_api_key(): void
@@ -479,6 +500,21 @@ final class EnvironmentDoctorTest extends TestCase
             $composerAvailabilityChecker,
             $auditPreflight,
             new ModelsDevPricingProvider(new NullLogger()),
+        );
+    }
+
+    private function federatedDoctor(): EnvironmentDoctor
+    {
+        $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
+        $composerAvailabilityChecker->method('probe')->willReturn(ComposerProbe::available());
+
+        return new EnvironmentDoctor(
+            new StandaloneConfigLoader($this->resolver(), new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY' => self::FEDERATION_PLACEHOLDER])),
+            $this->resolver(),
+            $composerAvailabilityChecker,
+            self::createStub(AuditPreflightInterface::class),
+            new ModelsDevPricingProvider(new NullLogger()),
+            workloadIdentityFederation: new WorkloadIdentityFederation('fdrl_rule', 'org-uuid'),
         );
     }
 

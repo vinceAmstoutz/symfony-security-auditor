@@ -31,6 +31,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\U
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\WorkloadIdentityFederation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPackage;
 
@@ -53,7 +54,8 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
     private const string BRIDGE_CHECK = 'Provider bridge';
 
     /**
-     * @param ?string $bundledAiPlatformVersion the `symfony/ai-platform` release the binary bundles, which the bridge tree must hold too
+     * @param ?string                     $bundledAiPlatformVersion   the `symfony/ai-platform` release the binary bundles, which the bridge tree must hold too
+     * @param ?WorkloadIdentityFederation $workloadIdentityFederation what an `anthropic` audit signs in with in place of an API key
      */
     public function __construct(
         private StandaloneConfigLoader $standaloneConfigLoader,
@@ -64,6 +66,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
         private string $pricingCatalogPackage = ModelsDevPricingProvider::CATALOG_PACKAGE,
         private ?string $bundledAiPlatformVersion = null,
         private ?ConfiguredModelCheck $configuredModelCheck = null,
+        private ?WorkloadIdentityFederation $workloadIdentityFederation = null,
     ) {}
 
     /**
@@ -112,10 +115,15 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
     }
 
     /**
-     * Names the API key that resolved by its masked preview and fingerprint.
+     * Names the API key that resolved by its masked preview and fingerprint,
+     * or the workload identity federation an `anthropic` audit signs in with.
      */
     private function resolvedConfigurationDetail(StandaloneConfig $standaloneConfig): string
     {
+        if ($this->workloadIdentityFederation instanceof WorkloadIdentityFederation && $standaloneConfig->platform->runsOn(WorkloadIdentityFederation::PLATFORM)) {
+            return \sprintf('Config resolves and an audit signs in through %s, with no API key.', $this->workloadIdentityFederation->credentialName());
+        }
+
         $credentialIdentity = $standaloneConfig->platform->credentialIdentity();
 
         return $credentialIdentity instanceof CredentialIdentity

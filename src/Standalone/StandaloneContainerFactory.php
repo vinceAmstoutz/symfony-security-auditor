@@ -257,7 +257,7 @@ final readonly class StandaloneContainerFactory
     {
         $credentialIdentity = $standalonePlatformConfig->credentialIdentity();
 
-        if (!$credentialIdentity instanceof CredentialIdentity || $this->standsInForFederation($credentialIdentity)) {
+        if (!$credentialIdentity instanceof CredentialIdentity) {
             $containerBuilder->register(ConsoleBannerInterface::class, NullConsoleBanner::class);
 
             return;
@@ -265,12 +265,6 @@ final readonly class StandaloneContainerFactory
 
         $containerBuilder->register(ConsoleBannerInterface::class, CredentialConsoleBanner::class)
             ->setArguments([ContainerParameterSyntax::escape($credentialIdentity->maskedPreview)]);
-    }
-
-    private function standsInForFederation(CredentialIdentity $credentialIdentity): bool
-    {
-        return $this->federatedAnthropicAccess instanceof FederatedAnthropicAccess
-            && CredentialIdentity::of(FederatedAnthropicAccess::API_KEY_PLACEHOLDER)->fingerprint === $credentialIdentity->fingerprint;
     }
 
     /**
