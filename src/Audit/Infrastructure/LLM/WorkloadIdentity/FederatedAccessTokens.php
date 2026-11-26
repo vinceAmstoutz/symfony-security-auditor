@@ -21,11 +21,12 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\RefusedTokenExchangeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientHttpStatusException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnobtainableIdentityTokenException;
 
 /**
  * Exchanges the workload's identity token for an Anthropic access token
- * through workload identity federation, and reuses that token until it
- * expires.
+ * through workload identity federation. Reuses that token until a minute
+ * before it expires.
  *
  * Not readonly: keeps the access token across calls (stateful collaborator,
  * see .claude/rules/php-classes.md).
@@ -59,8 +60,9 @@ final class FederatedAccessTokens implements AccessTokenProviderInterface
     }
 
     /**
-     * @throws RefusedTokenExchangeException when the exchange is refused, or answers without an access token
-     * @throws TransientHttpStatusException  when the token endpoint answers with a status worth retrying
+     * @throws RefusedTokenExchangeException      when the exchange is refused, or answers without an access token
+     * @throws TransientHttpStatusException       when the token endpoint answers with a status worth retrying
+     * @throws UnobtainableIdentityTokenException when the workload gets no identity token
      */
     #[Override]
     public function accessToken(): string

@@ -158,16 +158,17 @@ final readonly class StandaloneApplicationFactory
         $filesystemCredentialStore = new FilesystemCredentialStore($xdgConfigPathResolver);
         $bundledAiPlatformVersion = BundledAiPlatformVersion::detect();
         $embeddedComposer = EmbeddedComposer::bundled(new SelfInvocation($resolvedBinaryPath), new ComposerPhar(ComposerPhar::bundledPath()));
+        $federatedAnthropicAccess = FederatedAnthropicAccess::fromEnvironment($environment);
 
         return new self(
             new StandaloneConfigLoader(
                 $xdgConfigPathResolver,
-                new StandalonePlatformConfigResolver($environment, credentialStore: $filesystemCredentialStore),
+                new StandalonePlatformConfigResolver($federatedAnthropicAccess?->environmentWithPlaceholderApiKey($environment) ?? $environment, credentialStore: $filesystemCredentialStore),
                 self::projectConfigFile($environment),
             ),
             $xdgConfigPathResolver,
             $bridgeInstaller ?? self::bridgeInstaller($resolvedBinaryPath, $bundledAiPlatformVersion),
-            StandaloneContainerFactory::withEmbeddedComposer($embeddedComposer, $xdgConfigPathResolver),
+            StandaloneContainerFactory::withEmbeddedComposer($embeddedComposer, $xdgConfigPathResolver, $federatedAnthropicAccess),
             runningBinaryPath: $resolvedBinaryPath,
             pathEnvironment: $pathEnvironment,
             updateAvailabilityConsoleListener: self::updateAvailabilityConsoleListener(

@@ -31,6 +31,27 @@ final readonly class WorkloadIdentityFederation
     ) {}
 
     /**
+     * Reads the rule from the variables the Anthropic SDK and Claude Code read.
+     *
+     * @param array<string, string> $environment
+     */
+    public static function fromEnvironment(array $environment): ?self
+    {
+        $ruleId = self::valueOf($environment, 'ANTHROPIC_FEDERATION_RULE_ID');
+        $organizationId = self::valueOf($environment, 'ANTHROPIC_ORGANIZATION_ID');
+        if (null === $ruleId || null === $organizationId) {
+            return null;
+        }
+
+        return new self(
+            $ruleId,
+            $organizationId,
+            self::valueOf($environment, 'ANTHROPIC_SERVICE_ACCOUNT_ID'),
+            self::valueOf($environment, 'ANTHROPIC_WORKSPACE_ID'),
+        );
+    }
+
+    /**
      * @return array<string, string>
      */
     public function exchangeRequest(string $identityToken): array
@@ -43,5 +64,15 @@ final readonly class WorkloadIdentityFederation
             'service_account_id' => $this->serviceAccountId,
             'workspace_id' => $this->workspaceId,
         ], static fn (?string $value): bool => null !== $value);
+    }
+
+    /**
+     * @param array<string, string> $environment
+     */
+    private static function valueOf(array $environment, string $name): ?string
+    {
+        $value = $environment[$name] ?? '';
+
+        return '' === $value ? null : $value;
     }
 }

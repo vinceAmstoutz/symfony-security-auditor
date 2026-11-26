@@ -18,6 +18,7 @@ use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\RefusedTokenExchangeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientHttpStatusException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnobtainableIdentityTokenException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\AccessTokenProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\WorkloadIdentityHttpClient;
 
@@ -26,6 +27,7 @@ final class WorkloadIdentityHttpClientTest extends TestCase
     /**
      * @throws RefusedTokenExchangeException
      * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
      */
     public function test_it_sends_the_federated_access_token_as_a_bearer_token_in_place_of_the_api_key(): void
     {
@@ -45,6 +47,7 @@ final class WorkloadIdentityHttpClientTest extends TestCase
     /**
      * @throws RefusedTokenExchangeException
      * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
      */
     public function test_it_drops_the_api_key_header_whatever_its_case(): void
     {
@@ -59,6 +62,7 @@ final class WorkloadIdentityHttpClientTest extends TestCase
     /**
      * @throws RefusedTokenExchangeException
      * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
      */
     public function test_a_client_with_other_options_keeps_the_options_and_the_bearer_token(): void
     {
@@ -77,6 +81,7 @@ final class WorkloadIdentityHttpClientTest extends TestCase
     /**
      * @throws RefusedTokenExchangeException
      * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
      */
     public function test_it_streams_the_responses_of_its_requests(): void
     {
@@ -94,6 +99,7 @@ final class WorkloadIdentityHttpClientTest extends TestCase
     /**
      * @throws RefusedTokenExchangeException
      * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
      */
     public function test_it_keeps_a_header_written_as_one_line(): void
     {

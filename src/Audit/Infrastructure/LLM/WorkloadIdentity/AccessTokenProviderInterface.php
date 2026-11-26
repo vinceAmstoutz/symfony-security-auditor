@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Workload
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\RefusedTokenExchangeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientHttpStatusException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnobtainableIdentityTokenException;
 
 /** @internal not part of the BC promise, see docs/versioning.md */
 interface AccessTokenProviderInterface
@@ -22,8 +23,9 @@ interface AccessTokenProviderInterface
     /**
      * Returns an Anthropic access token that is still valid.
      *
-     * @throws RefusedTokenExchangeException when the exchange is refused, or answers without an access token
-     * @throws TransientHttpStatusException  when the token endpoint answers with a status worth retrying
+     * @throws RefusedTokenExchangeException      when the exchange is refused, or answers without an access token
+     * @throws TransientHttpStatusException       when the token endpoint answers with a status worth retrying
+     * @throws UnobtainableIdentityTokenException when the workload gets no identity token
      */
     public function accessToken(): string;
 }

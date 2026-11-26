@@ -21,6 +21,7 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\RefusedTokenExchangeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientHttpStatusException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnobtainableIdentityTokenException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\FederatedAccessTokens;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\IdentityTokenSourceInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\WorkloadIdentityFederation;
@@ -33,6 +34,7 @@ final class FederatedAccessTokensTest extends TestCase
     /**
      * @throws RefusedTokenExchangeException
      * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
      */
     public function test_it_exchanges_the_identity_token_for_an_access_token(): void
     {
@@ -49,6 +51,7 @@ final class FederatedAccessTokensTest extends TestCase
     /**
      * @throws RefusedTokenExchangeException
      * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
      */
     public function test_it_posts_the_identity_token_with_the_federation_rule_to_the_token_endpoint(): void
     {
@@ -77,6 +80,7 @@ final class FederatedAccessTokensTest extends TestCase
     /**
      * @throws RefusedTokenExchangeException
      * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
      */
     public function test_it_leaves_out_the_service_account_and_workspace_the_rule_does_not_name(): void
     {
@@ -93,6 +97,7 @@ final class FederatedAccessTokensTest extends TestCase
     /**
      * @throws RefusedTokenExchangeException
      * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
      */
     public function test_it_reuses_the_access_token_while_it_stays_valid(): void
     {
@@ -109,6 +114,7 @@ final class FederatedAccessTokensTest extends TestCase
     /**
      * @throws RefusedTokenExchangeException
      * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
      */
     public function test_it_exchanges_a_new_access_token_a_minute_before_the_first_one_expires(): void
     {
@@ -125,6 +131,7 @@ final class FederatedAccessTokensTest extends TestCase
     /**
      * @throws RefusedTokenExchangeException
      * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
      */
     public function test_a_refused_exchange_stops_with_the_status_and_the_reason_anthropic_gives(): void
     {
@@ -144,6 +151,7 @@ final class FederatedAccessTokensTest extends TestCase
     /**
      * @throws RefusedTokenExchangeException
      * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
      */
     public function test_a_refusal_in_the_anthropic_error_format_gives_its_message(): void
     {
@@ -158,6 +166,7 @@ final class FederatedAccessTokensTest extends TestCase
     /**
      * @throws RefusedTokenExchangeException
      * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
      */
     public function test_a_gateway_failure_is_retried_and_stops_as_a_refusal_once_the_retries_are_spent(): void
     {
@@ -179,6 +188,7 @@ final class FederatedAccessTokensTest extends TestCase
      *
      * @throws RefusedTokenExchangeException
      * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
      */
     #[DataProvider('statusFailures')]
     public function test_only_a_status_worth_retrying_fails_as_retryable(int $status, string $failure): void
@@ -206,6 +216,7 @@ final class FederatedAccessTokensTest extends TestCase
     /**
      * @throws RefusedTokenExchangeException
      * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
      */
     public function test_an_answer_without_an_access_token_is_a_refusal(): void
     {
@@ -220,6 +231,7 @@ final class FederatedAccessTokensTest extends TestCase
     /**
      * @throws RefusedTokenExchangeException
      * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
      */
     public function test_an_access_token_without_a_lifetime_is_exchanged_again_on_the_next_call(): void
     {

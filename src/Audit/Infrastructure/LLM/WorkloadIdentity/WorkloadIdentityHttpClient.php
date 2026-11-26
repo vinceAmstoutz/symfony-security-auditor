@@ -19,6 +19,7 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 use Symfony\Contracts\HttpClient\ResponseStreamInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\RefusedTokenExchangeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientHttpStatusException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnobtainableIdentityTokenException;
 
 /**
  * Sends each request with an access token from workload identity federation
@@ -38,8 +39,9 @@ final readonly class WorkloadIdentityHttpClient implements HttpClientInterface
     /**
      * @param array<mixed> $options
      *
-     * @throws RefusedTokenExchangeException when the exchange is refused, or answers without an access token
-     * @throws TransientHttpStatusException  when the token endpoint answers with a status worth retrying
+     * @throws RefusedTokenExchangeException      when the exchange is refused, or answers without an access token
+     * @throws TransientHttpStatusException       when the token endpoint answers with a status worth retrying
+     * @throws UnobtainableIdentityTokenException when the workload gets no identity token
      */
     #[Override]
     public function request(string $method, string $url, array $options = []): ResponseInterface
@@ -65,8 +67,9 @@ final readonly class WorkloadIdentityHttpClient implements HttpClientInterface
     /**
      * @return array<int|string, mixed>
      *
-     * @throws RefusedTokenExchangeException when the exchange is refused, or answers without an access token
-     * @throws TransientHttpStatusException  when the token endpoint answers with a status worth retrying
+     * @throws RefusedTokenExchangeException      when the exchange is refused, or answers without an access token
+     * @throws TransientHttpStatusException       when the token endpoint answers with a status worth retrying
+     * @throws UnobtainableIdentityTokenException when the workload gets no identity token
      */
     private function withBearerToken(mixed $headers): array
     {
