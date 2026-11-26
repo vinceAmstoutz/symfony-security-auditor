@@ -342,4 +342,25 @@ final class AttackerSkillRegistryTest extends TestCase
 
         self::assertStringContainsString('a non-GET route cannot be hijacked this way.', $block);
     }
+
+    public function test_controller_trust_boundary_skill_does_not_wave_off_absolute_urls_the_router_builds(): void
+    {
+        $block = (new ControllerTrustBoundaryAttackerSkill())->block();
+
+        self::assertStringNotContainsString('the configured request context, not a manually read `Host` header', $block);
+    }
+
+    public function test_controller_trust_boundary_skill_hunts_links_the_router_builds_from_the_request_host(): void
+    {
+        $block = (new ControllerTrustBoundaryAttackerSkill())->block();
+
+        self::assertStringContainsString('Report as `host_header_injection`.', $block);
+    }
+
+    public function test_controller_trust_boundary_skill_does_not_flag_links_built_from_the_configured_default_uri(): void
+    {
+        $block = (new ControllerTrustBoundaryAttackerSkill())->block();
+
+        self::assertStringContainsString('`framework.router.default_uri`', $block);
+    }
 }

@@ -36,11 +36,12 @@ final readonly class ControllerTrustBoundaryAttackerSkill implements AttackerSki
     {
         return <<<'SKILL'
             <skills role="controller_trust_boundary">
-            Hunt (`Request::getHost()` / `getSchemeAndHttpHost()` / `getHttpHost()`):
+            Hunt (`Request::getHost()` / `getSchemeAndHttpHost()` / `getHttpHost()` / `UrlGeneratorInterface::ABSOLUTE_URL`):
             - The Host derived from the request is used to build a password-reset, email-verification, or webhook-callback URL without a hardcoded or `%env(APP_URL)%`-sourced base — an attacker-controlled `Host` header ends up embedded in a link sent to another user (host header injection / password-reset poisoning).
+            - A password-reset, email-verification or invitation link built during a request by `generateUrl()` or `UrlGeneratorInterface::generate()` with `UrlGeneratorInterface::ABSOLUTE_URL`, or by Twig's `url()`, while `framework.trusted_hosts` is not set: the router takes the link's host from the request's `Host` header, so the attacker picks where it points. Report as `host_header_injection`.
             - A cache key, cached response, or `Cache-Control` decision derived from the request's Host or forwarded headers — HTTP cache poisoning via header spoofing when `trusted_proxies`/`trusted_hosts` is not correctly scoped.
             Do NOT flag:
-            - URL generation via the `router` service (`UrlGeneratorInterface::generate(..., UrlGeneratorInterface::ABSOLUTE_URL)`) — Symfony's router uses the configured request context, not a manually read `Host` header.
+            - An absolute URL the router builds outside an HTTP request (a console command, a message consumed asynchronously, a scheduled task), where its host comes from `framework.router.default_uri`, or while `framework.trusted_hosts` lists the application's hosts.
             - `getHost()`/`getHttpHost()` calls used only for logging or display, not for building a link, cache key, or security decision.
             </skills>
             SKILL;
