@@ -33,42 +33,22 @@ function down(): void
     run('docker compose down --remove-orphans');
 }
 
+#[AsTask(name: 'release:prepare', description: 'Promote the Unreleased changelog section to X.Y.Z Codename, add its link reference, bump every version pin, then run release:check')]
+function releasePrepare(string $version, string $codename): void
+{
+    run(['sh', '.github/scripts/release.sh', 'prepare', $version, $codename]);
+}
+
+#[AsTask(name: 'release:check', description: 'Check that the changelog releases X.Y.Z with every pull request link and that every version pin points at it')]
+function releaseCheck(string $version): void
+{
+    run(['sh', '.github/scripts/release.sh', 'check', $version]);
+}
+
 #[AsTask(name: 'release:bump', description: 'Rewrite every release version pin (schema $id, GitHub Action uses: examples) to the given X.Y.Z tag')]
 function releaseBump(string $version): void
 {
-    if (1 !== preg_match('/^\\d+\\.\\d+\\.\\d+$/', $version)) {
-        io()->error(sprintf('"%s" is not a X.Y.Z version.', $version));
-
-        exit(1);
-    }
-
-    $pinnedFiles = [
-        'resources/schema.json' => '#(symfony-security-auditor/)\\d+\\.\\d+\\.\\d+(/resources/schema\\.json)#',
-        'README.md' => '#(uses: vinceamstoutz/symfony-security-auditor@)\\d+\\.\\d+\\.\\d+#',
-        'docs/ci.md' => '#(uses: vinceamstoutz/symfony-security-auditor@)\\d+\\.\\d+\\.\\d+#',
-        'docs/versioning.md' => '#(uses: vinceamstoutz/symfony-security-auditor@)\\d+\\.\\d+\\.\\d+#',
-    ];
-
-    foreach ($pinnedFiles as $file => $pattern) {
-        $content = file_get_contents($file);
-        if (false === $content) {
-            io()->error(sprintf('Could not read %s.', $file));
-
-            exit(1);
-        }
-
-        $rewritten = preg_replace($pattern, '${1}'.$version.'${2}', $content, -1, $count);
-        if (null === $rewritten || 0 === $count) {
-            io()->error(sprintf('No version pin matched in %s — the pin list in castor.php is stale.', $file));
-
-            exit(1);
-        }
-
-        file_put_contents($file, $rewritten);
-        io()->writeln(sprintf('  <info>OK</info> %s (%d pin%s)', $file, $count, 1 === $count ? '' : 's'));
-    }
-
-    io()->success(sprintf('All version pins now point at %s.', $version));
+    run(['sh', '.github/scripts/release.sh', 'bump', $version]);
 }
 
 #[AsTask(name: 'compat:record', description: 'Record the compatibility fixtures from a release tag, or from a checkout of one that has its vendor/ installed')]
@@ -295,6 +275,9 @@ function runCodeQualityTools(bool $fixMode = false): void
 
     io()->section('Binary build plan tests');
     run('sh tests/Shell/plan_binary_build_test.sh');
+
+    io()->section('Release script tests');
+    run('sh tests/Shell/release_script_test.sh');
 
     io()->section('Claude hook tests');
     run('sh tests/Shell/claude_hooks_test.sh');
