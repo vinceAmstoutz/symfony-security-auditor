@@ -65,7 +65,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 ### Core 🧱
 
-- The Azure bridge suggestion in `composer.json` recommends `gpt-5.4-mini` instead of `o4-mini`, which the symfony/models-dev price catalog no longer lists for Azure, so a user following it gets a model whose cost the audit can report
+- The Azure bridge suggestion in `composer.json` recommends `gpt-5.4-mini` instead of `o4-mini`, which the symfony/models-dev price catalog no longer lists for Azure, so a user following it gets a model whose cost the audit can report ([#736](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/736))
 - A configuration file whose YAML aliases expand past the value limit is refused with the same message on `symfony/yaml` 7.4.24 and later, which caps alias expansion itself ([#724](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/724))
 - `mcp:serve` runs on `mcp/sdk` `^0.10`, for the bundle and the standalone binary; in bundle mode an application holding `mcp/sdk` at 0.9 must let it move to 0.10 ([#703](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/703))
 - A provider failure that symfony/ai marks as retryable is retried whatever its message says, so a provider rewording an error no longer stops a run that would have recovered ([#686](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/686))
