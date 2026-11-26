@@ -19,6 +19,7 @@ use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Parameter;
+use Symfony\Component\DependencyInjection\Reference;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PulledModelNoticePass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\OllamaPulledModelList;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelNotice;
@@ -41,6 +42,18 @@ final class PulledModelNoticePassTest extends TestCase
             [PulledModelNotice::class, OllamaPulledModelList::class, '%env(OLLAMA_ENDPOINT)%', 'symfony_security_auditor.audit.models_requiring_pricing'],
             [$definition->getClass(), $pulledModelList->getClass(), $definition->getArgument(1), (string) $models],
         );
+    }
+
+    public function test_it_asks_the_server_through_the_http_client_of_the_platform(): void
+    {
+        $containerBuilder = self::containerWith(PlatformInterface::class, 'ai.platform.ollama');
+        $containerBuilder->register('ai.platform.ollama')->setArguments(['http://localhost:11434', null, new Reference('ai.platform.http_client')]);
+
+        (new PulledModelNoticePass())->process($containerBuilder);
+
+        $pulledModelList = $containerBuilder->getDefinition(PulledModelNoticePass::SERVICE)->getArgument(0);
+        self::assertInstanceOf(Definition::class, $pulledModelList);
+        self::assertEquals(new Reference('ai.platform.http_client'), $pulledModelList->getArgument(0));
     }
 
     /**

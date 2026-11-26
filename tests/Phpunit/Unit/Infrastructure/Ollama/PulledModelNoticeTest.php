@@ -33,6 +33,25 @@ final class PulledModelNoticeTest extends TestCase
         );
     }
 
+    public function test_it_names_the_server_without_the_credentials_its_endpoint_holds(): void
+    {
+        $endpoint = 'https://admin:s3cret@ollama.example:8443/base?token=t0k3n';
+
+        $notices = (new PulledModelNotice($this->serverPulling([$endpoint => ['qwen3:latest']]), $endpoint, ['qwen9']))->notices();
+
+        self::assertStringStartsWith('The Ollama server at https://ollama.example:8443 has not pulled the model "qwen9"', $notices[0] ?? '');
+    }
+
+    public function test_it_escapes_the_control_characters_of_a_model_name(): void
+    {
+        $notices = (new PulledModelNotice($this->serverPulling(['http://localhost:11434' => ["evil\e]0;pwned\x07:latest"]]), 'http://localhost:11434', ["qwen\e[2J9"]))->notices();
+
+        self::assertSame(
+            ['The Ollama server at http://localhost:11434 has not pulled the model "qwen\\033[2J9", so every call with it will fail. Run "ollama pull qwen\\033[2J9", or configure one of the models it pulled: evil\\033]0;pwned\\a:latest.'],
+            $notices,
+        );
+    }
+
     /**
      * @param list<string> $models
      */

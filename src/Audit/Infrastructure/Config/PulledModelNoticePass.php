@@ -26,7 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModel
 /**
  * Registers the notice naming the configured models the Ollama server has not
  * pulled, when the audit runs on the `ollama` platform of `symfony/ai`, with
- * the endpoint that platform is configured with.
+ * the endpoint and the HTTP client that platform is configured with.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -40,6 +40,12 @@ final readonly class PulledModelNoticePass implements CompilerPassInterface
 
     private const string MODELS_PARAMETER = 'symfony_security_auditor.audit.models_requiring_pricing';
 
+    /**
+     * Where `symfony/ai-bundle` passes the Ollama platform its HTTP client,
+     * the one that carries the proxy settings of the run.
+     */
+    private const int PLATFORM_HTTP_CLIENT_ARGUMENT = 2;
+
     #[Override]
     public function process(ContainerBuilder $container): void
     {
@@ -47,10 +53,11 @@ final readonly class PulledModelNoticePass implements CompilerPassInterface
             return;
         }
 
-        $httpClient = (new Definition(HttpClientInterface::class))->setFactory([HttpClient::class, 'create']);
+        $platformArguments = $container->getDefinition(self::OLLAMA)->getArguments();
+        $httpClient = $platformArguments[self::PLATFORM_HTTP_CLIENT_ARGUMENT] ?? (new Definition(HttpClientInterface::class))->setFactory([HttpClient::class, 'create']);
         $container->register(self::SERVICE, PulledModelNotice::class)->setArguments([
             new Definition(OllamaPulledModelList::class, [$httpClient]),
-            $container->getDefinition(self::OLLAMA)->getArguments()[0] ?? null,
+            $platformArguments[0] ?? null,
             new Parameter(self::MODELS_PARAMETER),
         ]);
     }

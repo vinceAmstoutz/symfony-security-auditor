@@ -13,6 +13,9 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama;
 
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PlatformEndpoint;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\TerminalText;
+
 /**
  * Names each configured model an Ollama server has not pulled. Says nothing
  * when no endpoint is configured or the server lists no model, which it
@@ -56,7 +59,7 @@ final readonly class PulledModelNotice
         $notices = [];
         foreach ($this->models as $model) {
             if (!$this->isPulled($model, $pulledModels)) {
-                $notices[] = \sprintf('The Ollama server at %s has not pulled the model "%s", so every call with it will fail. Run "ollama pull %2$s", or configure one of the models it pulled: %s.', $this->endpoint, $model, implode(', ', $pulledModels));
+                $notices[] = \sprintf('The Ollama server at %s has not pulled the model "%s", so every call with it will fail. Run "ollama pull %2$s", or configure one of the models it pulled: %s.', PlatformEndpoint::tryFrom($this->endpoint)?->origin(), TerminalText::escaped($model), TerminalText::escaped(implode(', ', $pulledModels)));
             }
         }
 
