@@ -509,7 +509,7 @@ final class EnvironmentDoctorTest extends TestCase
         $composerAvailabilityChecker->method('probe')->willReturn(ComposerProbe::available());
 
         return new EnvironmentDoctor(
-            new StandaloneConfigLoader($this->resolver(), new StandalonePlatformConfigResolver(['ANTHROPIC_API_KEY' => self::FEDERATION_PLACEHOLDER])),
+            new StandaloneConfigLoader($this->resolver(), new StandalonePlatformConfigResolver(platformEnvironments: ['anthropic' => ['ANTHROPIC_API_KEY' => self::FEDERATION_PLACEHOLDER]])),
             $this->resolver(),
             $composerAvailabilityChecker,
             self::createStub(AuditPreflightInterface::class),

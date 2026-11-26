@@ -156,11 +156,9 @@ final readonly class StandaloneContainerFactory
      */
     private function aiConfigFor(StandaloneConfig $standaloneConfig, ContainerBuilder $containerBuilder): array
     {
-        $aiConfig = $standaloneConfig->platform->toAiConfig();
-
         return $this->federatedAnthropicAccess instanceof FederatedAnthropicAccess
-            ? $this->federatedAnthropicAccess->configure($aiConfig, $containerBuilder)
-            : $aiConfig;
+            ? $this->federatedAnthropicAccess->configure($standaloneConfig->platform, $containerBuilder)
+            : $standaloneConfig->platform->toAiConfig();
     }
 
     private function auditAdvisoriesWithEmbeddedComposer(ContainerBuilder $containerBuilder): void

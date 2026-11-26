@@ -164,7 +164,7 @@ final readonly class StandaloneApplicationFactory
         return new self(
             new StandaloneConfigLoader(
                 $xdgConfigPathResolver,
-                new StandalonePlatformConfigResolver($federatedAnthropicAccess?->environmentWithPlaceholderApiKey($environment) ?? $environment, credentialStore: $filesystemCredentialStore),
+                new StandalonePlatformConfigResolver($environment, credentialStore: $filesystemCredentialStore, platformEnvironments: $federatedAnthropicAccess?->platformEnvironments() ?? []),
                 self::projectConfigFile($environment),
             ),
             $xdgConfigPathResolver,

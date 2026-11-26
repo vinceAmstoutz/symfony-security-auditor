@@ -19,6 +19,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterSyntax;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnobtainableIdentityTokenException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\FederatedAccessTokens;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\GithubActionsIdentityToken;
@@ -68,29 +69,29 @@ final readonly class FederatedAnthropicAccess
     }
 
     /**
-     * @param array<string, string> $environment
+     * The placeholder API key only the `anthropic` block reads, for the
+     * platform config resolver to apply when the run calls that platform.
      *
-     * @return array<string, string>
+     * @return array<string, array<string, string>>
      */
-    public function environmentWithPlaceholderApiKey(array $environment): array
+    public function platformEnvironments(): array
     {
-        return [...$environment, self::API_KEY_VARIABLE => self::API_KEY_PLACEHOLDER];
+        return [self::ANTHROPIC => [self::API_KEY_VARIABLE => self::API_KEY_PLACEHOLDER]];
     }
 
     /**
      * Registers the federated HTTP client and hands it to the `anthropic`
-     * platform of the AI configuration.
-     *
-     * @param array{platform: array<array-key, mixed>} $aiConfig
+     * platform of the AI configuration, when the run calls that platform.
      *
      * @return array{platform: array<array-key, mixed>}
      *
      * @throws UnobtainableIdentityTokenException when the run cannot request an identity token from GitHub Actions
      */
-    public function configure(array $aiConfig, ContainerBuilder $containerBuilder): array
+    public function configure(StandalonePlatformConfig $standalonePlatformConfig, ContainerBuilder $containerBuilder): array
     {
+        $aiConfig = $standalonePlatformConfig->toAiConfig();
         $anthropic = $aiConfig['platform'][self::ANTHROPIC] ?? null;
-        if (!\is_array($anthropic)) {
+        if (!\is_array($anthropic) || !$standalonePlatformConfig->runsOn(self::ANTHROPIC)) {
             return $aiConfig;
         }
 

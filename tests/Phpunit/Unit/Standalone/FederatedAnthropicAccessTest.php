@@ -19,6 +19,8 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnobtainableIdentityTokenException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\FederatedAnthropicAccess;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
@@ -39,14 +41,14 @@ final class FederatedAnthropicAccessTest extends TestCase
         self::assertNull(FederatedAnthropicAccess::fromEnvironment([...self::FEDERATION, 'ANTHROPIC_API_KEY' => 'sk-ant-api03-stored']));
     }
 
-    public function test_the_config_reads_a_placeholder_api_key_that_federation_replaces(): void
+    public function test_only_the_anthropic_block_reads_a_placeholder_api_key_that_federation_replaces(): void
     {
         $federatedAnthropicAccess = FederatedAnthropicAccess::fromEnvironment(self::FEDERATION);
         self::assertInstanceOf(FederatedAnthropicAccess::class, $federatedAnthropicAccess);
 
         self::assertSame(
-            [...self::FEDERATION, 'ANTHROPIC_API_KEY' => FederatedAnthropicAccess::API_KEY_PLACEHOLDER],
-            $federatedAnthropicAccess->environmentWithPlaceholderApiKey(self::FEDERATION),
+            ['anthropic' => ['ANTHROPIC_API_KEY' => FederatedAnthropicAccess::API_KEY_PLACEHOLDER]],
+            $federatedAnthropicAccess->platformEnvironments(),
         );
     }
 
@@ -66,7 +68,7 @@ final class FederatedAnthropicAccessTest extends TestCase
         $federatedAnthropicAccess = FederatedAnthropicAccess::fromEnvironment(self::FEDERATION);
         self::assertInstanceOf(FederatedAnthropicAccess::class, $federatedAnthropicAccess);
 
-        $aiConfig = $federatedAnthropicAccess->configure(['platform' => ['anthropic' => ['api_key' => FederatedAnthropicAccess::API_KEY_PLACEHOLDER]]], $containerBuilder);
+        $aiConfig = $federatedAnthropicAccess->configure(new StandalonePlatformConfig(['anthropic' => ['api_key' => FederatedAnthropicAccess::API_KEY_PLACEHOLDER]]), $containerBuilder);
         $anthropic = $aiConfig['platform']['anthropic'];
         self::assertIsArray($anthropic);
         self::assertIsString($anthropic['http_client'] ?? null);
@@ -93,7 +95,7 @@ final class FederatedAnthropicAccessTest extends TestCase
         $this->expectException(UnobtainableIdentityTokenException::class);
         $this->expectExceptionMessageContaining('Workload identity federation reads the identity token from GitHub Actions: run in a job with the "id-token: write" permission, or set ANTHROPIC_API_KEY.');
 
-        $federatedAnthropicAccess->configure(['platform' => ['anthropic' => ['api_key' => FederatedAnthropicAccess::API_KEY_PLACEHOLDER]]], new ContainerBuilder());
+        $federatedAnthropicAccess->configure(new StandalonePlatformConfig(['anthropic' => ['api_key' => FederatedAnthropicAccess::API_KEY_PLACEHOLDER]]), new ContainerBuilder());
     }
 
     /**
@@ -117,12 +119,39 @@ final class FederatedAnthropicAccessTest extends TestCase
         $federatedAnthropicAccess = FederatedAnthropicAccess::fromEnvironment(['ANTHROPIC_FEDERATION_RULE_ID' => 'fdrl_rule', 'ANTHROPIC_ORGANIZATION_ID' => 'org-uuid']);
         self::assertInstanceOf(FederatedAnthropicAccess::class, $federatedAnthropicAccess);
 
-        $aiConfig = ['platform' => ['openai' => ['api_key' => 'sk-proj-key']]];
+        $platform = ['openai' => ['api_key' => 'sk-proj-key']];
 
         self::assertSame(
-            [$aiConfig, false],
-            [$federatedAnthropicAccess->configure($aiConfig, $containerBuilder), $containerBuilder->hasDefinition(FederatedAnthropicAccess::HTTP_CLIENT_SERVICE)],
+            [['platform' => $platform], false],
+            [$federatedAnthropicAccess->configure(new StandalonePlatformConfig($platform), $containerBuilder), $containerBuilder->hasDefinition(FederatedAnthropicAccess::HTTP_CLIENT_SERVICE)],
         );
+    }
+
+    /**
+     * @throws UnobtainableIdentityTokenException
+     */
+    #[DataProvider('anthropicBlocksTheRunDoesNotCall')]
+    public function test_an_anthropic_block_the_run_does_not_call_is_left_as_it_is_outside_github_actions(?string $provider): void
+    {
+        $containerBuilder = new ContainerBuilder();
+        $federatedAnthropicAccess = FederatedAnthropicAccess::fromEnvironment(['ANTHROPIC_FEDERATION_RULE_ID' => 'fdrl_rule', 'ANTHROPIC_ORGANIZATION_ID' => 'org-uuid']);
+        self::assertInstanceOf(FederatedAnthropicAccess::class, $federatedAnthropicAccess);
+
+        $platform = ['anthropic' => ['api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL], 'openai' => ['api_key' => 'sk-proj-key']];
+
+        self::assertSame(
+            [['platform' => $platform], false],
+            [$federatedAnthropicAccess->configure(new StandalonePlatformConfig($platform, $provider), $containerBuilder), $containerBuilder->hasDefinition(FederatedAnthropicAccess::HTTP_CLIENT_SERVICE)],
+        );
+    }
+
+    /**
+     * @return iterable<string, array{?string}>
+     */
+    public static function anthropicBlocksTheRunDoesNotCall(): iterable
+    {
+        yield 'another platform the provider selects' => ['openai'];
+        yield 'no provider among several platforms' => [null];
     }
 
     /**
@@ -139,7 +168,7 @@ final class FederatedAnthropicAccessTest extends TestCase
                 'anthropic' => ['api_key' => FederatedAnthropicAccess::API_KEY_PLACEHOLDER, 'cache_retention' => 'long', 'http_client' => FederatedAnthropicAccess::HTTP_CLIENT_SERVICE],
             ]],
             $federatedAnthropicAccess->configure(
-                ['platform' => ['openai' => ['api_key' => 'sk-proj-key'], 'anthropic' => ['api_key' => FederatedAnthropicAccess::API_KEY_PLACEHOLDER, 'cache_retention' => 'long']]],
+                new StandalonePlatformConfig(['openai' => ['api_key' => 'sk-proj-key'], 'anthropic' => ['api_key' => FederatedAnthropicAccess::API_KEY_PLACEHOLDER, 'cache_retention' => 'long']], 'anthropic'),
                 new ContainerBuilder(),
             ),
         );
@@ -157,7 +186,7 @@ final class FederatedAnthropicAccessTest extends TestCase
         $federatedAnthropicAccess = FederatedAnthropicAccess::fromEnvironment([...self::FEDERATION, 'ANTHROPIC_FEDERATION_RULE_ID' => 'fdrl_%kernel.debug%']);
         self::assertInstanceOf(FederatedAnthropicAccess::class, $federatedAnthropicAccess);
 
-        $federatedAnthropicAccess->configure(['platform' => ['anthropic' => ['api_key' => FederatedAnthropicAccess::API_KEY_PLACEHOLDER]]], $containerBuilder);
+        $federatedAnthropicAccess->configure(new StandalonePlatformConfig(['anthropic' => ['api_key' => FederatedAnthropicAccess::API_KEY_PLACEHOLDER]]), $containerBuilder);
         $httpClient = $containerBuilder->get(FederatedAnthropicAccess::HTTP_CLIENT_SERVICE);
         self::assertInstanceOf(HttpClientInterface::class, $httpClient);
         $httpClient->request('POST', 'https://api.anthropic.com/v1/messages');

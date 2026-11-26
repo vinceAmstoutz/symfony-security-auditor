@@ -34,12 +34,14 @@ final readonly class StandalonePlatformConfigResolver
     public const string UNNEEDED_CREDENTIAL = 'unneeded-for-this-run';
 
     /**
-     * @param array<string, string> $environment
+     * @param array<string, string>                $environment
+     * @param array<string, array<string, string>> $platformEnvironments variables only the block of the platform they are keyed by reads, when the run calls that platform
      */
     public function __construct(
         private array $environment = [],
         private Filesystem $filesystem = new Filesystem(),
         private CredentialStoreInterface $credentialStore = new NullCredentialStore(),
+        private array $platformEnvironments = [],
     ) {}
 
     /**
@@ -61,12 +63,57 @@ final readonly class StandalonePlatformConfigResolver
         $activeProvider = $rawConfig['provider'] ?? null;
         $activeProvider = \is_string($activeProvider) && '' !== $activeProvider ? $activeProvider : $this->loneCliAgentIn($platform);
 
+        $calledPlatform = $this->calledPlatformWithEnvironment($platform, $activeProvider);
+        if (null === $calledPlatform) {
+            return new StandalonePlatformConfig($this->resolvePlatform($platform, $activeProvider, $credentialsRequired), $activeProvider);
+        }
+
+        $calledBlock = [$calledPlatform => $platform[$calledPlatform]];
+        $calledBlockResolver = new self([...$this->environment, ...$this->platformEnvironments[$calledPlatform]], $this->filesystem, $this->credentialStore);
+
         return new StandalonePlatformConfig(
-            null === $activeProvider
-                ? $this->resolveEnvPlaceholders($platform, $credentialsRequired)
-                : $this->resolveSelected($platform, $this->selectedPath(ProviderKey::of($activeProvider)), $credentialsRequired),
+            array_replace(
+                $platform,
+                $this->resolvePlatform(array_diff_key($platform, $calledBlock), $activeProvider, $credentialsRequired),
+                $calledBlockResolver->resolvePlatform($calledBlock, $activeProvider, $credentialsRequired),
+            ),
             $activeProvider,
         );
+    }
+
+    /**
+     * @param array<array-key, mixed> $platform
+     *
+     * @return array<array-key, mixed>
+     *
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    private function resolvePlatform(array $platform, ?string $activeProvider, bool $credentialsRequired): array
+    {
+        return null === $activeProvider
+            ? $this->resolveEnvPlaceholders($platform, $credentialsRequired)
+            : $this->resolveSelected($platform, $this->selectedPath(ProviderKey::of($activeProvider)), $credentialsRequired);
+    }
+
+    /**
+     * Names the platform the run calls whose block has variables of its own,
+     * read from the same `provider:` and blocks the run is resolved from.
+     *
+     * @param array<array-key, mixed> $platform
+     */
+    private function calledPlatformWithEnvironment(array $platform, ?string $activeProvider): ?string
+    {
+        $standalonePlatformConfig = new StandalonePlatformConfig($platform, $activeProvider);
+        foreach (array_keys($this->platformEnvironments) as $platformName) {
+            if ($standalonePlatformConfig->runsOn($platformName) && \array_key_exists($platformName, $platform)) {
+                return $platformName;
+            }
+        }
+
+        return null;
     }
 
     /**

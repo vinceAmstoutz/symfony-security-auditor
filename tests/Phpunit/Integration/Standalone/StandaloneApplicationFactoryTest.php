@@ -795,7 +795,7 @@ final class StandaloneApplicationFactoryTest extends TestCase
         self::assertStringNotContainsString(CredentialIdentity::of(FederatedAnthropicAccess::API_KEY_PLACEHOLDER)->fingerprint, $display);
     }
 
-    public function test_doctor_names_no_placeholder_key_for_several_platforms_none_selects_under_workload_identity_federation(): void
+    public function test_doctor_reports_the_missing_anthropic_key_of_several_platforms_none_selects_under_workload_identity_federation_as_without_it(): void
     {
         $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n    openai:\n        api_key: 'sk-proj-0123456789abcdefghij'\nmodel: claude-opus-5-5\n");
         $standaloneApplication = StandaloneApplicationFactory::fromEnvironment($this->federatedEnvironment())->create();
@@ -807,6 +807,7 @@ final class StandaloneApplicationFactoryTest extends TestCase
 
         $display = (string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay());
 
+        self::assertStringContainsString('[ERROR] API key: No API key available. Your config reads it from "ANTHROPIC_API_KEY"', $display);
         self::assertStringNotContainsString(CredentialIdentity::of(FederatedAnthropicAccess::API_KEY_PLACEHOLDER)->fingerprint, $display);
         self::assertStringNotContainsString(CredentialIdentity::of(FederatedAnthropicAccess::API_KEY_PLACEHOLDER)->maskedPreview, $display);
     }
@@ -825,6 +826,22 @@ final class StandaloneApplicationFactoryTest extends TestCase
 
         self::assertStringNotContainsString(CredentialIdentity::of(FederatedAnthropicAccess::API_KEY_PLACEHOLDER)->fingerprint, $display);
         self::assertStringNotContainsString(CredentialIdentity::of(FederatedAnthropicAccess::API_KEY_PLACEHOLDER)->maskedPreview, $display);
+    }
+
+    public function test_doctor_reports_the_missing_key_of_another_platform_reading_anthropic_api_key_under_workload_identity_federation_as_without_it(): void
+    {
+        $this->writeConfig("provider: generic.gw\nplatform:\n    generic:\n        gw:\n            base_url: 'https://gateway.example'\n            api_key: '%env(ANTHROPIC_API_KEY)%'\nmodel: claude-opus-5-5\n");
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment($this->federatedEnvironment())->create();
+        $standaloneApplication->setAutoExit(false);
+
+        $applicationTester = new ApplicationTester($standaloneApplication);
+
+        $applicationTester->run(['command' => 'doctor']);
+
+        self::assertStringContainsString(
+            '[ERROR] API key: No API key available. Your config reads it from "ANTHROPIC_API_KEY"',
+            (string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay()),
+        );
     }
 
     public function test_doctor_probes_the_composer_the_binary_bundles(): void
