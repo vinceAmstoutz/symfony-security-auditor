@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Infrastructure\LLM;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -87,6 +88,29 @@ final class ProcessCliAgentAccountProbeTest extends TestCase
 
         [$workingDirectory, $configDirectory, $entries, $mode] = explode(' ', trim((string) file_get_contents($record)));
         self::assertSame([$configDirectory, '0', 'drwx------'], [$workingDirectory, $entries, $mode]);
+    }
+
+    #[DataProvider('statusCommands')]
+    public function test_it_asks_the_cli_from_a_private_directory_rather_than_the_current_one(string $agent): void
+    {
+        $record = $this->directory.'/working-directory';
+        $cli = $this->directory.'/cli';
+        $this->filesystem->dumpFile($cli, \sprintf("#!/bin/sh\n[ -n \"\$CLAUDE_CONFIG_DIR\" ] || echo \"\$(pwd -P) \$(ls -A | wc -l) \$(ls -ld . | cut -c1-10)\" > %s\necho 'Logged in using ChatGPT'\n", escapeshellarg($record)));
+        $this->filesystem->chmod($cli, 0o755);
+
+        (new ProcessCliAgentAccountProbe())->probe($agent, $cli);
+
+        [$workingDirectory, $entries, $mode] = explode(' ', trim((string) file_get_contents($record)));
+        self::assertSame([false, '0', 'drwx------'], [(string) realpath((string) getcwd()) === $workingDirectory, $entries, $mode]);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function statusCommands(): iterable
+    {
+        yield 'claude auth status' => ['claudecode'];
+        yield 'codex login status' => ['codex'];
     }
 
     public function test_it_removes_the_empty_configuration_directory_once_it_has_looked(): void
