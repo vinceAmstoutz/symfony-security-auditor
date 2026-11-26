@@ -86,7 +86,21 @@ final readonly class LLMAnswerJsonDecoder
         $openerPositions = BalancedBlockScanner::openerPositions($content);
 
         return self::lastDecodedBlock(self::topLevelBlocks($content, $openerPositions))
-            ?? self::firstDecodedBlock($content, $openerPositions);
+            ?? self::firstDecodedBlock($content, self::recoveryCandidates($openerPositions));
+    }
+
+    /**
+     * The openers searched for the first block that decodes anywhere, each
+     * scanned up to the end of the answer at most: the first
+     * {@see self::MAX_RECOVERY_CANDIDATES} of `$openerPositions`.
+     *
+     * @param list<int> $openerPositions
+     *
+     * @return list<int>
+     */
+    public static function recoveryCandidates(array $openerPositions): array
+    {
+        return \array_slice($openerPositions, 0, self::MAX_RECOVERY_CANDIDATES);
     }
 
     /**
@@ -167,11 +181,11 @@ final readonly class LLMAnswerJsonDecoder
     }
 
     /**
-     * @param list<int> $openerPositions
+     * @param list<int> $recoveryCandidates
      */
-    private static function firstDecodedBlock(string $content, array $openerPositions): mixed
+    private static function firstDecodedBlock(string $content, array $recoveryCandidates): mixed
     {
-        foreach (\array_slice($openerPositions, 0, self::MAX_RECOVERY_CANDIDATES) as $openerPosition) {
+        foreach ($recoveryCandidates as $openerPosition) {
             $block = BalancedBlockScanner::balancedBlockOpenedAt($content, $openerPosition);
             $decoded = null === $block ? null : self::decodeBlock($block);
             if (null !== $decoded) {
