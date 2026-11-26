@@ -59,8 +59,11 @@ final readonly class UnpricedModelBudgetGuard implements UnpricedModelBudgetGuar
         return false;
     }
 
+    /**
+     * @throws void
+     */
     #[Override]
-    public function warnWhenBudgetCannotBeEnforced(LoggerInterface $logger): void
+    public function assertUnattendedRunPermitted(LoggerInterface $logger): void
     {
         $unpricedModels = $this->unpricedModels();
         if (null === $this->maxCostUsd || [] === $unpricedModels) {

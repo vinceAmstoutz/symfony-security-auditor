@@ -21,8 +21,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ClaudeCodeSubscriptionCli;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentAccount;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentAccountProbeInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnattendedRunRefusedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\SubscriptionAccountGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\WarningCollectingLogger;
 
 final class SubscriptionAccountGuardTest extends TestCase
 {
@@ -69,13 +71,18 @@ final class SubscriptionAccountGuardTest extends TestCase
         (new SubscriptionAccountGuard($unpricedModelBudgetGuard, new ClaudeCodeSubscriptionCli(), '/opt/claude/bin/claude', $cliAgentAccountProbe))->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), new BufferedOutput()));
     }
 
+    /**
+     * @throws UnattendedRunRefusedException
+     */
     public function test_it_leaves_the_unenforceable_budget_warning_to_the_guard_it_wraps(): void
     {
         $logger = new NullLogger();
         $unpricedModelBudgetGuard = $this->createMock(UnpricedModelBudgetGuardInterface::class);
-        $unpricedModelBudgetGuard->expects(self::once())->method('warnWhenBudgetCannotBeEnforced')->with($logger);
+        $unpricedModelBudgetGuard->expects(self::once())->method('assertUnattendedRunPermitted')->with($logger);
+        $cliAgentAccountProbe = self::createStub(CliAgentAccountProbeInterface::class);
+        $cliAgentAccountProbe->method('probe')->willReturn(CliAgentAccount::subscription(null));
 
-        (new SubscriptionAccountGuard($unpricedModelBudgetGuard, new ClaudeCodeSubscriptionCli(), null, self::createStub(CliAgentAccountProbeInterface::class)))->warnWhenBudgetCannotBeEnforced($logger);
+        (new SubscriptionAccountGuard($unpricedModelBudgetGuard, new ClaudeCodeSubscriptionCli(), null, $cliAgentAccountProbe))->assertUnattendedRunPermitted($logger);
     }
 
     public function test_it_says_how_to_log_the_cli_in_when_it_refuses_to_start(): void
@@ -99,6 +106,41 @@ final class SubscriptionAccountGuardTest extends TestCase
         $permitted = $this->guard(CliAgentAccount::unknown('"claude auth status" failed'))->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), $bufferedOutput));
 
         self::assertSame([true, true], [$permitted, str_contains((string) preg_replace('/\s+/', ' ', $bufferedOutput->fetch()), '[WARNING] Run "claude auth status" to see which account the Claude Code CLI bills.')]);
+    }
+
+    /**
+     * @throws UnattendedRunRefusedException
+     */
+    public function test_it_refuses_an_unattended_run_while_the_cli_is_not_logged_in(): void
+    {
+        $this->expectExceptionObject(UnattendedRunRefusedException::because('Run "claude auth login" to log the Claude Code CLI in to your Claude subscription before an audit.'));
+
+        $this->guard(CliAgentAccount::notLoggedIn())->assertUnattendedRunPermitted(new NullLogger());
+    }
+
+    /**
+     * @throws UnattendedRunRefusedException
+     */
+    public function test_it_logs_and_lets_an_unattended_run_start_when_the_cli_cannot_tell_which_account_it_bills(): void
+    {
+        $warningCollectingLogger = new WarningCollectingLogger();
+
+        $this->guard(CliAgentAccount::unknown('"claude auth status" failed'))->assertUnattendedRunPermitted($warningCollectingLogger);
+
+        self::assertCount(1, $warningCollectingLogger->warnings);
+        self::assertStringContainsString('Run "claude auth status" to see which account the Claude Code CLI bills.', $warningCollectingLogger->warnings[0][0]);
+    }
+
+    /**
+     * @throws UnattendedRunRefusedException
+     */
+    public function test_it_logs_nothing_for_an_unattended_run_the_subscription_bills(): void
+    {
+        $warningCollectingLogger = new WarningCollectingLogger();
+
+        $this->guard(CliAgentAccount::subscription('max plan'))->assertUnattendedRunPermitted($warningCollectingLogger);
+
+        self::assertSame([], $warningCollectingLogger->warnings);
     }
 
     private function guard(CliAgentAccount $cliAgentAccount): SubscriptionAccountGuard

@@ -956,6 +956,7 @@ args = ["mcp:serve"]
 The audit runs on the auditor's own configured platform and models and bills that provider as a CLI run would. **The MCP client's model is not used**, so your provider credential is still required.
 
 - An audit needs **no API key** only when the configured platform takes none, such as a local [Ollama](#supported-platforms); nothing then leaves your machine either.
+- On a [Claude](#running-on-a-claude-subscription) or [ChatGPT](#running-on-a-chatgpt-subscription) subscription, the `audit` tool refuses to start, as `audit:run` does, while the CLI is not logged in or would bill an API key in place of the subscription. The client receives the reason.
 - A client started from a desktop app does not inherit your shell's environment variables. With the standalone binary, store the key once with [`auth:set`](#providing-the-api-key) so the server finds it however it is launched; otherwise pass the variable through the client's `env` setting.
 - A full report can be large. Claude Code caps a tool's output at 25,000 tokens by default; raise `MAX_MCP_OUTPUT_TOKENS` if a report is cut off.
 - An audit takes minutes and sends no progress; a client that times out (60 seconds by default in the MCP TypeScript SDK) leaves the server spending on an answer nobody reads. Raise the client's tool timeout (Claude Code: `MCP_TOOL_TIMEOUT`, in milliseconds) or keep MCP audits short with the `fast` profile.

@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnattendedRunRefusedException;
 
 /** @internal not part of the BC promise, see docs/versioning.md */
 interface UnpricedModelBudgetGuardInterface
@@ -28,8 +29,11 @@ interface UnpricedModelBudgetGuardInterface
     public function permitsRun(InputInterface $input, SymfonyStyle $symfonyStyle): bool;
 
     /**
-     * Logs that the cost budget cannot be enforced on an unpriced model, for
-     * an entry point with nobody to confirm, such as the MCP server.
+     * For an entry point with nobody to confirm, such as the MCP server: logs
+     * that the cost budget cannot be enforced on an unpriced model and refuses
+     * a run that `permitsRun()` refuses without asking.
+     *
+     * @throws UnattendedRunRefusedException
      */
-    public function warnWhenBudgetCannotBeEnforced(LoggerInterface $logger): void;
+    public function assertUnattendedRunPermitted(LoggerInterface $logger): void;
 }

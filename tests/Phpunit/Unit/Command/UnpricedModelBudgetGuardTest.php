@@ -98,7 +98,7 @@ final class UnpricedModelBudgetGuardTest extends TestCase
         $unpricedModelBudgetGuard = new UnpricedModelBudgetGuard($this->pricingKnowing('claude-opus-4-8'), ['claude-opus-4-8', 'mystery-model', 'other-model', 'mystery-model'], 10.5);
         $warningCollectingLogger = new WarningCollectingLogger();
 
-        $unpricedModelBudgetGuard->warnWhenBudgetCannotBeEnforced($warningCollectingLogger);
+        $unpricedModelBudgetGuard->assertUnattendedRunPermitted($warningCollectingLogger);
 
         self::assertSame(
             [[
@@ -113,7 +113,7 @@ final class UnpricedModelBudgetGuardTest extends TestCase
     {
         $warningCollectingLogger = new WarningCollectingLogger();
 
-        (new UnpricedModelBudgetGuard($this->pricingKnowing(), ['mystery-model']))->warnWhenBudgetCannotBeEnforced($warningCollectingLogger);
+        (new UnpricedModelBudgetGuard($this->pricingKnowing(), ['mystery-model']))->assertUnattendedRunPermitted($warningCollectingLogger);
 
         self::assertSame([], $warningCollectingLogger->warnings);
     }
@@ -122,7 +122,7 @@ final class UnpricedModelBudgetGuardTest extends TestCase
     {
         $warningCollectingLogger = new WarningCollectingLogger();
 
-        (new UnpricedModelBudgetGuard($this->pricingKnowing('claude-opus-4-8'), ['claude-opus-4-8'], 10.0))->warnWhenBudgetCannotBeEnforced($warningCollectingLogger);
+        (new UnpricedModelBudgetGuard($this->pricingKnowing('claude-opus-4-8'), ['claude-opus-4-8'], 10.0))->assertUnattendedRunPermitted($warningCollectingLogger);
 
         self::assertSame([], $warningCollectingLogger->warnings);
     }
