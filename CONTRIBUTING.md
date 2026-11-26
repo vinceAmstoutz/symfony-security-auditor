@@ -246,7 +246,7 @@ A custom LLM client, advisory source or provider is wired in the audited applica
 
 All eight CI jobs must pass before merging ([`docs/ci.md`](docs/ci.md)).
 
-Into a version branch, the [Merge guard](.github/workflows/merge-guard.yaml) checks must pass too: `Signed commits` fails when GitHub did not verify a commit of the pull request. `1.x is green` fails while the latest completed, non-cancelled CI run of the base branch did not succeed. A pull request that fixes the base branch passes `1.x is green` with the `fixes-1.x` label once its own CI passes. Neither check re-runs when the base branch changes state: push again or re-run the `1.x is green` job.
+Into a version branch, the [Merge guard](.github/workflows/merge-guard.yaml) checks must pass too: `Signed commits` fails when GitHub did not verify a commit of the pull request. `Base branch is green` fails while the latest completed, non-cancelled CI run of the base branch did not succeed. A pull request that fixes the base branch passes it once its own CI passes, with the label naming that branch: `fixes-1.x` for `1.x`, `fixes-2.x` for `2.x`. Neither check re-runs when the base branch changes state: push again or re-run the `Base branch is green` job.
 
 ## Commit Style
 

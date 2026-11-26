@@ -54,7 +54,7 @@ jobs:
           echo "GitHub verified all $total commits of this pull request."
 
   base-green:
-    name: 1.x is green
+    name: Base branch is green
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
@@ -63,7 +63,7 @@ jobs:
       NUMBER: ${{ github.event.pull_request.number }}
       BASE_REF: ${{ github.event.pull_request.base.ref }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-      FIX_LABEL: fixes-1.x
+      FIX_LABEL: fixes-${{ github.event.pull_request.base.ref }}
       OWN_CI_WAIT_SECONDS: 10200
     steps:
       - name: Check the latest CI run of the base branch
