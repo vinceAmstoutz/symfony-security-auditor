@@ -1,3 +1,10 @@
+---
+paths:
+  - "src/**"
+  - "tests/**"
+  - "tools/**"
+---
+
 # No-Comments Rule
 
 A comment is a symptom of code that doesn't speak for itself. Before writing one, fix the code instead.
