@@ -585,6 +585,31 @@ final class SymfonyAiLLMClientTest extends TestCase
     }
 
     /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    #[DataProvider('platformsNotTranslatingTheCanonicalOutputCap')]
+    public function test_complete_sends_no_configured_output_cap_to_a_platform_that_would_not_translate_it(string $servingPlatform): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'deepseek-v4-pro', new NullLogger(), maxOutputTokens: 8000),
+            new PlatformRequestConfig(temperature: 0.2, servingPlatform: $servingPlatform, capsEveryModel: true),
+        );
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertSame(['temperature' => 0.2], $invocationOptionsCapture->options);
+    }
+
+    /**
      * @return iterable<string, array{string}>
      */
     public static function platformsNotTranslatingTheCanonicalOutputCap(): iterable

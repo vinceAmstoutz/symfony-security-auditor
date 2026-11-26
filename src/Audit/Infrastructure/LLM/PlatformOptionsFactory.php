@@ -42,6 +42,7 @@ final readonly class PlatformOptionsFactory
         private bool $providerJsonMode,
         private ?int $maxOutputTokens,
         private ?string $servingPlatform = null,
+        private bool $capsEveryModel = false,
     ) {}
 
     /**
@@ -68,11 +69,11 @@ final readonly class PlatformOptionsFactory
 
     private function outputCapOption(): ?string
     {
-        if (!$this->usesAnthropicOptionDialect()) {
-            return null;
+        if (\in_array($this->servingPlatform, self::PLATFORMS_TAKING_THE_CANONICAL_OUTPUT_CAP, true)) {
+            return $this->usesAnthropicOptionDialect() || $this->capsEveryModel ? PlatformOptions::MAX_OUTPUT_TOKENS : null;
         }
 
-        return \in_array($this->servingPlatform, self::PLATFORMS_TAKING_THE_CANONICAL_OUTPUT_CAP, true) ? PlatformOptions::MAX_OUTPUT_TOKENS : 'max_tokens';
+        return $this->usesAnthropicOptionDialect() ? 'max_tokens' : null;
     }
 
     private function usesAnthropicOptionDialect(): bool

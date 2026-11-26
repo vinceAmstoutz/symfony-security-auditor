@@ -30,5 +30,6 @@ final readonly class PlatformRequestConfig
         public TokenEstimatorInterface $tokenEstimator = new ResolvingTokenEstimator(),
         public ?string $servingPlatform = null,
         public bool $streaming = false,
+        public bool $capsEveryModel = false,
     ) {}
 }
