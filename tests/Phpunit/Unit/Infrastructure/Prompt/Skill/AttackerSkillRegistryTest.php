@@ -354,7 +354,7 @@ final class AttackerSkillRegistryTest extends TestCase
     {
         $block = (new ControllerTrustBoundaryAttackerSkill())->block();
 
-        self::assertStringContainsString('UrlGeneratorInterface::ABSOLUTE_URL', $block);
+        self::assertStringContainsString('Report as `host_header_injection`.', $block);
     }
 
     public function test_controller_trust_boundary_skill_does_not_flag_links_built_from_the_configured_default_uri(): void
