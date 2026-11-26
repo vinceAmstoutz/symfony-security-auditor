@@ -256,4 +256,18 @@ return [
         'reason' => 'auth:status first names the provider, the models and what each call bills.',
         'changelog' => '#724',
     ],
+    [
+        'scenarios' => ['cache/written-by-release', 'cache/written-by-release-batch', 'cache/written-by-release-changed-project', 'standalone/cache-written-by-release'],
+        'path' => 'llm.lines',
+        'match' => '/^\\+(?:reviewer|reviewer-json|tool-results) model=/',
+        'reason' => 'The reviewer prompt version went from 4 to 5 for the rule that rejects test-only credentials, so a run no longer serves the verdicts 1.22.1 cached and reviews those findings again.',
+        'changelog' => '#758',
+    ],
+    [
+        'scenarios' => ['cache/written-by-release-changed-project'],
+        'path' => 'runs.0.stdout.json.cost.**',
+        'match' => '/^\\d+(?:\\.\\d+)? -> \\d+(?:\\.\\d+)?$/',
+        'reason' => 'The reviewer prompt version went from 4 to 5 for the rule that rejects test-only credentials, so a run no longer serves the verdicts 1.22.1 cached and reviews those findings again.',
+        'changelog' => '#758',
+    ],
 ];
