@@ -66,7 +66,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 
 - A large `audit.baseline` no longer slows the run down: checking findings against the accepted ones took seconds at a thousand and minutes at several thousand; persisting thousands of reviewed findings no longer takes seconds either ([#734](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/734))
 - `audit.reviewer_max_concurrent` above 1 holds only the prompts of the calls it is sending, instead of every finding's prompt with its whole file at once ([#734](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/734))
-- The static pre-scan reads each file once per audit: the attacker's later iterations and `audit.report_static_findings` reuse the markers it found instead of scanning every file again
+- The static pre-scan reads each file once per audit: the attacker's later iterations and `audit.report_static_findings` reuse the markers it found instead of scanning every file again ([#747](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/747))
 
 ### Core 🧱
 

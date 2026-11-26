@@ -156,11 +156,9 @@ final readonly class StandaloneContainerFactory
      */
     private function aiConfigFor(StandaloneConfig $standaloneConfig, ContainerBuilder $containerBuilder): array
     {
-        $aiConfig = $standaloneConfig->platform->toAiConfig();
-
         return $this->federatedAnthropicAccess instanceof FederatedAnthropicAccess
-            ? $this->federatedAnthropicAccess->configure($aiConfig, $containerBuilder)
-            : $aiConfig;
+            ? $this->federatedAnthropicAccess->configure($standaloneConfig->platform, $containerBuilder)
+            : $standaloneConfig->platform->toAiConfig();
     }
 
     private function auditAdvisoriesWithEmbeddedComposer(ContainerBuilder $containerBuilder): void
@@ -257,7 +255,7 @@ final readonly class StandaloneContainerFactory
     {
         $credentialIdentity = $standalonePlatformConfig->credentialIdentity();
 
-        if (!$credentialIdentity instanceof CredentialIdentity || $this->standsInForFederation($credentialIdentity)) {
+        if (!$credentialIdentity instanceof CredentialIdentity) {
             $containerBuilder->register(ConsoleBannerInterface::class, NullConsoleBanner::class);
 
             return;
@@ -265,12 +263,6 @@ final readonly class StandaloneContainerFactory
 
         $containerBuilder->register(ConsoleBannerInterface::class, CredentialConsoleBanner::class)
             ->setArguments([ContainerParameterSyntax::escape($credentialIdentity->maskedPreview)]);
-    }
-
-    private function standsInForFederation(CredentialIdentity $credentialIdentity): bool
-    {
-        return $this->federatedAnthropicAccess instanceof FederatedAnthropicAccess
-            && CredentialIdentity::of(FederatedAnthropicAccess::API_KEY_PLACEHOLDER)->fingerprint === $credentialIdentity->fingerprint;
     }
 
     /**

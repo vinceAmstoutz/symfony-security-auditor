@@ -21,6 +21,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Workload
  */
 final readonly class WorkloadIdentityFederation
 {
+    public const string PLATFORM = 'anthropic';
+
+    /** Stands in for the API key the `anthropic` config reads; the federated client never sends it. */
+    public const string API_KEY_PLACEHOLDER = 'workload-identity-federation';
+
     private const string JWT_BEARER_GRANT = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
 
     public function __construct(
@@ -49,6 +54,14 @@ final readonly class WorkloadIdentityFederation
             self::valueOf($environment, 'ANTHROPIC_SERVICE_ACCOUNT_ID'),
             self::valueOf($environment, 'ANTHROPIC_WORKSPACE_ID'),
         );
+    }
+
+    /**
+     * Names the credential an audit signs in with, never a token.
+     */
+    public function credentialName(): string
+    {
+        return \sprintf('workload identity federation (rule %s)', $this->ruleId);
     }
 
     /**

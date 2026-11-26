@@ -19,6 +19,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredCredentialVariable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentAccount;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\WorkloadIdentityFederation;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCheckResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCheckStatus;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\EnvironmentDoctorInterface;
@@ -103,14 +104,24 @@ final class ProviderSetupDoctorTest extends TestCase
         self::assertStringEndsWith('Run "codex login status" to see which account the Codex CLI bills.', $this->doctor(CliAgentAccount::unknown('"codex login status" failed'))->diagnose()[1]->detail);
     }
 
-    private function doctor(CliAgentAccount $cliAgentAccount): ProviderSetupDoctor
+    public function test_it_bills_each_call_through_the_workload_identity_federation_the_anthropic_provider_signs_in_with(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\nmodel: claude-opus-5-5\n");
+
+        self::assertEquals(
+            new DoctorCheckResult('Provider', DoctorCheckStatus::Ok, 'Anthropic (Claude). Model: claude-opus-5-5. Billing: per call, through workload identity federation (rule fdrl_rule).'),
+            $this->doctor(CliAgentAccount::subscription(null), new WorkloadIdentityFederation('fdrl_rule', 'org-uuid'))->diagnose()[1],
+        );
+    }
+
+    private function doctor(CliAgentAccount $cliAgentAccount, ?WorkloadIdentityFederation $workloadIdentityFederation = null): ProviderSetupDoctor
     {
         $environmentDoctor = self::createStub(EnvironmentDoctorInterface::class);
         $environmentDoctor->method('diagnose')->willReturn([new DoctorCheckResult('Composer', DoctorCheckStatus::Ok, 'Available.')]);
 
         return new ProviderSetupDoctor(
             $environmentDoctor,
-            new ConfiguredCredentialVariable(new XdgConfigPathResolver($this->configHome, null, null)),
+            new ConfiguredCredentialVariable(new XdgConfigPathResolver($this->configHome, null, null), workloadIdentityFederation: $workloadIdentityFederation),
             new FixedCliAgentAccountProbe($cliAgentAccount),
         );
     }

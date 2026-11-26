@@ -56,6 +56,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneP
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ProcessCliAgentAccountProbe;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\WorkloadIdentityFederation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\OllamaPulledModelList;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricedModelList;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
@@ -163,7 +164,7 @@ final readonly class StandaloneApplicationFactory
         return new self(
             new StandaloneConfigLoader(
                 $xdgConfigPathResolver,
-                new StandalonePlatformConfigResolver($federatedAnthropicAccess?->environmentWithPlaceholderApiKey($environment) ?? $environment, credentialStore: $filesystemCredentialStore),
+                new StandalonePlatformConfigResolver($environment, credentialStore: $filesystemCredentialStore, platformEnvironments: $federatedAnthropicAccess?->platformEnvironments() ?? []),
                 self::projectConfigFile($environment),
             ),
             $xdgConfigPathResolver,
@@ -316,7 +317,12 @@ final readonly class StandaloneApplicationFactory
 
     private function configuredCredentialVariable(): ConfiguredCredentialVariable
     {
-        return new ConfiguredCredentialVariable($this->xdgConfigPathResolver);
+        return new ConfiguredCredentialVariable($this->xdgConfigPathResolver, workloadIdentityFederation: $this->workloadIdentityFederation());
+    }
+
+    private function workloadIdentityFederation(): ?WorkloadIdentityFederation
+    {
+        return FederatedAnthropicAccess::fromEnvironment($this->environment)?->workloadIdentityFederation;
     }
 
     private function selfUpdateCommand(): SelfUpdateCommand
@@ -435,6 +441,7 @@ final readonly class StandaloneApplicationFactory
                     new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath())),
                     new OllamaPulledModelList(HttpClient::create()),
                 ),
+                workloadIdentityFederation: $this->workloadIdentityFederation(),
             ), $this->configuredCredentialVariable(), new ProcessCliAgentAccountProbe()),
             new StandaloneConnectionCheck($this->standaloneConfigLoader, $this->xdgConfigPathResolver, $this->standaloneContainerFactory),
         );

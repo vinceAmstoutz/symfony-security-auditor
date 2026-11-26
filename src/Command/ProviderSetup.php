@@ -82,6 +82,15 @@ final readonly class ProviderSetup
         return ProviderSetupLines::warningFor($this->subscriptionCli, $this->cliAgentAccount);
     }
 
+    /**
+     * Names the credential the provider signs in with in place of an API key,
+     * null when it uses one.
+     */
+    public function federatedCredential(): ?string
+    {
+        return $this->configuredProvider->federatedCredential;
+    }
+
     public function runsOnACli(): bool
     {
         return $this->cliAgentAccount instanceof CliAgentAccount;

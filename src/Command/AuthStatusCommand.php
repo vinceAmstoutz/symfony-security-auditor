@@ -62,6 +62,9 @@ final readonly class AuthStatusCommand
         }
 
         $providerSetup = (new ProviderSetupReader($this->configuredCredentialVariable, $this->cliAgentAccountProbe))->report($symfonyStyle);
+        if ($this->federatedCredentialReported($symfonyStyle, $providerSetup, $envVar)) {
+            return Command::SUCCESS;
+        }
 
         $placeholder = $this->configuredCredentialVariable->placeholder();
         $variableName = $envVar ?? $placeholder?->variableName;
@@ -83,6 +86,22 @@ final readonly class AuthStatusCommand
         return $placeholder?->variableName === $variableName && $placeholder->readsFile
             ? $this->reportFromFile($symfonyStyle, $variableName, $exported, $shadowsStoredCredential)
             : $this->reportResolved($symfonyStyle, $variableName, $exported, self::ENVIRONMENT_SOURCE, $shadowsStoredCredential);
+    }
+
+    /**
+     * Reports the federated credential an audit signs in with, unless a
+     * variable is named on the command line.
+     */
+    private function federatedCredentialReported(SymfonyStyle $symfonyStyle, ?ProviderSetup $providerSetup, ?string $envVar): bool
+    {
+        $federatedCredential = null === $envVar ? $providerSetup?->federatedCredential() : null;
+        if (null === $federatedCredential) {
+            return false;
+        }
+
+        $symfonyStyle->success(\sprintf('An audit uses no API key: it signs in through %s.', $federatedCredential));
+
+        return true;
     }
 
     private function reportWithoutVariable(SymfonyStyle $symfonyStyle, ?ProviderSetup $providerSetup): int

@@ -25,6 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentAccount;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ProcessCliAgentAccountProbe;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\WorkloadIdentityFederation;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthStatusCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\FixedCliAgentAccountProbe;
 
@@ -191,6 +192,30 @@ final class AuthStatusCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertStringContainsString('Pick whichever fits how you work', $this->flattened($commandTester));
+    }
+
+    public function test_it_reports_the_workload_identity_federation_an_anthropic_audit_signs_in_with_in_place_of_an_api_key(): void
+    {
+        $this->writeConfig();
+        $commandTester = $this->federatedCommandTester();
+
+        self::assertSame(
+            [Command::SUCCESS, true],
+            [$commandTester->execute([]), str_contains($this->flattened($commandTester), '[OK] An audit uses no API key: it signs in through workload identity federation (rule fdrl_rule).')],
+            $commandTester->getDisplay(),
+        );
+    }
+
+    public function test_a_variable_named_on_the_command_line_is_reported_under_workload_identity_federation_too(): void
+    {
+        $this->writeConfig();
+        $commandTester = $this->federatedCommandTester();
+
+        self::assertSame(
+            [Command::FAILURE, true],
+            [$commandTester->execute(['--env-var' => 'ANTHROPIC_API_KEY']), str_contains($this->flattened($commandTester), 'No API key resolves for ANTHROPIC_API_KEY')],
+            $commandTester->getDisplay(),
+        );
     }
 
     public function test_it_refuses_when_no_variable_is_configured_yet(): void
@@ -386,6 +411,17 @@ final class AuthStatusCommandTest extends TestCase
             new ConfiguredCredentialVariable($xdgConfigPathResolver),
             $environment,
             cliAgentAccountProbe: new FixedCliAgentAccountProbe($cliAgentAccount ?? CliAgentAccount::subscription(null)),
+        ));
+    }
+
+    private function federatedCommandTester(): CommandTester
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null);
+
+        return new CommandTester(new AuthStatusCommand(
+            new FilesystemCredentialStore($xdgConfigPathResolver),
+            new ConfiguredCredentialVariable($xdgConfigPathResolver, workloadIdentityFederation: new WorkloadIdentityFederation('fdrl_rule', 'org-uuid')),
+            cliAgentAccountProbe: new FixedCliAgentAccountProbe(CliAgentAccount::subscription(null)),
         ));
     }
 

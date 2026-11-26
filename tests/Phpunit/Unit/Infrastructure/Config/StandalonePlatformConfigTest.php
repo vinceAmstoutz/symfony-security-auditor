@@ -17,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\WorkloadIdentityFederation;
 
 final class StandalonePlatformConfigTest extends TestCase
 {
@@ -48,6 +49,13 @@ final class StandalonePlatformConfigTest extends TestCase
         self::assertNull($standalonePlatformConfig->credentialIdentity());
     }
 
+    public function test_it_names_no_credential_for_the_placeholder_workload_identity_federation_stands_in_for(): void
+    {
+        $standalonePlatformConfig = new StandalonePlatformConfig(['anthropic' => ['api_key' => WorkloadIdentityFederation::API_KEY_PLACEHOLDER]]);
+
+        self::assertNull($standalonePlatformConfig->credentialIdentity());
+    }
+
     public function test_it_names_the_credential_of_the_provider_the_run_selects(): void
     {
         $standalonePlatformConfig = new StandalonePlatformConfig(
@@ -73,5 +81,26 @@ final class StandalonePlatformConfigTest extends TestCase
         $standalonePlatformConfig = new StandalonePlatformConfig(['anthropic' => ['api_key' => 'anthropic-test-key-for-previews']], 'mistral');
 
         self::assertNull($standalonePlatformConfig->credentialIdentity());
+    }
+
+    public function test_a_run_runs_only_on_the_platform_the_provider_selects(): void
+    {
+        $standalonePlatformConfig = new StandalonePlatformConfig(['anthropic' => [], 'openai' => []], 'openai');
+
+        self::assertSame([false, true], [$standalonePlatformConfig->runsOn('anthropic'), $standalonePlatformConfig->runsOn('openai')]);
+    }
+
+    public function test_a_run_without_a_provider_runs_on_the_only_platform_it_declares(): void
+    {
+        $standalonePlatformConfig = new StandalonePlatformConfig(['anthropic' => []]);
+
+        self::assertSame([true, false], [$standalonePlatformConfig->runsOn('anthropic'), $standalonePlatformConfig->runsOn('openai')]);
+    }
+
+    public function test_a_run_without_a_provider_among_several_platforms_runs_on_none_of_them(): void
+    {
+        $standalonePlatformConfig = new StandalonePlatformConfig(['anthropic' => [], 'openai' => []]);
+
+        self::assertSame([false, false], [$standalonePlatformConfig->runsOn('anthropic'), $standalonePlatformConfig->runsOn('openai')]);
     }
 }

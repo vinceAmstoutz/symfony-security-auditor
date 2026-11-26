@@ -237,7 +237,7 @@ jobs:
           mode: standalone
 ```
 
-The audit asks the runner for a fresh identity token, exchanges it for an access token and sends that token as `Authorization: Bearer`. It exchanges a new one a minute before the previous one expires, so a long audit keeps running. When `ANTHROPIC_API_KEY` holds a key, the key wins and federation is not used, as in the Anthropic SDK. A job without `id-token: write` stops before the audit starts and says so. An exchange Anthropic refuses stops the run with the reason Anthropic gives.
+The audit asks the runner for a fresh identity token, exchanges it for an access token and sends that token as `Authorization: Bearer`, adding the `oauth-2025-04-20` beta Anthropic requires of such a token to the `anthropic-beta` header of each call. It exchanges a new one a minute before the previous one expires, so a long audit keeps running. When `ANTHROPIC_API_KEY` holds a key, the key wins and federation is not used, as in the Anthropic SDK. A job without `id-token: write` stops before the audit starts and says so. An exchange Anthropic refuses stops the run with the reason Anthropic gives.
 
 Accept the current findings as a baseline once (locally), then commit it so future PRs only report new findings:
 

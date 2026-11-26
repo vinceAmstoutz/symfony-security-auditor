@@ -85,6 +85,7 @@ final readonly class ProviderSetupLines
     private static function apiBilling(ConfiguredProvider $configuredProvider): string
     {
         return match (true) {
+            null !== $configuredProvider->federatedCredential => \sprintf('per call, through %s', $configuredProvider->federatedCredential),
             !$configuredProvider->takesApiKey => \sprintf('nothing per call: %s takes no API key', ProviderNames::ofPlatform($configuredProvider->name)),
             null !== $configuredProvider->apiKeyVariable => \sprintf('per call, to the API key %s holds', $configuredProvider->apiKeyVariable),
             default => 'per call, to the API key the configuration holds',

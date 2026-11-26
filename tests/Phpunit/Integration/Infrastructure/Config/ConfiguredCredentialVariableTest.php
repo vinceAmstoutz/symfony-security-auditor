@@ -20,6 +20,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredCredentialVariable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\WorkloadIdentityFederation;
 
 final class ConfiguredCredentialVariableTest extends TestCase
 {
@@ -99,6 +100,23 @@ final class ConfiguredCredentialVariableTest extends TestCase
         self::assertEquals(new ConfiguredProvider('openai', takesApiKey: true, apiKeyVariable: 'OPENAI_API_KEY'), $this->configuredCredentialVariable()->provider());
     }
 
+    public function test_the_anthropic_provider_signs_in_through_the_federation_the_run_uses(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n");
+
+        self::assertEquals(
+            new ConfiguredProvider('anthropic', takesApiKey: true, apiKeyVariable: 'ANTHROPIC_API_KEY', federatedCredential: 'workload identity federation (rule fdrl_rule)'),
+            $this->federatedConfiguredCredentialVariable()->provider(),
+        );
+    }
+
+    public function test_another_provider_selected_beside_an_anthropic_block_does_not_sign_in_through_the_federation(): void
+    {
+        $this->writeConfig("provider: openai\nplatform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n    openai:\n        api_key: '%env(OPENAI_API_KEY)%'\n");
+
+        self::assertEquals(new ConfiguredProvider('openai', takesApiKey: true, apiKeyVariable: 'OPENAI_API_KEY'), $this->federatedConfiguredCredentialVariable()->provider());
+    }
+
     public function test_it_reads_the_cli_the_subscription_runs(): void
     {
         $this->writeConfig("provider: claudecode\nplatform:\n    claudecode: { cli_binary: /opt/claude/bin/claude, effort: low }\nmodel: opus\n");
@@ -116,6 +134,11 @@ final class ConfiguredCredentialVariableTest extends TestCase
     private function writeConfig(string $contents): void
     {
         $this->filesystem->dumpFile($this->configHome.'/symfony-security-auditor/config.yaml', $contents);
+    }
+
+    private function federatedConfiguredCredentialVariable(): ConfiguredCredentialVariable
+    {
+        return new ConfiguredCredentialVariable(new XdgConfigPathResolver($this->configHome, null, null), workloadIdentityFederation: new WorkloadIdentityFederation('fdrl_rule', 'org-uuid'));
     }
 
     private function configuredCredentialVariable(): ConfiguredCredentialVariable

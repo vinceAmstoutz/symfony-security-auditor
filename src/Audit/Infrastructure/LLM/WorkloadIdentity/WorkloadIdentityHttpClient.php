@@ -23,7 +23,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Unob
 
 /**
  * Sends each request with an access token from workload identity federation
- * as `Authorization: Bearer`, in place of the `x-api-key` header.
+ * as `Authorization: Bearer`, in place of the `x-api-key` header. Adds the
+ * OAuth beta Anthropic requires of such a token to the `anthropic-beta` header.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -34,6 +35,7 @@ final readonly class WorkloadIdentityHttpClient implements HttpClientInterface
     public function __construct(
         private HttpClientInterface $httpClient,
         private AccessTokenProviderInterface $accessTokenProvider,
+        private AnthropicBetaHeader $defaultAnthropicBetaHeader = new AnthropicBetaHeader(),
     ) {}
 
     /**
@@ -46,7 +48,7 @@ final readonly class WorkloadIdentityHttpClient implements HttpClientInterface
     #[Override]
     public function request(string $method, string $url, array $options = []): ResponseInterface
     {
-        return $this->httpClient->request($method, $url, [...$options, 'headers' => $this->withBearerToken($options['headers'] ?? [])]);
+        return $this->httpClient->request($method, $url, [...$options, 'headers' => $this->withBearerToken($this->headersIn($options))]);
     }
 
     #[Override]
@@ -61,25 +63,42 @@ final readonly class WorkloadIdentityHttpClient implements HttpClientInterface
     #[Override]
     public function withOptions(array $options): static
     {
-        return new self($this->httpClient->withOptions($options), $this->accessTokenProvider);
+        return new self(
+            $this->httpClient->withOptions($options),
+            $this->accessTokenProvider,
+            AnthropicBetaHeader::in($this->headersIn($options)) ?? $this->defaultAnthropicBetaHeader,
+        );
     }
 
     /**
+     * @param array<mixed> $options
+     *
+     * @return array<mixed>
+     */
+    private function headersIn(array $options): array
+    {
+        return \is_array($options['headers'] ?? null) ? $options['headers'] : [];
+    }
+
+    /**
+     * @param array<mixed> $headers
+     *
      * @return array<int|string, mixed>
      *
      * @throws RefusedTokenExchangeException      when the exchange is refused, or answers without an access token
      * @throws TransientHttpStatusException       when the token endpoint answers with a status worth retrying
      * @throws UnobtainableIdentityTokenException when the workload gets no identity token
      */
-    private function withBearerToken(mixed $headers): array
+    private function withBearerToken(array $headers): array
     {
         $kept = [];
-        foreach (\is_array($headers) ? $headers : [] as $name => $value) {
-            if (!$this->isApiKey($name)) {
+        foreach ($headers as $name => $value) {
+            if (!$this->isApiKey($name) && !AnthropicBetaHeader::matches($name, $value)) {
                 $kept[$name] = $value;
             }
         }
 
+        $kept[AnthropicBetaHeader::NAME] = (AnthropicBetaHeader::in($headers) ?? $this->defaultAnthropicBetaHeader)->withOAuth();
         $kept['authorization'] = \sprintf('Bearer %s', $this->accessTokenProvider->accessToken());
 
         return $kept;

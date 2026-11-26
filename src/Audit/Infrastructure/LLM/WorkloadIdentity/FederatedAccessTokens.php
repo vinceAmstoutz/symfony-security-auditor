@@ -70,6 +70,7 @@ final class FederatedAccessTokens implements AccessTokenProviderInterface
         }
 
         $response = $this->httpClient->request('POST', \sprintf('%s%s', $this->baseUrl, self::TOKEN_PATH), [
+            'headers' => [AnthropicBetaHeader::NAME => \sprintf('%s,%s', AnthropicBetaHeader::OAUTH, AnthropicBetaHeader::OIDC_FEDERATION)],
             'json' => $this->workloadIdentityFederation->exchangeRequest($this->identityTokenSource->identityToken()),
         ]);
         $answer = DecodedAnswer::of($response);
