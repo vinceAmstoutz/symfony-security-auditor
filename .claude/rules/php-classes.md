@@ -11,10 +11,10 @@ Every class **must** be declared `final readonly`. The only permitted opt-outs a
 
 - `Audit\Domain\Model\AuditContext`: pipeline state accumulated across stages.
 - `Command\AuditCommandInput` and `Command\InitCommandInput`: Symfony Console MapInput requires public mutable properties with property-level defaults; promoted readonly constructor params are invisible to its reflection.
-- Per-run accumulators, late-bound holders and stateful collaborators: a collaborator whose job is to collect state while one audit runs, to receive it after the container is built, or to keep a rate window, a lazily built dependency or a memoized lookup across calls (`VulnerabilityCollector`, `ReviewCollector`, `RecordingToolReach`, `StatusTrackingCoverageRecorder`, `BudgetTracker`, `TokenUsageRecorder`, `UnpricedCostCapWarning`, `TokenBucketRateLimiter`, `FederatedAccessTokens`, `DeferredAdvisoryDatabase`, `ModelsDevPricingProvider`, `PhpDataMaskMemo`, `ReadableGitignores`, `ScannedContents`, `ConsoleProgressReporter`, `CompositeReviewerFeedbackProvider`, `PendingBinarySwap`, the `*Holder` delegates).
+- Per-run accumulators, late-bound holders and stateful collaborators: a collaborator whose job is to collect state while one audit runs, to receive it after the container is built, or to keep a rate window, a lazily built dependency or a memoized lookup across calls (e.g. `VulnerabilityCollector`, `TokenBucketRateLimiter`, the `*Holder` delegates).
 - A subclass of a class that is not `readonly` itself: every exception (extending PHP's own), `StandaloneApplication` and the bundle class.
 
-Each opt-out site declares the reason in a leading code comment and cites this rule. Anything outside that list must be `final readonly`. If inheritance feels needed, introduce an interface instead. The `final`-or-`abstract` requirement is enforced by the custom `FinalRule` (`tools/PHPStan/FinalRule.php`).
+Each opt-out site declares which of these reasons applies in a leading code comment and cites this rule: that comment, not a list here, is the record. Anything outside these reasons must be `final readonly`. If inheritance feels needed, introduce an interface instead. The `final`-or-`abstract` requirement is enforced by the custom `FinalRule` (`tools/PHPStan/FinalRule.php`).
 
 ## Interfaces & SOLID
 
@@ -26,7 +26,7 @@ Every collaborator that crosses a layer or could plausibly have an alternative i
 - **I**SP: split fat interfaces; consumers depend only on methods they use.
 - **D**IP: Application/Domain depend on interfaces; Infrastructure provides the implementations (wired in `config/services.php`).
 
-See also: [[ddd-layers]], [[llm-seam]].
+See also [`ddd-layers.md`](ddd-layers.md) and [`llm-seam.md`](llm-seam.md).
 
 ## Single Responsibility: One File, One Thing
 
@@ -38,11 +38,11 @@ When you touch a file that bundles responsibilities, extract them into new class
 
 ## Constructor & Method Parameters
 
-Cap every method and constructor at **5 parameters**, enforced by the custom `MaxParameterCountRule` (`tools/PHPStan/MaxParameterCountRule.php`). When a signature would exceed it, group related parameters into an immutable value/context object (a `Context` or config VO), never by merging helpers or relaxing the cap. See memory `[[feedback_context_object_over_param_threading]]`.
+Cap every method and constructor at **5 parameters**, enforced by the custom `MaxParameterCountRule` (`tools/PHPStan/MaxParameterCountRule.php`). When a signature would exceed it, group related parameters into an immutable value/context object (a `Context` or config VO), never by merging helpers or relaxing the cap.
 
 - **All-promoted constructor** (every parameter promoted) is exempt: it _is_ the value object (e.g. the per-finding `Vulnerability` storage ctor).
 - **`@deprecated` methods** are exempt: they are scheduled for removal and their replacement already satisfies the cap.
-- **Public, BC-frozen factories** that exceed the cap are not edited in place (that would be a `MAJOR` break). Instead add an `of()`-style value-object factory (`Vulnerability::of()`, `SymfonyMapping::of()`, `LLMResponse::of()`), mark the wide `create()` `@deprecated` and have it delegate to `of()`. The new VOs live in the layer that owns the model (see [[ddd-layers]]).
+- **Public, BC-frozen factories** that exceed the cap are not edited in place (that would be a `MAJOR` break). Instead add an `of()`-style value-object factory (`Vulnerability::of()`, `SymfonyMapping::of()`, `LLMResponse::of()`), mark the wide `create()` `@deprecated` and have it delegate to `of()`. The new VOs live in the layer that owns the model (see [`ddd-layers.md`](ddd-layers.md)).
 
 ## Custom Exceptions
 
@@ -77,7 +77,7 @@ Reach for plain PHP only when no Symfony component fits or when the component wo
 
 ### Domain-layer exception
 
-This rule applies to the **Application, Infrastructure and Command** layers only. The **Domain layer** (`src/Audit/Domain/`) is pure PHP by mandate (see [[ddd-layers]]: _"No Symfony, no `symfony/ai`, no I/O"_) and therefore keeps native functions (`str_ends_with`, `str_contains`, `trim`, `is_dir`, …) even where a Symfony component would otherwise be preferred. Do **not** import `symfony/string`, `symfony/filesystem`, or any other Symfony component into a Domain class; the layer boundary wins over the components-first preference.
+This rule applies to the **Application, Infrastructure and Command** layers only. The **Domain layer** (`src/Audit/Domain/`) is pure PHP by mandate (see [`ddd-layers.md`](ddd-layers.md): _"No Symfony, no `symfony/ai`, no I/O"_) and therefore keeps native functions (`str_ends_with`, `str_contains`, `trim`, `is_dir`, …) even where a Symfony component would otherwise be preferred. Do **not** import `symfony/string`, `symfony/filesystem`, or any other Symfony component into a Domain class; the layer boundary wins over the components-first preference.
 
 Concretely:
 

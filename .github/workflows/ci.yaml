@@ -177,6 +177,12 @@ jobs:
       - name: Binary build plan tests
         run: sh tests/Shell/plan_binary_build_test.sh
 
+      - name: Release script tests
+        run: sh tests/Shell/release_script_test.sh
+
+      - name: Claude hook tests
+        run: sh tests/Shell/claude_hooks_test.sh
+
       - name: Changelog check tests
         run: sh tests/Shell/changelog_check_test.sh
 

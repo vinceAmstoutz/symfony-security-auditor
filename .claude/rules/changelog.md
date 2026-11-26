@@ -1,3 +1,8 @@
+---
+paths:
+  - "CHANGELOG.md"
+---
+
 # Changelog Rules
 
 Every behavior-affecting change updates `CHANGELOG.md` **in the same commit/PR**. Docs-only, CI-only and pure-tooling changes are exempt.
@@ -57,12 +62,4 @@ One line, one change, in the voice of a release note:
 
 ## Step 4: At release time
 
-1. Rename `## [Unreleased]` to `## [X.Y.Z] — YYYY-MM-DD — Codename` (one-word codename: Polyglot, Hush, Watertight, …) and re-create an empty `## [Unreleased]` above it. There is no introduction paragraph.
-2. Add the link reference at the bottom block: `[X.Y.Z]: https://github.com/vinceAmstoutz/symfony-security-auditor/releases/tag/X.Y.Z`.
-3. Make sure every entry of the release has its pull request link: `CHANGELOG_REQUIRE_LINKS=all sh .github/scripts/check-changelog.sh` must pass (the `Auto Release` workflow runs it too).
-4. Bump the version pins to `X.Y.Z`: run `bin/castor release:bump X.Y.Z`. It rewrites every pinned location (the config-schema `$id` in `resources/schema.json` and the GitHub Action `uses:` examples in `README.md`, `docs/ci.md` and `docs/versioning.md`) and fails loudly if a pin goes missing. The `Release Guard` workflow (`.github/workflows/release-guard.yaml`) re-checks the pins against the tag on every tag push. (The `# $schema:` modelines in `examples/configs/*.yaml`, `examples/vulnerable-app/…` and `docs/configuration.md` track `main` and need no per-release bump.)
-5. Merge. `Auto Release` tags the release and drafts its GitHub Release from the changelog section: headings promoted to `##`, followed by the `**Full Changelog**` compare link, with each entry credited to its pull request authors. To preview it: `PREVIOUS_TAG=<prev> sh .github/scripts/release-notes.sh X.Y.Z` (`CREDIT_AUTHORS=0` skips the author lookup).
-6. Once the tag exists, record the compatibility fixtures from it in a pull request on `<N>.x`, as [CONTRIBUTING.md → Compatibility Checks](../../CONTRIBUTING.md#compatibility-checks) describes:
-   - run `bin/castor compat:record X.Y.Z`, which replaces the configuration snapshot under `tests/Phpunit/Compat/Configuration/Fixture/` and the scenario recordings under `tests/Phpunit/Compat/Fixture/`;
-   - empty `tests/Phpunit/Compat/Configuration/accepted-differences.php` and `tests/Phpunit/Compat/accepted-differences.php`: their entries described differences from the previous release.
-   - empty the `<baseline>` of `.roave-backward-compatibility-check.xml`: the API compatibility job now compares with the new tag. The breaks it accepted were against the previous one.
+Renaming `## [Unreleased]`, the link references, the version pins and the compatibility fixtures are steps of the [`release`](../skills/release/SKILL.md) skill.
