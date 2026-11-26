@@ -1,8 +1,6 @@
 name: Bot mention
 
 on:
-  issue_comment:
-    types: [created]
   pull_request_review_comment:
     types: [created]
 
@@ -21,5 +19,4 @@ jobs:
           GH_TOKEN: ${{ secrets.BOT_DISPATCH_TOKEN }}
           REPOSITORY: ${{ github.event.repository.name }}
           COMMENT_ID: ${{ github.event.comment.id }}
-          COMMENT_TYPE: ${{ github.event_name == 'pull_request_review_comment' && 'review' || 'issue' }}
-        run: gh workflow run mentions.yaml -R vinceAmstoutz/vince-bot -f repository="$REPOSITORY" -f comment_id="$COMMENT_ID" -f comment_type="$COMMENT_TYPE"
+        run: gh workflow run mentions.yaml -R vinceAmstoutz/vince-bot -f repository="$REPOSITORY" -f comment_id="$COMMENT_ID" -f comment_type=review
