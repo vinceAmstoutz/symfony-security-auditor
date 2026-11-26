@@ -118,6 +118,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Inva
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ModelSetting;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
@@ -141,6 +142,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlic
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\RunRefusedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
@@ -376,6 +378,9 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertStringContainsString('not priced per call: billed to your ChatGPT subscription, or to an API key the CLI uses in its place', $reportRenderer->render(AuditReport::fromContext(AuditContext::forProject($this->tmpDir), AuditCost::of(100, 50, 0.0, 'gpt-6-luna'))));
     }
 
+    /**
+     * @throws RunRefusedException
+     */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
     public function test_a_cli_agent_run_names_the_subscription_its_cli_bills(): void
@@ -392,6 +397,9 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertStringContainsString('Billing: your Claude subscription (pro plan)', (string) preg_replace('/\s+/', ' ', $bufferedOutput->fetch()));
     }
 
+    /**
+     * @throws RunRefusedException
+     */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
     public function test_a_cli_agent_run_says_the_subscription_is_not_priced_per_call(): void
@@ -690,6 +698,34 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'privacy' => ['offline_only' => true]]);
 
         self::assertSame(InMemoryAdvisoryDatabase::class, (string) $containerBuilder->getAlias(AdvisoryDatabaseInterface::class));
+    }
+
+    /**
+     * @param array<string, mixed> $bundleConfig
+     */
+    #[DataProvider('modelSettingsOfTheClients')]
+    public function test_each_client_names_the_setting_its_model_comes_from(array $bundleConfig, string $clientId, ModelSetting $expectedModelSetting): void
+    {
+        $platformBinding = $this->loadParameters($bundleConfig)->getDefinition($clientId)->getArgument(0);
+
+        self::assertInstanceOf(Definition::class, $platformBinding);
+        self::assertSame($expectedModelSetting, $platformBinding->getArgument(5));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, string, ModelSetting}>
+     */
+    public static function modelSettingsOfTheClients(): iterable
+    {
+        $escalation = ['audit' => ['escalation' => ['enabled' => true]]];
+
+        yield 'the attacker on model' => [['model' => 'm'], 'security_auditor.attacker_client', ModelSetting::Model];
+        yield 'the attacker on attacker_model' => [['model' => 'm', 'attacker_model' => 'a'], 'security_auditor.attacker_client', ModelSetting::AttackerModel];
+        yield 'the reviewer on model' => [['model' => 'm', 'attacker_model' => 'a'], 'security_auditor.reviewer_client', ModelSetting::Model];
+        yield 'the reviewer on reviewer_model' => [['model' => 'm', 'reviewer_model' => 'r'], 'security_auditor.reviewer_client', ModelSetting::ReviewerModel];
+        yield 'the cheap pass on cheap_model' => [['model' => 'm', 'reviewer_model' => 'r', 'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'c']]], 'security_auditor.cheap_attacker_client', ModelSetting::CheapModel];
+        yield 'the cheap pass on reviewer_model' => [['model' => 'm', 'reviewer_model' => 'r', ...$escalation], 'security_auditor.cheap_attacker_client', ModelSetting::ReviewerModel];
+        yield 'the cheap pass on model' => [['model' => 'm', ...$escalation], 'security_auditor.cheap_attacker_client', ModelSetting::Model];
     }
 
     public function test_bundle_does_not_register_escalation_services_by_default(): void

@@ -81,27 +81,37 @@ final readonly class ClaudeCodeSubscriptionCli implements SubscriptionCliInterfa
             return $process->isSuccessful() ? CliAgentAccount::unreadableAnswer($command) : CliAgentAccount::failedCommand($command);
         }
 
-        return $this->accountIn($this->withoutIgnoredHelper($status, $command, $cliStatusRun));
+        return $this->ignoresHelperOf($status, $command, $cliStatusRun) ? $this->accountWithoutHelper($status) : $this->accountIn($status);
     }
 
     /**
-     * Drops the `apiKeyHelper` source a settings file sets: the audit loads no
-     * settings file, so only one of managed settings bills in its place.
+     * Whether the `apiKeyHelper` source comes from a settings file: the audit
+     * loads no settings file, so only one of managed settings bills in its
+     * place.
      *
      * @param array<array-key, mixed> $status
      * @param list<string>            $command
-     *
-     * @return array<array-key, mixed>
      */
-    private function withoutIgnoredHelper(array $status, array $command, CliStatusRun $cliStatusRun): array
+    private function ignoresHelperOf(array $status, array $command, CliStatusRun $cliStatusRun): bool
     {
-        if (self::API_KEY_HELPER !== ($status['apiKeySource'] ?? null) || $this->helperOutlivesSettingsFiles($command, $cliStatusRun)) {
-            return $status;
+        return self::API_KEY_HELPER === ($status['apiKeySource'] ?? null) && !$this->helperOutlivesSettingsFiles($command, $cliStatusRun);
+    }
+
+    /**
+     * The account the audit bills once it ignores the `apiKeyHelper` of a
+     * settings file. Unknown for a login that names no subscription plan,
+     * which that helper may be all of.
+     *
+     * @param array<array-key, mixed> $status
+     */
+    private function accountWithoutHelper(array $status): CliAgentAccount
+    {
+        unset($status['apiKeySource']);
+        if (true === ($status['loggedIn'] ?? null) && !\is_string($status['subscriptionType'] ?? null)) {
+            return CliAgentAccount::unknown(\sprintf('"%s" names no subscription plan besides an apiKeyHelper the audit ignores', $this->statusCommand()));
         }
 
-        unset($status['apiKeySource']);
-
-        return $status;
+        return $this->accountIn($status);
     }
 
     /**

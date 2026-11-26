@@ -18,7 +18,9 @@ use Symfony\Component\Process\Process;
 
 /**
  * Runs a CLI's status command in the environment the audit runs the CLI in,
- * without the variables the audit keeps from it.
+ * without the variables the audit keeps from it, from a fresh
+ * CliAgentWorkingDirectory unless told where, so the settings of the
+ * current directory never apply.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -37,7 +39,8 @@ final readonly class CliStatusRun
      */
     public function run(array $command, array $removedVariables, array $environment = [], ?string $workingDirectory = null): ?Process
     {
-        $process = new Process($command, $workingDirectory, [...array_fill_keys($removedVariables, false), ...$environment], timeout: $this->timeoutSeconds);
+        $privateDirectory = null === $workingDirectory ? new CliAgentWorkingDirectory() : null;
+        $process = new Process($command, $workingDirectory ?? $privateDirectory?->path, [...array_fill_keys($removedVariables, false), ...$environment], timeout: $this->timeoutSeconds);
 
         try {
             $process->run();

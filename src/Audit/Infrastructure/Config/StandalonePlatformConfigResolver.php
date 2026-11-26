@@ -59,7 +59,7 @@ final readonly class StandalonePlatformConfigResolver
         }
 
         $activeProvider = $rawConfig['provider'] ?? null;
-        $activeProvider = \is_string($activeProvider) && '' !== $activeProvider ? $activeProvider : null;
+        $activeProvider = \is_string($activeProvider) && '' !== $activeProvider ? $activeProvider : $this->loneCliAgentIn($platform);
 
         return new StandalonePlatformConfig(
             null === $activeProvider
@@ -67,6 +67,19 @@ final readonly class StandalonePlatformConfigResolver
                 : $this->resolveSelected($platform, $this->selectedPath(ProviderKey::of($activeProvider)), $credentialsRequired),
             $activeProvider,
         );
+    }
+
+    /**
+     * Selects a lone CLI agent block, which `symfony/ai-bundle` cannot select
+     * as it selects a lone platform it declares.
+     *
+     * @param array<array-key, mixed> $platform
+     */
+    private function loneCliAgentIn(array $platform): ?string
+    {
+        $name = array_key_first($platform);
+
+        return 1 === \count($platform) && \in_array($name, array_keys(CliAgentPlatforms::FACTORIES), true) ? $name : null;
     }
 
     /**

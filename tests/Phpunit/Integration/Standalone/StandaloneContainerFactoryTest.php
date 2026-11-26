@@ -46,6 +46,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelNotice;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
@@ -716,6 +717,39 @@ final class StandaloneContainerFactoryTest extends TestCase
         );
 
         self::assertInstanceOf(PlatformInterface::class, $containerBuilder->get(PlatformInterface::class));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    #[DataProvider('cliAgents')]
+    #[RunInSeparateProcess]
+    public function test_a_lone_subscription_block_runs_the_audit_without_a_provider_as_a_lone_api_block_does(string $cliAgent): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], (new StandalonePlatformConfigResolver())->resolve(['platform' => [$cliAgent => []]])),
+            $this->cacheDir,
+        );
+
+        self::assertInstanceOf(CliAgentPlatform::class, $containerBuilder->get(PlatformInterface::class));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function cliAgents(): iterable
+    {
+        yield 'Claude Code' => ['claudecode'];
+        yield 'Codex' => ['codex'];
     }
 
     /**

@@ -24,6 +24,10 @@ if (is_string($composer) && '' !== $composer) {
     unset($_SERVER['SYMFONY_SECURITY_AUDITOR_COMPOSER'], $_ENV['SYMFONY_SECURITY_AUDITOR_COMPOSER']);
     $_SERVER['argv'][0] = $composer;
 
+    // Composer echoes this warning to stdout ahead of its JSON on any SAPI but the CLI, phpmicro's `micro` included.
+    $sapiWarning = sprintf('Warning: Composer should be invoked via the CLI version of PHP, not the %s SAPI%s', \PHP_SAPI, \PHP_EOL);
+    ob_start(static fn (string $output): string => $sapiWarning === $output ? '' : $output, 1);
+
     require $composer;
 
     exit(0);

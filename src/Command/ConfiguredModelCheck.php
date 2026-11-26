@@ -17,6 +17,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PlatformApiKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\MemoizedPulledModelList;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelNotice;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModelListInterface;
@@ -51,9 +52,10 @@ final readonly class ConfiguredModelCheck
         $platform = $this->platformOf($standaloneConfig);
         $models = $this->modelsOf($standaloneConfig);
         $endpoint = self::OLLAMA === $platform ? $this->endpointOf($standaloneConfig) : null;
-        $notices = (new PulledModelNotice($this->pulledModelList, $endpoint, $models))->notices();
+        $pulledModelList = new MemoizedPulledModelList($this->pulledModelList);
+        $notices = (new PulledModelNotice($pulledModelList, $endpoint, $models))->notices();
 
-        if ([] === $notices && $this->writesAPlaceholder($platform, $models, $endpoint)) {
+        if ([] === $notices && $this->writesAPlaceholder($platform, $models, $endpoint, $pulledModelList)) {
             $notices = [\sprintf('The model %s is the placeholder init writes for a provider it cannot list models for. Set model: in config.yaml to a model the provider serves, or run init again with --model.', PlaceholderModel::MODEL)];
         }
 
@@ -63,15 +65,15 @@ final readonly class ConfiguredModelCheck
     /**
      * @param list<string> $models
      */
-    private function writesAPlaceholder(string $platform, array $models, ?string $endpoint): bool
+    private function writesAPlaceholder(string $platform, array $models, ?string $endpoint, PulledModelListInterface $pulledModelList): bool
     {
-        return \in_array(PlaceholderModel::MODEL, $models, true) && !$this->listsModelsOf($platform, $endpoint);
+        return \in_array(PlaceholderModel::MODEL, $models, true) && !$this->listsModelsOf($platform, $endpoint, $pulledModelList);
     }
 
-    private function listsModelsOf(string $platform, ?string $endpoint): bool
+    private function listsModelsOf(string $platform, ?string $endpoint, PulledModelListInterface $pulledModelList): bool
     {
         if (self::OLLAMA === $platform) {
-            return null !== $endpoint && [] !== $this->pulledModelList->pulledModels($endpoint);
+            return null !== $endpoint && [] !== $pulledModelList->pulledModels($endpoint);
         }
 
         return 'anthropic' === $platform || CliAgentPlatforms::declares(ProviderKey::of($platform)) || [] !== $this->pricedModelList->pricedModels($platform);

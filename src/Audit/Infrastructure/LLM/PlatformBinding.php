@@ -34,6 +34,7 @@ final readonly class PlatformBinding
         public LoggerInterface $logger,
         public ?int $maxOutputTokens = SymfonyAiLLMClient::DEFAULT_MAX_OUTPUT_TOKENS,
         public array $unselectedPlatforms = [],
+        public ModelSetting $modelSetting = ModelSetting::Model,
     ) {}
 
     /**

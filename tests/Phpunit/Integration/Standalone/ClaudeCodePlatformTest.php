@@ -28,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\N
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\ProviderBridgeException;
@@ -343,6 +344,31 @@ final class ClaudeCodePlatformTest extends TestCase
         $commandTester->execute(['project-path' => $project], ['interactive' => false]);
 
         self::assertStringContainsString('Billing: your Claude subscription (max plan)', (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_an_audit_on_a_claude_cli_that_is_not_logged_in_fails_before_it_starts(): void
+    {
+        $project = $this->workingDirectory.'/project';
+        (new Filesystem())->dumpFile($project.'/src/Controller/HomeController.php', "<?php\n\nfinal class HomeController {}\n");
+        $loggedOutCli = $this->workingDirectory.'/logged-out-claude';
+        (new Filesystem())->dumpFile($loggedOutCli, "#!/bin/sh\necho '{\"loggedIn\":false}'\nexit 1\n");
+        (new Filesystem())->chmod($loggedOutCli, 0o755);
+        $auditCommand = $this->container(['cli_binary' => $loggedOutCli], ['model' => 'claude-opus-5-5'])->get(AuditCommand::class);
+        self::assertInstanceOf(AuditCommand::class, $auditCommand);
+        $commandTester = new CommandTester($auditCommand);
+
+        $exitCode = $commandTester->execute(['project-path' => $project], ['interactive' => false]);
+
+        self::assertSame([ExitCode::Failure->value, true], [$exitCode, str_contains((string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()), '[ERROR] Run "claude auth login" to log the Claude Code CLI in to your Claude subscription before an audit.')]);
     }
 
     /**

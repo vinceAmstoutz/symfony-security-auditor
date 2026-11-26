@@ -65,6 +65,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Inva
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ModelSetting;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformAccountingConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformRequestConfig;
@@ -2583,6 +2584,55 @@ final class SymfonyAiLLMClientTest extends TestCase
 
         $this->expectException(NonTransientLLMFailureException::class);
         $this->expectExceptionMessageContaining(\sprintf('The provider does not know the model "qwen9": %s. Set model: in the standalone config.yaml or run init --model=<model id>, or set symfony_security_auditor.model in a Symfony application.', $failure->getMessage()));
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
+     */
+    public function test_a_model_the_provider_does_not_know_names_the_reviewer_model_setting_that_configured_it(): void
+    {
+        $failure = new RuntimeException('HTTP 404: {"error":{"message":"model \'qwen9\' not found"}}');
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($this->flakyPlatform([$failure]), 'qwen9', new NullLogger(), modelSetting: ModelSetting::ReviewerModel),
+            platformResilienceConfig: new PlatformResilienceConfig(transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper()),
+        );
+
+        $this->expectException(NonTransientLLMFailureException::class);
+        $this->expectExceptionMessageContaining('Set reviewer_model: in the standalone config.yaml or run init --reviewer-model=<model id>, or set symfony_security_auditor.reviewer_model in a Symfony application.');
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
+     */
+    public function test_a_streaming_client_names_the_attacker_model_setting_that_configured_its_unknown_model(): void
+    {
+        $failure = new RuntimeException('HTTP 404: {"type":"error","error":{"type":"not_found_error","message":"model: qwen9"}}');
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($this->flakyPlatform([$failure]), 'qwen9', new NullLogger(), modelSetting: ModelSetting::AttackerModel),
+            new PlatformRequestConfig(servingPlatform: 'anthropic', streaming: true),
+            new PlatformResilienceConfig(transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper()),
+        );
+
+        $this->expectException(NonTransientLLMFailureException::class);
+        $this->expectExceptionMessageContaining('Set attacker_model: in the standalone config.yaml, or set symfony_security_auditor.attacker_model in a Symfony application.');
 
         $symfonyAiLLMClient->complete('sys', 'usr');
     }

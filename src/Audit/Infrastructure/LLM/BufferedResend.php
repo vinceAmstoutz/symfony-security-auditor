@@ -18,8 +18,8 @@ use Symfony\AI\Platform\Result\DeferredResult;
 
 /**
  * The streamed call sent again without streaming, at most once, when the
- * platform hands back unread an answer given in one piece, as a platform a
- * debug kernel traces does.
+ * platform hands back unread a successful answer given in one piece, as a
+ * platform a debug kernel traces does.
  *
  * Not `readonly`: it keeps the call it sent (`.claude/rules/php-classes.md`).
  *

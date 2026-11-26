@@ -43,6 +43,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\PipelineInterface
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\ProjectFileScanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ClaudeCodeSubscriptionCli;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentAccount;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentAccountProbeInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\JsonReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
@@ -53,6 +56,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\AuditWithoutVerdictEx
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InvalidProjectPathException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\AuditTool;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\SubscriptionAccountGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\PartlyFailedPipeline;
@@ -221,6 +225,17 @@ final class AuditToolTest extends TestCase
         $report = $this->decodedReport($auditTool->audit($this->projectPath.'/packages/legacy'));
 
         self::assertSame([$this->projectPath.'/packages/legacy', []], [$report['project'], $reads]);
+    }
+
+    public function test_it_refuses_to_start_an_audit_that_would_bill_an_api_key_in_place_of_the_subscription(): void
+    {
+        $cliAgentAccountProbe = self::createStub(CliAgentAccountProbeInterface::class);
+        $cliAgentAccountProbe->method('probe')->willReturn(CliAgentAccount::apiKey('ANTHROPIC_API_KEY', 'Unset it.'));
+        $auditTool = $this->budgetedAuditTool(new SubscriptionAccountGuard($this->budgetGuard(), new ClaudeCodeSubscriptionCli(), null, $cliAgentAccountProbe));
+
+        $this->expectExceptionObject(new ToolCallException('The Claude Code CLI bills the API key in ANTHROPIC_API_KEY, not your Claude subscription. Unset it.'));
+
+        $auditTool->audit($this->projectPath);
     }
 
     /**
