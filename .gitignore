@@ -18,6 +18,8 @@ infection/
 /.claude/*
 !/.claude/skills/
 !/.claude/rules/
+!/.claude/hooks/
+!/.claude/settings.json
 
 ###> phpunit/phpunit ###
 /phpunit.xml
