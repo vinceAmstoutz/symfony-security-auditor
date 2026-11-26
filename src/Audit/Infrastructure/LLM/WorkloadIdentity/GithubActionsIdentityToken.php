@@ -45,7 +45,7 @@ final readonly class GithubActionsIdentityToken implements IdentityTokenSourceIn
             'query' => ['audience' => self::ANTHROPIC_AUDIENCE],
             'auth_bearer' => $this->requestToken,
         ]);
-        $identityToken = $response->toArray(false)['value'] ?? null;
+        $identityToken = DecodedAnswer::of($response)['value'] ?? null;
         if (200 !== $response->getStatusCode() || !\is_string($identityToken)) {
             throw UnobtainableIdentityTokenException::fromGithubActions($response->getStatusCode());
         }

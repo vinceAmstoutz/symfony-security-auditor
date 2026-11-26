@@ -16,9 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Workload
 use DateTimeImmutable;
 use Override;
 use Psr\Clock\ClockInterface;
-use Symfony\Contracts\HttpClient\Exception\DecodingExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
-use Symfony\Contracts\HttpClient\ResponseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\RefusedTokenExchangeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientHttpStatusException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnobtainableIdentityTokenException;
@@ -74,7 +72,7 @@ final class FederatedAccessTokens implements AccessTokenProviderInterface
         $response = $this->httpClient->request('POST', \sprintf('%s%s', $this->baseUrl, self::TOKEN_PATH), [
             'json' => $this->workloadIdentityFederation->exchangeRequest($this->identityTokenSource->identityToken()),
         ]);
-        $answer = $this->answerOf($response);
+        $answer = DecodedAnswer::of($response);
         $accessToken = $answer['access_token'] ?? null;
         if (200 !== $response->getStatusCode() || !\is_string($accessToken)) {
             throw $this->refusal($response->getStatusCode(), $this->reasonIn($answer));
@@ -102,18 +100,6 @@ final class FederatedAccessTokens implements AccessTokenProviderInterface
         $reason = $answer['error_description'] ?? (\is_array($error) ? $error['message'] ?? null : null);
 
         return \is_string($reason) ? $reason : self::NO_REASON;
-    }
-
-    /**
-     * @return array<mixed>
-     */
-    private function answerOf(ResponseInterface $response): array
-    {
-        try {
-            return $response->toArray(false);
-        } catch (DecodingExceptionInterface) {
-            return [];
-        }
     }
 
     private function refusal(int $status, string $reason): RefusedTokenExchangeException|TransientHttpStatusException

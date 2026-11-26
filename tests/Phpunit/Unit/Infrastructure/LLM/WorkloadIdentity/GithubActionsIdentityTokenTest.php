@@ -66,4 +66,17 @@ final class GithubActionsIdentityTokenTest extends TestCase
 
         $githubActionsIdentityToken->identityToken();
     }
+
+    /**
+     * @throws UnobtainableIdentityTokenException
+     */
+    public function test_an_answer_that_is_not_json_gives_no_identity_token(): void
+    {
+        $githubActionsIdentityToken = new GithubActionsIdentityToken(new MockHttpClient(new MockResponse('<html><body>Bad gateway</body></html>', ['http_code' => 502])), 'https://pipelines.actions.githubusercontent.com/abc/idtoken', 'request-token');
+
+        $this->expectException(UnobtainableIdentityTokenException::class);
+        $this->expectExceptionMessageContaining('(HTTP 502)');
+
+        $githubActionsIdentityToken->identityToken();
+    }
 }
