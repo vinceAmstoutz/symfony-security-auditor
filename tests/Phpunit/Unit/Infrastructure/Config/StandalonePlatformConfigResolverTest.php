@@ -184,6 +184,36 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws UnreadableCredentialStoreException
      * @throws UnsupportedEnvPlaceholderException
      */
+    public function test_it_selects_a_lone_subscription_block_without_a_selector(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver())
+            ->resolve(['platform' => ['codex' => ['effort' => 'medium']]]);
+
+        self::assertSame('codex', $standalonePlatformConfig->activeProvider);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_it_leaves_a_subscription_block_beside_another_platform_to_the_selector(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver())
+            ->resolve(['platform' => ['claudecode' => [], 'anthropic' => ['api_key' => 'a']]]);
+
+        self::assertNull($standalonePlatformConfig->activeProvider);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
     public function test_it_rejects_a_config_without_a_platform_block(): void
     {
         $this->expectException(MissingPlatformException::class);
