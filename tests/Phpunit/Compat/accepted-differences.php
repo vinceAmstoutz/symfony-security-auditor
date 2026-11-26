@@ -256,4 +256,11 @@ return [
         'reason' => 'auth:status first names the provider, the models and what each call bills.',
         'changelog' => '#724',
     ],
+    [
+        'scenarios' => ['option/dry-run', 'option/show-scanned-dry-run', 'standalone/dry-run'],
+        'path' => 'runs.*.stdout.lines',
+        'match' => '#^(?:[-+] (?:// )?(?:Reviewer input is projected at |actual cost scales with real findings\\.|Dry run \\xE2\\x80\\x94 no LLM calls were made\\.|attacker/reviewer caches, so a real run|Tip: run with --show-scanned )|\\+$)#',
+        'reason' => 'A dry run prints its caveats and the --show-scanned tip as // comment lines wrapped between words, in place of dimmed lines that ran past the terminal width.',
+        'changelog' => '#751',
+    ],
 ];

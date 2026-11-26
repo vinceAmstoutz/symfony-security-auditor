@@ -192,7 +192,6 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         }
 
         $this->caveat($symfonyStyle, 'Dry run — no LLM calls were made. This is a cost estimate only. It excludes provider prompt-cache discounts and warm attacker/reviewer caches, so a real run typically costs less than shown.');
-        $symfonyStyle->newLine();
         $this->lightConfirmation($symfonyStyle, 'Dry run complete.');
     }
 
@@ -242,7 +241,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 
     private function caveat(SymfonyStyle $symfonyStyle, string $message): void
     {
-        $symfonyStyle->text(\sprintf('<fg=gray>%s</>', $message));
+        $symfonyStyle->comment($message);
     }
 
     private function lightConfirmation(SymfonyStyle $symfonyStyle, string $message): void
@@ -254,10 +253,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     #[Override]
     public function scannedFilesHint(SymfonyStyle $symfonyStyle, int $fileCount): void
     {
-        $symfonyStyle->writeln(\sprintf(
-            ' <fg=gray>Tip: run with --show-scanned to list the %d file(s) that would be audited.</>',
-            $fileCount,
-        ));
+        $symfonyStyle->comment(\sprintf('Tip: run with --show-scanned to list the %d file(s) that would be audited.', $fileCount));
     }
 
     /**
