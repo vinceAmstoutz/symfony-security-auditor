@@ -323,6 +323,24 @@ final class AuditPresenterTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
      */
+    public function test_an_incomplete_audit_names_a_hostile_file_name_as_inert_text(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $auditContext = $this->contextWithAFile();
+        $auditContext->recordCoverage('attacker', 'src/Analyzed.php', 'analyzed');
+        $auditContext->recordCoverage('attacker', "src/A\x1b[2J\n##[error]forged.php", 'errored');
+
+        $this->auditPresenter->incompleteRunNotice(new SymfonyStyle(new StringInput(''), $bufferedOutput), AuditReport::fromContext($auditContext), Command::SUCCESS, '--fail-on-incomplete');
+
+        $rendered = $bufferedOutput->fetch();
+        self::assertStringNotContainsString("\x1b", $rendered);
+        self::assertStringNotContainsString('##[', $rendered);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     #[DataProvider('namedUnanalyzedFileCases')]
     public function test_an_incomplete_audit_names_the_first_five_files_and_counts_the_others(int $erroredFiles, string $named): void
     {

@@ -33,8 +33,6 @@ final readonly class AuditPresenter implements AuditPresenterInterface
 {
     private const string NO_FILE_FOUND_VERDICT = 'The scan found no file to audit, so the run has no verdict.';
 
-    private const int NAMED_FILES = 5;
-
     public function __construct(
         private PricingProviderInterface $pricingProvider,
         private ConsoleBannerInterface $consoleBanner = new ConsoleBanner(),
@@ -265,17 +263,6 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     /**
      * `SymfonyStyle::warning()` escapes console markup itself.
      */
-    /**
-     * @param list<string> $relativePaths
-     */
-    private function namedFiles(array $relativePaths): string
-    {
-        $named = implode(', ', array_map($this->sanitizeForWarning(...), \array_slice($relativePaths, 0, self::NAMED_FILES)));
-        $others = \count($relativePaths) - self::NAMED_FILES;
-
-        return $others > 0 ? \sprintf('%s and %d more', $named, $others) : $named;
-    }
-
     private function sanitizeForWarning(string $text): string
     {
         return WorkflowCommandText::inLine(TerminalTextSanitizer::collapseToSingleLine(mb_scrub($text, 'UTF-8')));
@@ -417,7 +404,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         return \sprintf(
             'Audit incomplete: %d file(s) could not be fully analyzed: %s. The absence of findings there proves nothing. Risk: %s | Vulnerabilities: %d.',
             \count($auditReport->unanalyzedFiles()),
-            $this->namedFiles($auditReport->unanalyzedFiles()),
+            NamedFiles::of(array_map($this->sanitizeForWarning(...), $auditReport->unanalyzedFiles())),
             $auditReport->riskLevel(),
             $auditReport->totalVulnerabilities(),
         );
