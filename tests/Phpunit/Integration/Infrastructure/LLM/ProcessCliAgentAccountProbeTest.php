@@ -68,6 +68,24 @@ final class ProcessCliAgentAccountProbeTest extends TestCase
         self::assertEquals(CliAgentAccount::subscription('max plan'), (new ProcessCliAgentAccountProbe())->probe('claudecode', $cli));
     }
 
+    public function test_it_cannot_tell_the_account_of_a_login_that_names_no_plan_besides_an_api_key_helper_the_audit_ignores(): void
+    {
+        $cli = $this->directory.'/claude';
+        $this->filesystem->dumpFile($cli, "#!/bin/sh\nif [ -z \"\$CLAUDE_CONFIG_DIR\" ]; then echo '{\"loggedIn\":true,\"apiKeySource\":\"apiKeyHelper\"}'; else echo '{\"loggedIn\":false}'; fi\n");
+        $this->filesystem->chmod($cli, 0o755);
+
+        self::assertEquals(CliAgentAccount::unknown('"claude auth status" names no subscription plan besides an apiKeyHelper the audit ignores'), (new ProcessCliAgentAccountProbe())->probe('claudecode', $cli));
+    }
+
+    public function test_a_cli_that_is_not_logged_in_stays_so_beside_an_api_key_helper_the_audit_ignores(): void
+    {
+        $cli = $this->directory.'/claude';
+        $this->filesystem->dumpFile($cli, "#!/bin/sh\nif [ -z \"\$CLAUDE_CONFIG_DIR\" ]; then echo '{\"loggedIn\":false,\"apiKeySource\":\"apiKeyHelper\"}'; else echo '{\"loggedIn\":false}'; fi\n");
+        $this->filesystem->chmod($cli, 0o755);
+
+        self::assertEquals(CliAgentAccount::notLoggedIn(), (new ProcessCliAgentAccountProbe())->probe('claudecode', $cli));
+    }
+
     public function test_it_keeps_the_api_key_helper_warning_when_it_cannot_tell_where_the_helper_comes_from(): void
     {
         $cli = $this->directory.'/claude';
