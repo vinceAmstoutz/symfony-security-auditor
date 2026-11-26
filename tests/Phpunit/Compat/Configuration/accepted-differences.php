@@ -14,7 +14,7 @@ declare(strict_types=1);
 return [
     [
         'parameters' => ['symfony_security_auditor.cache.key_salt', 'symfony_security_auditor.cache.cheap_attacker_key_salt'],
-        'reason' => 'The attacker prompt version went from 19 to 20 for the Symfony 8.2, advisory and layered-architecture hunts, so the attacker cache keys no longer match what 1.22.1 cached.',
+        'reason' => 'The attacker prompt version went from 19 to 21 for the Symfony 8.2, advisory and layered-architecture hunts and for links the router builds from the Host header, so the attacker cache keys no longer match what 1.22.1 cached.',
         'changelog' => '#693',
     ],
 ];
