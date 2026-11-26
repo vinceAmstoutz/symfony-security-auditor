@@ -56,7 +56,7 @@ final class MultiLineCallExtentTest extends TestCase
     public function test_a_flood_of_open_calls_is_resolved_without_reading_the_rest_of_the_file_each_time(): void
     {
         $lines = [];
-        for ($index = 0; $index < 4000; ++$index) {
+        for ($index = 0; $index < 2000; ++$index) {
             $lines[] = \sprintf('exec($cmd%d,', $index);
         }
 

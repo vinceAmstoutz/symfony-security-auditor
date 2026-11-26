@@ -26,6 +26,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevP
 
 final class ModelsDevPricingProviderTest extends TestCase
 {
+    private static ?string $packagedCatalogUpdate = null;
+
     /** @var list<array{0: string, 1: array<array-key, mixed>}> */
     private array $loggedWarnings = [];
 
@@ -413,11 +415,7 @@ final class ModelsDevPricingProviderTest extends TestCase
     public function test_the_packaged_catalog_wins_only_when_it_is_strictly_newer_than_the_refreshed_one(string $offset, bool $packagedWins): void
     {
         $packagedCatalogPath = (new ModelsDevPricingProvider($this->warningCapturingLogger()))->packagedCatalogPath();
-        $packagedCatalog = ModelsDevCatalog::fromFile($packagedCatalogPath);
-        self::assertIsArray($packagedCatalog);
-        $packagedUpdate = ModelsDevCatalog::newestUpdate($packagedCatalog);
-        self::assertIsString($packagedUpdate);
-        $overridePath = $this->writeOverrideUpdatedOn((new DateTimeImmutable($packagedUpdate))->modify($offset)->format('Y-m-d'));
+        $overridePath = $this->writeOverrideUpdatedOn((new DateTimeImmutable($this->newestUpdateOf($packagedCatalogPath)))->modify($offset)->format('Y-m-d'));
 
         $modelsDevPricingProvider = new ModelsDevPricingProvider($this->warningCapturingLogger(), $overridePath);
 
@@ -611,6 +609,19 @@ final class ModelsDevPricingProviderTest extends TestCase
     private function providerForCatalog(string $fixture, string $package = 'vinceamstoutz/not-a-real-package'): ModelsDevPricingProvider
     {
         return new ModelsDevPricingProvider($this->warningCapturingLogger(), __DIR__.'/Fixture/'.$fixture, $package);
+    }
+
+    private function newestUpdateOf(?string $catalogPath): string
+    {
+        if (null === self::$packagedCatalogUpdate) {
+            $catalog = ModelsDevCatalog::fromFile($catalogPath);
+            self::assertIsArray($catalog);
+            $newestUpdate = ModelsDevCatalog::newestUpdate($catalog);
+            self::assertIsString($newestUpdate);
+            self::$packagedCatalogUpdate = $newestUpdate;
+        }
+
+        return self::$packagedCatalogUpdate;
     }
 
     private function warningCapturingLogger(): LoggerInterface

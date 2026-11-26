@@ -136,8 +136,7 @@ final readonly class ComposerPhar
     private function assertPinnedRelease(string $path): void
     {
         if (!hash_equals($this->sha256, (string) hash_file('sha256', $path))) {
-            $this->filesystem->remove($path);
-
+            // The finally block of unpack() discards the refused copy.
             throw BridgeInstallationFailedException::forTamperedComposerPhar(self::VERSION);
         }
     }

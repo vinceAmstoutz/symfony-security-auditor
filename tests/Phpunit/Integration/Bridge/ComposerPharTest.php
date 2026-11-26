@@ -193,6 +193,17 @@ final class ComposerPharTest extends TestCase
         }
     }
 
+    /**
+     * @throws BridgeInstallationFailedException
+     */
+    public function test_it_refuses_a_tampered_composer_whose_copy_the_system_will_not_delete(): void
+    {
+        $this->expectException(BridgeInstallationFailedException::class);
+        $this->expectExceptionMessageContaining('does not match its pinned SHA-256 checksum');
+
+        (new ComposerPhar(self::FIXTURE_PHAR, hash('sha256', 'another composer'), new PharRemovalRefusingFilesystem()))->in($this->directory.'/.composer');
+    }
+
     public function test_it_refuses_a_bundled_composer_whose_checksum_does_not_match_and_keeps_none_of_it(): void
     {
         $composerPhar = new ComposerPhar($this->bundledPhar, hash('sha256', 'another composer'));
