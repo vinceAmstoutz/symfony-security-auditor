@@ -272,7 +272,7 @@ The file or finding is then recorded as errored. The call still counts against `
 
 ### `The provider does not know the model "…"` after `init -n`
 
-`init --no-interaction` without `--model` writes `claude-opus-5-5` as a placeholder for a provider it cannot list models for (a gateway such as LM Studio or vLLM, an Ollama it could not reach or with no model pulled, a provider the price catalog does not list). It warns when it does so and marks the line in `config.yaml` with a comment. `doctor` warns about it too. Set `model:` in `config.yaml` to a model the provider serves, or run `init` again with `--model`. In a Symfony application, set `symfony_security_auditor.model`.
+`init --no-interaction` without `--model` writes `claude-opus-5-5` as a placeholder for a provider it cannot list models for (a gateway such as LM Studio or vLLM, an Ollama it could not reach or with no model pulled, a provider the price catalog does not list). It warns when it does so and marks the line in `config.yaml` with a comment. `doctor` warns about it too. Set `model:` in `config.yaml` to a model the provider serves, or run `init` again with `--model`. In a Symfony application, set `symfony_security_auditor.model`. The message names the setting the failing model comes from: `model`, `attacker_model`, `reviewer_model` or `audit.escalation.cheap_model`.
 
 ### `Ollama: model not found`
 

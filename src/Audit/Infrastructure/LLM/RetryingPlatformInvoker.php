@@ -277,7 +277,7 @@ final readonly class RetryingPlatformInvoker
         }
 
         if ($this->transientFailureClassifier->isUnknownModel($throwable)) {
-            throw NonTransientLLMFailureException::forUnknownModel($this->model, $throwable);
+            throw NonTransientLLMFailureException::forUnknownModel($this->model, $this->platformBinding->modelSetting, $throwable);
         }
 
         if (!$this->transientFailureClassifier->isTransient($throwable)) {

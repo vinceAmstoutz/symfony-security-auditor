@@ -82,6 +82,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\GitTrac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\LlmClientRole;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ModelSetting;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformAccountingConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformRequestConfig;
@@ -167,6 +169,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         /** @var BundleConfigArray $config */
         $bundleConfiguration = BundleConfiguration::fromArray($config);
         $this->assertCliAgentAllowed($bundleConfiguration, $cliAgent);
+        $reviewerModelSetting = ModelSetting::ReviewerModel->ifSet($config['reviewer_model']);
 
         $this->registerParameters($builder, $bundleConfiguration);
 
@@ -176,11 +179,11 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $this->registerBudget($services, $bundleConfiguration);
         $this->registerRateLimiter($services, $bundleConfiguration);
         $configuredOutputCaps = ConfiguredOutputCaps::in($config);
-        $this->registerLlmClients($services, $bundleConfiguration, $platformServiceId, $configuredOutputCaps);
+        $this->registerLlmClients($services, $bundleConfiguration, $platformServiceId, new LlmClientRole(ModelSetting::AttackerModel->ifSet($config['attacker_model']), $configuredOutputCaps->attacker), new LlmClientRole($reviewerModelSetting, $configuredOutputCaps->reviewer));
         $this->registerImplementationAliases($services, $bundleConfiguration);
         $this->registerTrackedIgnoredFiles($services, $bundleConfiguration);
         $this->registerCustomSkills($services, $bundleConfiguration);
-        $this->registerEscalation($services, $bundleConfiguration, $platformServiceId, $configuredOutputCaps);
+        $this->registerEscalation($services, $bundleConfiguration, $platformServiceId, new LlmClientRole(ModelSetting::CheapModel->ifSet($bundleConfiguration->audit->escalationCheapModel, $reviewerModelSetting), $configuredOutputCaps->attacker));
     }
 
     /**
@@ -335,7 +338,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $servicesConfigurator->alias(RateLimiterInterface::class, TokenBucketRateLimiter::class);
     }
 
-    private function registerLlmClients(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration, string $platformServiceId, ConfiguredOutputCaps $configuredOutputCaps): void
+    private function registerLlmClients(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration, string $platformServiceId, LlmClientRole $attacker, LlmClientRole $reviewer): void
     {
         $servicesConfigurator->set(RetryAfterHeaderParser::class)->private();
 
@@ -346,7 +349,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $bundleConfiguration->llm->attackerModel(),
                 $bundleConfiguration->llm->attackerMaxOutputTokens(),
                 $platformServiceId,
-                $configuredOutputCaps->attacker,
+                $attacker,
             ));
 
         $servicesConfigurator->set('security_auditor.reviewer_client', SymfonyAiLLMClient::class)
@@ -356,7 +359,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $bundleConfiguration->llm->reviewerModel(),
                 $bundleConfiguration->llm->reviewerMaxOutputTokens(),
                 $platformServiceId,
-                $configuredOutputCaps->reviewer,
+                $reviewer,
             ));
 
         $servicesConfigurator->alias(LLMClientInterface::class, 'security_auditor.attacker_client');
@@ -475,7 +478,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $servicesConfigurator->alias(StaticPreScannerInterface::class, SarifImportingPreScanner::class);
     }
 
-    private function registerEscalation(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration, string $platformServiceId, ConfiguredOutputCaps $configuredOutputCaps): void
+    private function registerEscalation(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration, string $platformServiceId, LlmClientRole $cheapAttacker): void
     {
         if (!$bundleConfiguration->audit->escalationEnabled) {
             return;
@@ -490,7 +493,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $cheapModel,
                 $bundleConfiguration->llm->attackerMaxOutputTokens(),
                 $platformServiceId,
-                $configuredOutputCaps->attacker,
+                $cheapAttacker,
             ));
         $this->bookUsageOf($servicesConfigurator, 'security_auditor.cheap_attacker_client');
 
@@ -549,7 +552,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     /**
      * @return list<mixed>
      */
-    private function llmClientArguments(BundleConfiguration $bundleConfiguration, string $model, ?int $maxOutputTokens, string $platformServiceId, bool $capsEveryModel): array
+    private function llmClientArguments(BundleConfiguration $bundleConfiguration, string $model, ?int $maxOutputTokens, string $platformServiceId, LlmClientRole $llmClientRole): array
     {
         return [
             inline_service(PlatformBinding::class)->args([
@@ -558,6 +561,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 service('logger'),
                 $maxOutputTokens,
                 param(UnselectedPlatformsPass::PARAMETER),
+                $llmClientRole->modelSetting,
             ]),
             inline_service(PlatformRequestConfig::class)->args([
                 SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
@@ -565,7 +569,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 service(TokenEstimatorInterface::class),
                 param(PricingPlatformPass::PARAMETER),
                 $this->streamsCalls($platformServiceId),
-                $capsEveryModel,
+                $llmClientRole->capsEveryModel,
             ]),
             inline_service(PlatformResilienceConfig::class)->args([
                 service(RetryPolicy::class),
