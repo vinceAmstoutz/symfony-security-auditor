@@ -26,7 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
  *     model: string,
  *     attacker_model: string|null,
  *     reviewer_model: string|null,
- *     max_output_tokens?: int,
+ *     max_output_tokens?: int|null,
  *     attacker_max_output_tokens?: int|null,
  *     reviewer_max_output_tokens?: int|null,
  *     provider_json_mode?: bool,

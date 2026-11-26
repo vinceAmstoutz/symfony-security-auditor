@@ -253,6 +253,74 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
      * @throws LLMProviderException
      */
     #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_an_output_cap_the_configuration_sets_reaches_a_model_other_than_claude(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-5.6', 'max_output_tokens' => 8000], registerPlatform: false, registerHostServices: $this->servedBy('openai'));
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        $llmClient->complete('sys', 'usr');
+
+        self::assertSame(8000, OptionsRecordingPlatform::$lastOptions[PlatformOptions::MAX_OUTPUT_TOKENS] ?? null);
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_an_attacker_output_cap_the_configuration_sets_reaches_an_attacker_model_other_than_claude(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-5.6', 'attacker_max_output_tokens' => 8192], registerPlatform: false, registerHostServices: $this->servedBy('openai'));
+        $llmClient = $this->getPrivateService($kernel, 'security_auditor.attacker_client');
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        $llmClient->complete('sys', 'usr');
+
+        self::assertSame(8192, OptionsRecordingPlatform::$lastOptions[PlatformOptions::MAX_OUTPUT_TOKENS] ?? null);
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_reviewer_output_cap_the_configuration_sets_reaches_a_reviewer_model_other_than_claude(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-5.6', 'reviewer_max_output_tokens' => 2048], registerPlatform: false, registerHostServices: $this->servedBy('openai'));
+        $llmClient = $this->getPrivateService($kernel, 'security_auditor.reviewer_client');
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        $llmClient->complete('sys', 'usr');
+
+        self::assertSame(2048, OptionsRecordingPlatform::$lastOptions[PlatformOptions::MAX_OUTPUT_TOKENS] ?? null);
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_an_attacker_output_cap_the_configuration_sets_reaches_a_cheap_escalation_model_other_than_claude(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'claude-opus-5-5',
+            'attacker_max_output_tokens' => 8192,
+            'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'gpt-5.6-mini']],
+        ], registerPlatform: false, registerHostServices: $this->servedBy('openai'));
+        $llmClient = $this->getPrivateService($kernel, 'security_auditor.cheap_attacker_client');
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        $llmClient->complete('sys', 'usr');
+
+        self::assertSame(8192, OptionsRecordingPlatform::$lastOptions[PlatformOptions::MAX_OUTPUT_TOKENS] ?? null);
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
     #[MaximumDuration(8000)]
     public function test_the_auditor_runs_on_the_claude_code_cli_its_cli_agent_names(): void
     {

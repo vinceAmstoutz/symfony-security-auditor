@@ -291,7 +291,7 @@ The chunk's files are recorded as errored, left out of the cache and counted und
 | Reason | Fix |
 | --- | --- |
 | `tool-call limit reached (audit.max_tool_iterations)` | Raise `audit.max_tool_iterations` (try `16`) or set `audit.tools_enabled: false`. See [the cost](#attacker-loops-indefinitely-on-tool-calls). |
-| `output token limit reached (max_output_tokens)` | Raise `max_output_tokens` or `attacker_max_output_tokens` (Claude models only). |
+| `output token limit reached (max_output_tokens)` | Raise `max_output_tokens` or `attacker_max_output_tokens`. |
 | `answer withheld by the provider content filter` | Try another model or deployment. |
 | `the model returned no content` | Retry; switch model if every chunk fails. |
 | `the answer was not valid JSON` | See [`Failed to parse …`](#failed-to-parse-attacker-agent-json-response--failed-to-parse-reviewer-response). |

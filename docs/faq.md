@@ -259,7 +259,7 @@ A note on recall: recent Claude models follow strict instructions literally, so 
 
 ### Can I tune model parameters (temperature, max_tokens)?
 
-Yes. For `max_tokens`, use the dedicated `max_output_tokens` key: it defaults to `4096` and avoids `symfony/ai`'s built-in ~1000-token cap. This key currently only takes effect for Claude/Anthropic-dialect models (see [Configuration → Top-level](configuration.md#top-level)):
+Yes. For `max_tokens`, use the dedicated `max_output_tokens` key: it defaults to `4096` and avoids `symfony/ai`'s built-in ~1000-token cap. Left unset, it caps Claude models only; set, it also caps other models on a platform that takes `symfony/ai`'s output cap (see [Configuration → Top-level](configuration.md#top-level)):
 
 ```yaml
 symfony_security_auditor:
