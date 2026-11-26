@@ -19,8 +19,9 @@ use function Symfony\Component\String\u;
  * A unified-diff patch read from a model's answer, ignoring the prose and code
  * fences around it and replacing invalid UTF-8. parse() returns null for a
  * patch that creates, deletes or renames a file, leaves the project, has a
- * header with no hunk, a hunk whose counts do not add up or a hunk line past
- * the lines its header counts, so no part of it is applied.
+ * header with no hunk, a hunk whose counts do not add up, a hunk whose last
+ * counted line is a blank line without its space or a hunk line past the
+ * lines its header counts, so no part of it is applied.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -212,7 +213,7 @@ final readonly class UnifiedDiff
             ++$index;
         }
 
-        return \count($oldLines) === $oldCount && \count($newLines) === $newCount ? [$oldLines, $newLines, $index] : null;
+        return \count($oldLines) === $oldCount && \count($newLines) === $newCount && '' !== $lines[$index - 1] ? [$oldLines, $newLines, $index] : null;
     }
 
     /**
