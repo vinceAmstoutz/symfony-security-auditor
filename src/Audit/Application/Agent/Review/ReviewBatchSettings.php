@@ -23,7 +23,8 @@ final readonly class ReviewBatchSettings
 {
     /**
      * @param int<1, max> $batchSize
-     * @param bool        $groupByFile whether a batch holds the findings of one file only, so the file is sent once
+     * @param bool        $groupByFile   whether a batch holds the findings of one file only, so the file is sent once
+     * @param int<1, max> $maxConcurrent how many batches are sent at once to a client that takes several, without tools
      */
     public function __construct(
         public int $batchSize,
@@ -32,5 +33,6 @@ final readonly class ReviewBatchSettings
         public CoverageRecorderInterface $coverageRecorder,
         public ?ToolRegistry $toolRegistry,
         public bool $groupByFile = false,
+        public int $maxConcurrent = 1,
     ) {}
 }

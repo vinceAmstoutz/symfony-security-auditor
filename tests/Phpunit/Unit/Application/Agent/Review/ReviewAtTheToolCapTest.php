@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\RecordingToolClients;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\BatchAnswerReader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\BatchReviewAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\BatchVerdictApplier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ConcurrentStructuredReviewAnalyzer;
@@ -219,16 +220,18 @@ final class ReviewAtTheToolCapTest extends TestCase
     {
         $verdictApplier = new VerdictApplier(new NullLogger());
 
+        $batchVerdictApplier = new BatchVerdictApplier($verdictApplier, $this->reviewerVerdictCache, new NullLogger(), new NullProgressReporter(), $this->recordingTriageMemory);
+
         return new BatchReviewAnalyzer(
             $llmClient,
             new ReviewerPromptBuilder(useStructuredCollection: true),
-            new BatchVerdictApplier($verdictApplier, $this->reviewerVerdictCache, new NullLogger(), new NullProgressReporter(), $this->recordingTriageMemory),
+            $batchVerdictApplier,
             $this->reviewerVerdictCache,
             $this->reviewOutcomeRecorder(),
             new NullLogger(),
             4,
             new RecordReviewToolFactory(),
-            RecordingToolClients::forReviewer(new NullLogger()),
+            new BatchAnswerReader($llmClient, $batchVerdictApplier, new NullLogger(), RecordingToolClients::forReviewer(new NullLogger())),
         );
     }
 
