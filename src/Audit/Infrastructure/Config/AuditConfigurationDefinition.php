@@ -59,7 +59,7 @@ final readonly class AuditConfigurationDefinition
                 ->append((new NullableIntegerNodeDefinition('max_output_tokens'))
                     ->defaultNull()
                     ->min(1)
-                    ->info("Maximum output tokens per LLM call for both Attacker and Reviewer. A Claude model gets it, 4096 when unset, as symfony/ai's `max_output_tokens` on a platform whose bridge translates it and as `max_tokens` elsewhere; another model gets it only when it is set, and only on a platform whose bridge translates it, since its cap also counts the reasoning tokens. A tool call it cuts off is asked again with twice the cap, once per conversation, which keeps the raised cap; a raised cap the provider refuses ends the call as the answer the cap cut off. Without it, symfony/ai's Anthropic bridge would apply a much smaller default (~1000) that silently truncates findings."))
+                    ->info("Maximum output tokens per LLM call for both Attacker and Reviewer. A Claude model gets it, 4096 when unset, as symfony/ai's `max_output_tokens` on a platform whose bridge translates it and as `max_tokens` elsewhere; another model gets it only when it is set and only on a platform whose bridge translates it, since its cap also counts the reasoning tokens. A tool call it cuts off is asked again with twice the cap, once per conversation, which keeps the raised cap; a raised cap the provider refuses ends the call as the answer the cap cut off. Without it, symfony/ai's Anthropic bridge would apply a much smaller default (~1000) that silently truncates findings."))
                 ->append((new NullableIntegerNodeDefinition('attacker_max_output_tokens'))
                     ->defaultNull()
                     ->min(1)
