@@ -168,6 +168,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPacka
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPathPrefix;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\SarifReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\MemoizedStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NestingDepthGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
@@ -489,7 +490,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(CandidateFindingSource::class)
         ->args([
-            service(StaticPreScannerInterface::class),
+            service(MemoizedStaticPreScanner::class),
             param('symfony_security_auditor.audit.report_static_findings'),
         ]);
 
@@ -669,6 +670,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->alias(ToolRegistryFactoryInterface::class, SymfonyToolRegistryFactory::class);
 
     $defaultsConfigurator->set(NullStaticPreScanner::class);
+    $defaultsConfigurator->set(MemoizedStaticPreScanner::class)
+        ->args([service(StaticPreScannerInterface::class)]);
     $defaultsConfigurator->set(RegexStaticPreScanner::class)
         ->args([param('symfony_security_auditor.scan.custom_risk_patterns'), service('logger')]);
 

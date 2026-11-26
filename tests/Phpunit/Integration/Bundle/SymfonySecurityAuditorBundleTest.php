@@ -132,6 +132,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleRepo
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\MemoizedStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NestingDepthGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
@@ -1445,6 +1446,23 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $kernel = $this->boot(['model' => 'gpt-4o']);
 
         self::assertInstanceOf(RegexStaticPreScanner::class, $this->getPrivateService($kernel, StaticPreScannerInterface::class));
+    }
+
+    public function test_bundle_shares_one_memoized_pre_scan_between_the_attacker_and_the_static_findings(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        $decorated = $containerBuilder->getDefinition(MemoizedStaticPreScanner::class)->getArgument(0);
+        self::assertInstanceOf(Reference::class, $decorated);
+        self::assertSame(StaticPreScannerInterface::class, (string) $decorated);
+        $candidatePreScanner = $containerBuilder->getDefinition(CandidateFindingSource::class)->getArgument(0);
+        self::assertInstanceOf(Reference::class, $candidatePreScanner);
+        self::assertSame(MemoizedStaticPreScanner::class, (string) $candidatePreScanner);
+        $attackerScanCollaborators = $containerBuilder->getDefinition(AttackerAgent::class)->getArgument(1);
+        self::assertInstanceOf(Definition::class, $attackerScanCollaborators);
+        $attackerPreScanner = $attackerScanCollaborators->getArgument(1);
+        self::assertInstanceOf(Reference::class, $attackerPreScanner);
+        self::assertSame(MemoizedStaticPreScanner::class, (string) $attackerPreScanner);
     }
 
     #[RunInSeparateProcess]
