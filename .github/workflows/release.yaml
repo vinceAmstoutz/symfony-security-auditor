@@ -358,6 +358,16 @@ jobs:
           doctor_output="$(PATH="$empty_path" SYMFONY_SECURITY_AUDITOR_HOME="$binary_home" SSA_NO_UPDATE_CHECK=1 ./"$ASSET" doctor --no-ansi || true)"
           printf '%s\n' "$doctor_output"
           printf '%s\n' "$doctor_output" | grep -F '[OK] Composer: Available.'
+          # The advisory lookups read this output as JSON, so its first line must open the JSON.
+          bridge_tree="$ssa_home/.local/share/symfony-security-auditor"
+          composer_script="$(ls -d "$bridge_tree"/.composer/composer-*/bin/composer | head -n 1)"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            composer_script="$(cygpath -w "$composer_script")"
+          fi
+          binary="$PWD/$ASSET"
+          audit_output="$(cd "$bridge_tree" && PATH="$empty_path" SYMFONY_SECURITY_AUDITOR_COMPOSER="$composer_script" "$binary" audit --format=json --locked --no-interaction --no-scripts --no-plugins || true)"
+          printf '%s\n' "$audit_output"
+          test "$(printf '%s\n' "$audit_output" | head -n 1 | tr -d '\r')" = '{'
 
       - name: Generate the SHA-256 checksum
         run: |
