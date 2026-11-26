@@ -51,7 +51,7 @@ final readonly class InitModelQuestion
     {
         $subscriptionModels = CliAgentPlatformFactory::SUBSCRIPTION_MODELS[$providerKey->platform] ?? null;
         if (null !== $subscriptionModels) {
-            return NumberedChoice::ask($symfonyStyle, 'Which model should the auditor use? Pick a number, or type a model id', $subscriptionModels, $subscriptionModels[0]);
+            return NumberedChoice::ask($symfonyStyle, 'Which model should the <options=bold>auditor</> use? Pick a number, or type a model id', $subscriptionModels, $subscriptionModels[0]);
         }
 
         if ('ollama' === $providerKey->platform) {
@@ -64,8 +64,8 @@ final readonly class InitModelQuestion
         }
 
         return 'anthropic' === $providerKey->platform
-            ? InitPrompt::withDefault($symfonyStyle, 'Which model should the auditor use?', self::DEFAULT_MODEL)
-            : $this->typedModel($symfonyStyle, 'Which model should the auditor use? Type its id as your provider names it');
+            ? InitPrompt::withDefault($symfonyStyle, 'Which model should the <options=bold>auditor</> use?', self::DEFAULT_MODEL)
+            : $this->typedModel($symfonyStyle, 'Which model should the <options=bold>auditor</> use? Type its id as your provider names it');
     }
 
     public function askReviewer(SymfonyStyle $symfonyStyle, ProviderKey $providerKey): ?string
@@ -75,7 +75,7 @@ final readonly class InitModelQuestion
             return null;
         }
 
-        return NumberedChoice::ask($symfonyStyle, 'Which model should review the findings? Pick a number, or type a model id', $choices['models'], $choices['suggested']);
+        return NumberedChoice::ask($symfonyStyle, 'Which model should <options=bold>review the findings</>? Pick a number, or type a model id', $choices['models'], $choices['suggested']);
     }
 
     private function askOllamaModel(SymfonyStyle $symfonyStyle, ?string $endpoint): ?string
@@ -83,8 +83,8 @@ final readonly class InitModelQuestion
         $pulledModels = null === $endpoint ? [] : $this->pulledModelList?->pulledModels($endpoint) ?? [];
 
         return [] === $pulledModels
-            ? $this->typedModel($symfonyStyle, 'Which Ollama model should the auditor use? Type the name of a model you pulled, e.g. qwen3 or llama3.3')
-            : NumberedChoice::ask($symfonyStyle, 'Which Ollama model should the auditor use? Pick a number, or type a model name', $pulledModels, $pulledModels[0]);
+            ? $this->typedModel($symfonyStyle, 'Which Ollama model should the <options=bold>auditor</> use? Type the name of a model you pulled, e.g. qwen3 or llama3.3')
+            : NumberedChoice::ask($symfonyStyle, 'Which Ollama model should the <options=bold>auditor</> use? Pick a number, or type a model name', $pulledModels, $pulledModels[0]);
     }
 
     private function typedModel(SymfonyStyle $symfonyStyle, string $question): ?string
@@ -102,7 +102,7 @@ final readonly class InitModelQuestion
 
         return NumberedChoice::askNamingTheDefaultValue(
             $symfonyStyle,
-            'Which model should the auditor use? Pick a number, or type any model id',
+            'Which model should the <options=bold>auditor</> use? Pick a number, or type any model id',
             array_map($this->modelChoice(...), $pricedModels),
             $this->defaultModel($modelIds),
             $modelIds,
