@@ -771,7 +771,7 @@ _Since 1.23._ With [`audit.fix_synthesis`](#audit-orchestrator-knobs) enabled, a
 
 A single self-contained file (no external stylesheet, font, image or script) carrying the risk badge and run metadata, a Distribution section of two inline-SVG bar charts (by severity, by vulnerability type) and one card per finding with its location, description, vulnerable code, attack vector, proof of concept and remediation. Colors come from the report's own stylesheet, so it follows the reader's light/dark preference.
 
-![The HTML report: risk badge, run metadata, distribution charts and one card per finding](../assets/html-report.png?raw=true)
+![The HTML report: branded header, risk badge, run metadata, distribution charts and one card per finding](../assets/html-report.png?raw=true)
 
 ### Normalized score and grade
 
