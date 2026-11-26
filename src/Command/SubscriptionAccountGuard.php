@@ -21,7 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentAccoun
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentAccountProbeInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentBilling;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionCliInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnattendedRunRefusedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\RunRefusedException;
 
 /**
  * Names in the audit header the account the subscription's CLI bills and
@@ -55,10 +55,8 @@ final readonly class SubscriptionAccountGuard implements UnpricedModelBudgetGuar
             return true;
         }
 
-        if (self::refuses($cliAgentAccount)) {
-            $errorStyle->error($warning);
-
-            return false;
+        if ($this->refuses($cliAgentAccount)) {
+            throw RunRefusedException::because($warning);
         }
 
         $errorStyle->warning($warning);
@@ -77,14 +75,14 @@ final readonly class SubscriptionAccountGuard implements UnpricedModelBudgetGuar
             return;
         }
 
-        if (self::refuses($cliAgentAccount)) {
-            throw UnattendedRunRefusedException::because($warning);
+        if ($this->refuses($cliAgentAccount)) {
+            throw RunRefusedException::because($warning);
         }
 
         $logger->warning($warning);
     }
 
-    private static function refuses(CliAgentAccount $cliAgentAccount): bool
+    private function refuses(CliAgentAccount $cliAgentAccount): bool
     {
         return \in_array($cliAgentAccount->billing, [CliAgentBilling::NotLoggedIn, CliAgentBilling::ApiKey], true);
     }

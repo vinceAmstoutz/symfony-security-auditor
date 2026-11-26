@@ -21,13 +21,16 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ClaudeCodeSubscriptionCli;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentAccount;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentAccountProbeInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnattendedRunRefusedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\RunRefusedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\SubscriptionAccountGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\WarningCollectingLogger;
 
 final class SubscriptionAccountGuardTest extends TestCase
 {
+    /**
+     * @throws RunRefusedException
+     */
     public function test_it_names_the_subscription_the_audit_bills_in_its_header(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -41,16 +44,30 @@ final class SubscriptionAccountGuardTest extends TestCase
     {
         $bufferedOutput = new BufferedOutput();
 
-        $this->guard(CliAgentAccount::apiKey('apiKeyHelper', 'Stop it.'))->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), $bufferedOutput));
+        try {
+            $this->guard(CliAgentAccount::apiKey('apiKeyHelper', 'Stop it.'))->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), $bufferedOutput));
+        } catch (RunRefusedException) {
+            self::assertStringContainsString('Billing: the API key in apiKeyHelper, not your Claude subscription', (string) preg_replace('/\s+/', ' ', $bufferedOutput->fetch()));
 
-        self::assertStringContainsString('[ERROR] The Claude Code CLI bills the API key in apiKeyHelper, not your Claude subscription. Stop it.', (string) preg_replace('/\s+/', ' ', $bufferedOutput->fetch()));
+            return;
+        }
+
+        self::fail('The guard let a run start that an API key would bill.');
     }
 
+    /**
+     * @throws RunRefusedException
+     */
     public function test_it_refuses_to_start_while_the_cli_is_not_logged_in(): void
     {
-        self::assertFalse($this->guard(CliAgentAccount::notLoggedIn())->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), new BufferedOutput())));
+        $this->expectExceptionObject(RunRefusedException::because('Run "claude auth login" to log the Claude Code CLI in to your Claude subscription before an audit.'));
+
+        $this->guard(CliAgentAccount::notLoggedIn())->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), new BufferedOutput()));
     }
 
+    /**
+     * @throws RunRefusedException
+     */
     public function test_a_refused_budget_stops_the_run_before_the_cli_is_asked(): void
     {
         $unpricedModelBudgetGuard = self::createStub(UnpricedModelBudgetGuardInterface::class);
@@ -61,6 +78,9 @@ final class SubscriptionAccountGuardTest extends TestCase
         self::assertFalse((new SubscriptionAccountGuard($unpricedModelBudgetGuard, new ClaudeCodeSubscriptionCli(), null, $cliAgentAccountProbe))->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), new BufferedOutput())));
     }
 
+    /**
+     * @throws RunRefusedException
+     */
     public function test_it_asks_the_cli_the_configuration_names(): void
     {
         $unpricedModelBudgetGuard = self::createStub(UnpricedModelBudgetGuardInterface::class);
@@ -72,7 +92,7 @@ final class SubscriptionAccountGuardTest extends TestCase
     }
 
     /**
-     * @throws UnattendedRunRefusedException
+     * @throws RunRefusedException
      */
     public function test_it_leaves_the_unenforceable_budget_warning_to_the_guard_it_wraps(): void
     {
@@ -85,20 +105,19 @@ final class SubscriptionAccountGuardTest extends TestCase
         (new SubscriptionAccountGuard($unpricedModelBudgetGuard, new ClaudeCodeSubscriptionCli(), null, $cliAgentAccountProbe))->assertUnattendedRunPermitted($logger);
     }
 
-    public function test_it_says_how_to_log_the_cli_in_when_it_refuses_to_start(): void
-    {
-        $bufferedOutput = new BufferedOutput();
-
-        $this->guard(CliAgentAccount::notLoggedIn())->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), $bufferedOutput));
-
-        self::assertStringContainsString('[ERROR] Run "claude auth login" to log the Claude Code CLI in to your Claude subscription before an audit.', (string) preg_replace('/\s+/', ' ', $bufferedOutput->fetch()));
-    }
-
+    /**
+     * @throws RunRefusedException
+     */
     public function test_it_refuses_to_start_when_an_api_key_would_bill_in_place_of_the_subscription(): void
     {
-        self::assertFalse($this->guard(CliAgentAccount::apiKey('apiKeyHelper', 'Stop it.'))->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), new BufferedOutput())));
+        $this->expectExceptionObject(RunRefusedException::because('The Claude Code CLI bills the API key in apiKeyHelper, not your Claude subscription. Stop it.'));
+
+        $this->guard(CliAgentAccount::apiKey('apiKeyHelper', 'Stop it.'))->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), new BufferedOutput()));
     }
 
+    /**
+     * @throws RunRefusedException
+     */
     public function test_it_warns_and_lets_the_audit_run_when_the_cli_cannot_tell_which_account_it_bills(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -109,17 +128,17 @@ final class SubscriptionAccountGuardTest extends TestCase
     }
 
     /**
-     * @throws UnattendedRunRefusedException
+     * @throws RunRefusedException
      */
     public function test_it_refuses_an_unattended_run_while_the_cli_is_not_logged_in(): void
     {
-        $this->expectExceptionObject(UnattendedRunRefusedException::because('Run "claude auth login" to log the Claude Code CLI in to your Claude subscription before an audit.'));
+        $this->expectExceptionObject(RunRefusedException::because('Run "claude auth login" to log the Claude Code CLI in to your Claude subscription before an audit.'));
 
         $this->guard(CliAgentAccount::notLoggedIn())->assertUnattendedRunPermitted(new NullLogger());
     }
 
     /**
-     * @throws UnattendedRunRefusedException
+     * @throws RunRefusedException
      */
     public function test_it_logs_and_lets_an_unattended_run_start_when_the_cli_cannot_tell_which_account_it_bills(): void
     {
@@ -132,7 +151,7 @@ final class SubscriptionAccountGuardTest extends TestCase
     }
 
     /**
-     * @throws UnattendedRunRefusedException
+     * @throws RunRefusedException
      */
     public function test_it_logs_nothing_for_an_unattended_run_the_subscription_bills(): void
     {

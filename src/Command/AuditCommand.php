@@ -35,6 +35,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Progress\ProgressR
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\BaselineWriteFailedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ReportWriteFailedException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\RunRefusedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ScanPathOutsideProjectException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeBaselineWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteException;
@@ -182,8 +183,9 @@ final readonly class AuditCommand
                     return ExitCode::Success->value;
                 }
 
-                if (!$this->unpricedModelBudgetGuard->permitsRun($input, $symfonyStyle)) {
-                    return ExitCode::BudgetAborted->value;
+                $refusedStart = $this->refusedStart($input, $symfonyStyle);
+                if ($refusedStart instanceof ExitCode) {
+                    return $refusedStart->value;
                 }
 
                 $this->auditPresenter->preflightWarnings($displayStyle, true, $this->pulledModelNotice?->notices() ?? []);
@@ -207,6 +209,21 @@ final readonly class AuditCommand
             $this->auditPresenter->error($displayStyle, $throwable);
 
             return ExitCode::Failure->value;
+        }
+    }
+
+    /**
+     * Returns how a run the guard refuses to start exits: `2` for a budget it
+     * cannot enforce, `1` for any other refusal. Null when the run may start.
+     */
+    private function refusedStart(InputInterface $input, SymfonyStyle $symfonyStyle): ?ExitCode
+    {
+        try {
+            return $this->unpricedModelBudgetGuard->permitsRun($input, $symfonyStyle) ? null : ExitCode::BudgetAborted;
+        } catch (RunRefusedException $runRefusedException) {
+            $symfonyStyle->getErrorStyle()->error($runRefusedException->getMessage());
+
+            return ExitCode::Failure;
         }
     }
 

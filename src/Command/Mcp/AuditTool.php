@@ -36,8 +36,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineFilePathsHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\AuditWithoutVerdictException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InvalidProjectPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\RunRefusedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ScanPathOutsideProjectException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnattendedRunRefusedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ScanPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
@@ -119,7 +119,7 @@ final readonly class AuditTool
      * @throws InvalidAuditCostException
      * @throws InvalidTokenUsageException
      * @throws ScanPathOutsideProjectException
-     * @throws UnattendedRunRefusedException
+     * @throws RunRefusedException
      */
     private function auditReport(AuditTarget $auditTarget): AuditReport
     {

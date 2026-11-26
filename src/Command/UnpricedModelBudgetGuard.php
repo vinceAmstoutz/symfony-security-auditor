@@ -30,6 +30,9 @@ final readonly class UnpricedModelBudgetGuard implements UnpricedModelBudgetGuar
         private ?string $cliAgent = null,
     ) {}
 
+    /**
+     * @throws void
+     */
     #[Override]
     public function permitsRun(InputInterface $input, SymfonyStyle $symfonyStyle): bool
     {

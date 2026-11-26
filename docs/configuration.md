@@ -796,7 +796,7 @@ The grade boundaries mirror the `risk_level` thresholds, so the two never disagr
 | Code | Meaning |
 | --- | --- |
 | `0` | The audit completed below the `fail_on` threshold and, if set, at or above `--min-score` |
-| `1` | The risk level reached `fail_on`, the score fell below `--min-score`, the run has no verdict (the scan found no file, or no file could be analyzed and nothing was found, _since 1.21_), or the audit failed or was given an invalid path |
+| `1` | The risk level reached `fail_on`, the score fell below `--min-score`, the run has no verdict (the scan found no file, or no file could be analyzed and nothing was found, _since 1.21_), or the audit failed or was given an invalid path. _Since 1.23_ it also covers an audit on a subscription that refuses to start because the CLI is not logged in or would bill an API key in its place |
 | `2` | The token or cost budget was exceeded (the partial report is still written), or a cost budget could not be enforced on an unpriced model and the run was declined |
 | `3` | _Since 1.21._ `--fail-on-incomplete` (or, _since 1.22_, `audit.fail_on_incomplete`) is set, no gate tripped and some file could not be fully analyzed |
 

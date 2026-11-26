@@ -142,6 +142,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlic
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\RunRefusedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
@@ -377,6 +378,9 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertStringContainsString('not priced per call: billed to your ChatGPT subscription, or to an API key the CLI uses in its place', $reportRenderer->render(AuditReport::fromContext(AuditContext::forProject($this->tmpDir), AuditCost::of(100, 50, 0.0, 'gpt-6-luna'))));
     }
 
+    /**
+     * @throws RunRefusedException
+     */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
     public function test_a_cli_agent_run_names_the_subscription_its_cli_bills(): void
@@ -393,6 +397,9 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertStringContainsString('Billing: your Claude subscription (pro plan)', (string) preg_replace('/\s+/', ' ', $bufferedOutput->fetch()));
     }
 
+    /**
+     * @throws RunRefusedException
+     */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
     public function test_a_cli_agent_run_says_the_subscription_is_not_priced_per_call(): void

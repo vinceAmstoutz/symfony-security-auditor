@@ -16,7 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command\Exception;
 use RuntimeException;
 
 /** @internal not part of the BC promise, see docs/versioning.md */
-final class UnattendedRunRefusedException extends RuntimeException
+final class RunRefusedException extends RuntimeException
 {
     public static function because(string $reason): self
     {
