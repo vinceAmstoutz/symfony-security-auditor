@@ -296,6 +296,75 @@ final class ReportWriterTest extends TestCase
      * @throws UnsafeReportWriteException
      * @throws ReportWriteFailedException
      */
+    public function test_the_link_to_a_temporary_html_report_encodes_a_space_in_its_path(): void
+    {
+        $temporaryDirectory = $this->tmpDir.'/with space';
+        $this->filesystem->mkdir($temporaryDirectory);
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $temporaryDirectory);
+
+        $reportWriter->write($this->makeReport(), OutputFormat::Html, null, new SymfonyStyle(new StringInput(''), $bufferedOutput));
+
+        self::assertStringContainsString('/with%20space/symfony-security-auditor-report-', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_an_html_report_that_cannot_reach_a_temporary_file_is_printed(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $this->tmpDir.'/missing');
+
+        $reportWriter->write($this->makeReport(), OutputFormat::Html, null, new SymfonyStyle(new StringInput(''), $bufferedOutput));
+
+        self::assertStringContainsString('<!doctype html>', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_the_temporary_html_report_is_readable_by_its_owner_only(): void
+    {
+        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $this->tmpDir);
+
+        $reportWriter->write($this->makeReport(), OutputFormat::Html, null, new SymfonyStyle(new StringInput(''), new BufferedOutput(decorated: true)));
+
+        $savedReports = $this->savedHtmlReports();
+        self::assertSame(0o600, fileperms($savedReports[0]) & 0o777);
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_an_html_report_for_a_terminal_is_saved_to_a_temporary_file_it_links_to(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $this->tmpDir);
+
+        $reportWriter->write($this->makeReport(), OutputFormat::Html, null, new SymfonyStyle(new StringInput(''), $bufferedOutput));
+
+        $savedReports = $this->savedHtmlReports();
+        self::assertCount(1, $savedReports);
+        self::assertStringContainsString('<!doctype html>', (string) file_get_contents($savedReports[0]));
+        self::assertStringContainsString('file://'.$savedReports[0], $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
     public function test_writing_junit_format_streams_a_junit_xml_document(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -723,5 +792,15 @@ final class ReportWriterTest extends TestCase
         $this->expectException(ReportWriteFailedException::class);
 
         $this->reportWriter->assertWritable($this->tmpDir, $this->tmpDir);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function savedHtmlReports(): array
+    {
+        $paths = glob($this->tmpDir.'/*.html');
+
+        return false === $paths ? [] : $paths;
     }
 }
