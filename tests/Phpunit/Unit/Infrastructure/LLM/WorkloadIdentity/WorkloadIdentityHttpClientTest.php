@@ -112,6 +112,21 @@ final class WorkloadIdentityHttpClientTest extends TestCase
     }
 
     /**
+     * @throws RefusedTokenExchangeException
+     * @throws TransientHttpStatusException
+     * @throws UnobtainableIdentityTokenException
+     */
+    public function test_it_passes_the_other_request_options_through(): void
+    {
+        $mockResponse = new MockResponse('{}');
+
+        (new WorkloadIdentityHttpClient(new MockHttpClient($mockResponse), $this->accessTokenProvider()))
+            ->request('POST', 'https://api.anthropic.com/v1/messages', ['body' => '{"model":"claude-opus-5-5"}', 'headers' => ['x-api-key' => 'unused']]);
+
+        self::assertSame('{"model":"claude-opus-5-5"}', $mockResponse->getRequestOptions()['body'] ?? null);
+    }
+
+    /**
      * @return array<mixed>
      */
     private function sentHeaders(MockResponse $mockResponse): array

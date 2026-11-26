@@ -124,4 +124,46 @@ final class FederatedAnthropicAccessTest extends TestCase
             [$federatedAnthropicAccess->configure($aiConfig, $containerBuilder), $containerBuilder->hasDefinition(FederatedAnthropicAccess::HTTP_CLIENT_SERVICE)],
         );
     }
+
+    /**
+     * @throws UnobtainableIdentityTokenException
+     */
+    public function test_it_keeps_the_other_platforms_and_the_other_anthropic_settings(): void
+    {
+        $federatedAnthropicAccess = FederatedAnthropicAccess::fromEnvironment(self::FEDERATION);
+        self::assertInstanceOf(FederatedAnthropicAccess::class, $federatedAnthropicAccess);
+
+        self::assertSame(
+            ['platform' => [
+                'openai' => ['api_key' => 'sk-proj-key'],
+                'anthropic' => ['api_key' => FederatedAnthropicAccess::API_KEY_PLACEHOLDER, 'cache_retention' => 'long', 'http_client' => FederatedAnthropicAccess::HTTP_CLIENT_SERVICE],
+            ]],
+            $federatedAnthropicAccess->configure(
+                ['platform' => ['openai' => ['api_key' => 'sk-proj-key'], 'anthropic' => ['api_key' => FederatedAnthropicAccess::API_KEY_PLACEHOLDER, 'cache_retention' => 'long']]],
+                new ContainerBuilder(),
+            ),
+        );
+    }
+
+    /**
+     * @throws UnobtainableIdentityTokenException
+     */
+    public function test_a_federation_setting_holding_percent_signs_reaches_the_exchange_as_written(): void
+    {
+        $exchange = new MockResponse('{"access_token":"sk-ant-oat01-federated","expires_in":599}');
+        $containerBuilder = new ContainerBuilder();
+        $containerBuilder->register('http_client', HttpClientInterface::class)->setSynthetic(true);
+        $containerBuilder->set('http_client', new MockHttpClient([new MockResponse('{"value":"github-oidc-jwt"}'), $exchange, new MockResponse('{}')]));
+        $federatedAnthropicAccess = FederatedAnthropicAccess::fromEnvironment([...self::FEDERATION, 'ANTHROPIC_FEDERATION_RULE_ID' => 'fdrl_%kernel.debug%']);
+        self::assertInstanceOf(FederatedAnthropicAccess::class, $federatedAnthropicAccess);
+
+        $federatedAnthropicAccess->configure(['platform' => ['anthropic' => ['api_key' => FederatedAnthropicAccess::API_KEY_PLACEHOLDER]]], $containerBuilder);
+        $httpClient = $containerBuilder->get(FederatedAnthropicAccess::HTTP_CLIENT_SERVICE);
+        self::assertInstanceOf(HttpClientInterface::class, $httpClient);
+        $httpClient->request('POST', 'https://api.anthropic.com/v1/messages');
+
+        $body = $exchange->getRequestOptions()['body'] ?? null;
+        self::assertIsString($body);
+        self::assertStringContainsString('"federation_rule_id":"fdrl_%kernel.debug%"', $body);
+    }
 }
