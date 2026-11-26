@@ -1,0 +1,117 @@
+name: Merge guard
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - edited
+      - labeled
+      - unlabeled
+    branches:
+      - "*.x"
+
+permissions:
+  contents: read
+  pull-requests: read # reads the pull request's commits and labels
+  actions: read # reads the CI runs of the base branch and of the pull request
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  signed-commits:
+    name: Signed commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Check that GitHub verified every commit of the pull request
+        run: |
+          gh api "repos/$GH_REPO/pulls/$NUMBER/commits?per_page=100" --paginate --slurp > "$RUNNER_TEMP/commits.json"
+          listed=$(jq 'add // [] | length' "$RUNNER_TEMP/commits.json")
+          total=$(gh api "repos/$GH_REPO/pulls/$NUMBER" --jq .commits)
+          if [ "$listed" != "$total" ]; then
+            echo "::error::GitHub lists $listed of the $total commits of this pull request, so the others cannot be checked. Keep it under 250 commits."
+            exit 1
+          fi
+          unverified=$(jq -r 'add | .[] | select(.commit.verification.verified != true) | "\(.sha) \(.commit.verification.reason)"' "$RUNNER_TEMP/commits.json")
+          if [ -n "$unverified" ]; then
+            while read -r sha reason; do
+              echo "::error title=Unverified commit::$sha is not verified by GitHub (reason: $reason)"
+            done <<< "$unverified"
+            exit 1
+          fi
+          echo "GitHub verified all $total commits of this pull request."
+
+  base-green:
+    name: Base branch is green
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NUMBER: ${{ github.event.pull_request.number }}
+      BASE_REF: ${{ github.event.pull_request.base.ref }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      FIX_LABEL: fixes-${{ github.event.pull_request.base.ref }}
+      OWN_CI_WAIT_SECONDS: 10200
+    steps:
+      - name: Wait for the CI run of the pull request to finish
+        id: own-ci
+        run: |
+          deadline=$((SECONDS + OWN_CI_WAIT_SECONDS))
+          while :; do
+            own=$(gh run list --workflow ci.yaml --event pull_request --commit "$HEAD_SHA" --limit 1 \
+              --json status,conclusion,url --jq 'first // empty | "\(.status)/\(.conclusion) \(.url)"')
+            read -r state own_url <<< "$own"
+            case "$state" in
+              completed/*)
+                echo "The CI run of this pull request ended with ${state#completed/}: $own_url"
+                echo "conclusion=${state#completed/}" >> "$GITHUB_OUTPUT"
+                echo "url=$own_url" >> "$GITHUB_OUTPUT"
+                exit 0
+                ;;
+            esac
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::The CI run of this pull request has not finished yet. Re-run this job once it has."
+              exit 1
+            fi
+            sleep 60
+          done
+
+      - name: Check the latest CI run of the base branch
+        env:
+          OWN_CI_CONCLUSION: ${{ steps.own-ci.outputs.conclusion }}
+          OWN_CI_URL: ${{ steps.own-ci.outputs.url }}
+        run: |
+          latest=$(gh run list --branch "$BASE_REF" --workflow ci.yaml --event push --status completed --limit 100 \
+            --json conclusion,url --jq '[.[] | select(.conclusion != "cancelled")] | first // empty | "\(.conclusion) \(.url)"')
+          read -r conclusion url <<< "$latest"
+          if [ "$conclusion" = success ]; then
+            echo "The latest CI run of $BASE_REF passed: $url"
+            exit 0
+          fi
+          if [ -z "$conclusion" ]; then
+            reason="$BASE_REF has no completed CI run yet, so nothing shows it is green."
+          else
+            reason="The latest CI run of $BASE_REF ended with $conclusion: $url"
+          fi
+          if [ "$(gh api "repos/$GH_REPO/pulls/$NUMBER" --jq 'any(.labels[]; .name == env.FIX_LABEL)')" != true ]; then
+            echo "::error::$reason Merge the fix of $BASE_REF first, labelled $FIX_LABEL, then re-run this job."
+            exit 1
+          fi
+          if [ "$OWN_CI_CONCLUSION" != success ]; then
+            echo "::error::$reason $FIX_LABEL needs the CI run of this pull request to pass, and it ended with $OWN_CI_CONCLUSION: $OWN_CI_URL"
+            exit 1
+          fi
+          echo "::notice::$reason This pull request is labelled $FIX_LABEL and its CI run passed: $OWN_CI_URL"
