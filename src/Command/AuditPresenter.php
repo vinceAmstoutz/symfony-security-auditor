@@ -95,7 +95,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
             return;
         }
 
-        $symfonyStyle->getErrorStyle()->warning(UnpricedModelNotice::forEstimate(array_values($unsupportedModels)));
+        $symfonyStyle->getErrorStyle()->warning(UnpricedModelNotice::forEstimate($unsupportedModels));
     }
 
     #[Override]

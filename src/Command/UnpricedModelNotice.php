@@ -22,7 +22,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 final readonly class UnpricedModelNotice
 {
     /**
-     * @param list<string> $models
+     * @param array<string> $models
      */
     public static function forEstimate(array $models): string
     {
