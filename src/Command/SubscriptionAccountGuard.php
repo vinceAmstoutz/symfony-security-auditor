@@ -48,9 +48,9 @@ final readonly class SubscriptionAccountGuard implements UnpricedModelBudgetGuar
 
         $cliAgentAccount = $this->cliAgentAccountProbe->probe($this->subscriptionCli->platform(), $this->cliBinary);
         $errorStyle = $symfonyStyle->getErrorStyle();
-        $errorStyle->writeln(\sprintf(' Billing: %s', ProviderSetupLines::subscriptionBilling($this->subscriptionCli, $cliAgentAccount)));
-
         $warning = ProviderSetupLines::warningFor($this->subscriptionCli, $cliAgentAccount);
+        $errorStyle->writeln(\sprintf(null === $warning ? ' Billing: %s, not priced per call' : ' Billing: %s', ProviderSetupLines::subscriptionBilling($this->subscriptionCli, $cliAgentAccount)));
+
         if (null === $warning) {
             return true;
         }

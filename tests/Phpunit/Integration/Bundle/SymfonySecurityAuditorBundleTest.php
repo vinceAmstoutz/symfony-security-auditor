@@ -413,7 +413,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $bufferedOutput = new BufferedOutput();
         $unpricedModelBudgetGuard->permitsRun($input, new SymfonyStyle($input, $bufferedOutput));
 
-        self::assertStringContainsString('The audit runs on a subscription through the Claude Code CLI', (string) preg_replace('/[\s!]+/', ' ', $bufferedOutput->fetch()));
+        self::assertStringContainsString(', not priced per call', (string) preg_replace('/[\s!]+/', ' ', $bufferedOutput->fetch()));
     }
 
     /**
