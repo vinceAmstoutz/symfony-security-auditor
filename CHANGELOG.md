@@ -53,7 +53,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `doctor` warns about that placeholder or a model the Ollama server has not pulled; `audit:run` on Ollama notes a configured model the server has not pulled, in the binary and the bundle; an error from a provider that does not know the model names it and the setting that fixes it ([#733](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/733))
 - An interactive `init` preselects no answer to how you access AI models and which provider or subscription you use: an empty answer asks again. `init --no-interaction` still configures `anthropic` ([#752](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/752))
 - `audit:run --format=html` without `--output` on a terminal saves the report to a file only you can read in the temporary directory and prints a `file://` link to open it in a browser, instead of printing the HTML; piped or redirected, it still prints the HTML ([#757](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/757))
-- The console, HTML and Markdown reports of a run on a Claude or ChatGPT subscription show the subscription and plan the run checked it bills, such as `billed to your Claude subscription (team plan)`, in place of a `$0.0000` cost with a note about API keys. The account email stays out of the report
+- The console, HTML and Markdown reports of a run on a Claude or ChatGPT subscription show the subscription and plan the run checked it bills, such as `billed to your Claude subscription (team plan)`, in place of a `$0.0000` cost with a note about API keys. The account email stays out of the report ([#767](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/767))
 
 ### Bugfixes 🐛
 
