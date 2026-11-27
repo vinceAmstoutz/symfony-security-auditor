@@ -270,4 +270,11 @@ return [
         'reason' => 'The reviewer prompt version went from 4 to 5 for the rule that rejects test-only credentials, so a run no longer serves the verdicts 1.22.1 cached and reviews those findings again.',
         'changelog' => '#758',
     ],
+    [
+        'scenarios' => ['format/console-to-file', 'format/executive-to-file', 'format/github-comment-to-file', 'format/github-to-file', 'format/html-to-file', 'format/json-to-file', 'format/junit-to-file', 'format/markdown-to-file', 'format/sarif-to-file', 'output/config-key', 'output/dev-null', 'output/existing-file', 'output/missing-directory', 'output/relative-path', 'output/short-option', 'standalone/output-dev-null', 'standalone/output-file'],
+        'path' => 'runs.*.stdout.lines',
+        'match' => '/^(?:- \\[OK\\] Report saved to .+|\\+ Report saved to .+|-)$/',
+        'reason' => 'The saved report is named on a plain line whose path links to the file, in place of an [OK] block.',
+        'changelog' => '#999999',
+    ],
 ];

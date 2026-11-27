@@ -87,18 +87,83 @@ final class ReportWriterTest extends TestCase
      * @throws UnsafeReportWriteException
      * @throws ReportWriteFailedException
      */
-    public function test_writing_to_file_announces_save_path_via_success_message(): void
+    public function test_writing_to_file_announces_the_save_path_on_a_plain_line(): void
     {
         $bufferedOutput = new BufferedOutput();
-        $symfonyStyle = new SymfonyStyle(new StringInput(''), $bufferedOutput);
         $outputFile = $this->tmpDir.'/report.json';
 
-        $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $outputFile, $symfonyStyle);
+        $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $outputFile, new SymfonyStyle(new StringInput(''), $bufferedOutput));
 
-        $display = $bufferedOutput->fetch();
-        self::assertStringContainsString('[OK]', $display);
-        self::assertStringContainsString('Report saved to', $display);
-        self::assertStringContainsString($outputFile, $display);
+        self::assertSame(\sprintf(" Report saved to %s\n", $outputFile), $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_the_save_path_is_printed_literally_instead_of_as_console_markup(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $outputFile = $this->tmpDir.'/<error>report.json';
+
+        $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $outputFile, new SymfonyStyle(new StringInput(''), $bufferedOutput));
+
+        self::assertStringContainsString('/<error>report.json', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_the_save_path_links_to_the_report_file(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $outputFile = $this->tmpDir.'/report.json';
+
+        $this->reportWriter->write($this->makeReport(), OutputFormat::Json, $outputFile, new SymfonyStyle(new StringInput(''), $bufferedOutput));
+
+        self::assertStringContainsString("\e]8;;file://".$outputFile."\e\\", $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_a_relative_save_path_links_to_the_report_file_under_the_working_directory(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $workingDirectory = (string) getcwd();
+        chdir($this->tmpDir);
+
+        try {
+            $this->reportWriter->write($this->makeReport(), OutputFormat::Json, 'report.json', new SymfonyStyle(new StringInput(''), $bufferedOutput));
+        } finally {
+            chdir($workingDirectory);
+        }
+
+        self::assertStringContainsString("\e]8;;file://".$this->tmpDir."/report.json\e\\", $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_a_temporary_html_report_is_announced_on_one_plain_line(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $this->tmpDir, standardOutput: $this->standardOutput(isTerminal: true));
+
+        $reportWriter->write($this->makeReport(), OutputFormat::Html, null, new SymfonyStyle(new StringInput(''), $bufferedOutput));
+
+        self::assertSame(\sprintf(" Report saved, open it in your browser: file://%s\n", $this->savedHtmlReports()[0]), $bufferedOutput->fetch());
     }
 
     /**
