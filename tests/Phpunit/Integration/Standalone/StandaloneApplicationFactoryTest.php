@@ -989,7 +989,7 @@ final class StandaloneApplicationFactoryTest extends TestCase
         $display = (string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay());
         self::assertSame(
             [true, false, false],
-            [str_contains($display, 'or a .symfony-security-auditor.yaml in the project'), str_contains($display, 'config/packages/'), str_contains($display, '[default: "console"]')],
+            [str_contains($display, 'or a .symfony-security-auditor.yaml in the folder you run from or in the project'), str_contains($display, 'config/packages/'), str_contains($display, '[default: "console"]')],
             $display,
         );
     }

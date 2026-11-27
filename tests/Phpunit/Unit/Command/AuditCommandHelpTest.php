@@ -27,7 +27,7 @@ final class AuditCommandHelpTest extends TestCase
 {
     private const string BUNDLE_CONFIGURATION = 'via <info>config/packages/symfony_security_auditor.yaml</info>.';
 
-    private const string STANDALONE_CONFIGURATION = 'via the <info>config.yaml</info> <info>init</info> writes, or a <info>.symfony-security-auditor.yaml</info> in the project.';
+    private const string STANDALONE_CONFIGURATION = "via the <info>config.yaml</info> <info>init</info> writes, or a <info>.symfony-security-auditor.yaml</info>\n        in the folder you run from or in the project.";
 
     private const string CONFIGURATION = '<configuration>';
 
