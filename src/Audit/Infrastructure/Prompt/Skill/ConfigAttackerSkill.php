@@ -71,6 +71,7 @@ final readonly class ConfigAttackerSkill implements AttackerSkillInterface
             Do NOT flag:
             - Environment-variable references like `%env(DATABASE_URL)%` — those are externalized, not hardcoded.
             - `_profiler` / `_wdt` declarations gated by `when@dev` / `when@test`.
+            - A credential only a test or dev environment reads: under `when@test` or `when@dev`, in `config/packages/test/` or `config/packages/dev/`, in `.env.test` or `.env.dev`, or a user of an in-memory provider declared there. Production never loads it; report it only when production reads the same value.
             - `framework.messenger.transports.*.serializer: messenger.transport.symfony_serializer` — an explicit, safer opt-in (not Messenger's default).
             </skills>
             SKILL;
