@@ -43,6 +43,7 @@ final readonly class FormAttackerSkill implements AttackerSkillInterface
             - `EntityType` choice queries unscoped by ownership — attacker can select any other tenant's row.
             - Data transformers that `unserialize` / `json_decode` raw input without strict mode.
             - Missing `'constraints'` on free-form fields that flow into the database or shell.
+            - {requires symfony>=8.2} A `PolymorphicCollectionType` (Symfony ≥ 8.2) whose `entry_types` list a form type with privileged fields while `allow_add` is on: the submitter picks the type of each entry, so every listed type is reachable from every form using the collection.
             Do NOT flag:
             - Forms with the default CSRF token (Symfony enables it by default — only explicit `false` is the smell).
             - Fields declared `mapped: false` and re-validated by a constraint — those don't reach the entity setter.

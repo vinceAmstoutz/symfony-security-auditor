@@ -178,6 +178,15 @@ final class ConsoleProgressReporterTest extends TestCase
         self::assertStringContainsString('✗ chunk 2/3 failed (12s) — tool-call limit reached (audit.max_tool_iterations)', $this->bufferedOutput->fetch());
     }
 
+    public function test_it_names_the_files_a_failed_chunk_left_unanalyzed(): void
+    {
+        $this->consoleProgressReporter->report('pipeline.started', ['stages' => ['audit']]);
+        $this->consoleProgressReporter->report('stage.started', ['stage' => 'audit']);
+        $this->consoleProgressReporter->report('attacker.chunk.completed', ['chunk' => 2, 'total_chunks' => 3, 'elapsed_seconds' => 12.0, 'status' => 'errored', 'files' => ['src/Huge.php', 'src/Other.php'], 'reason' => 'the file is too large']);
+
+        self::assertStringContainsString('✗ chunk 2/3 failed (12s) — src/Huge.php, src/Other.php: the file is too large', $this->bufferedOutput->fetch());
+    }
+
     public function test_a_forged_console_tag_in_a_failure_reason_is_not_rendered_as_console_markup(): void
     {
         $bufferedOutput = new BufferedOutput(decorated: true);

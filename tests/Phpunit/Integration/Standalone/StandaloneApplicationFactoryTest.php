@@ -626,6 +626,7 @@ final class StandaloneApplicationFactoryTest extends TestCase
     }
 
     #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_a_malformed_config_of_the_working_directory_stops_the_run_before_the_one_of_the_project_it_names_is_read(): void
     {
         $workingDirectory = $this->configHome.'/working';
