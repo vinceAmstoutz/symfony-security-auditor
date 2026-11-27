@@ -63,6 +63,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - The `attacker.chunk.completed` progress event of a failed chunk lists the files it left unanalyzed under `files` ([#756](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/756))
 - `audit:run` no longer prints the fixed `Pipeline:` line under the project path; `-v` still shows it ([#760](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/760))
 - `audit:run` on a Claude or ChatGPT subscription says on its `Billing:` line that the run is not priced per call, in place of a separate warning block, unless the CLI cannot tell which account it bills. With `audit.budget.max_cost_usd` set, or an API key billing instead, the warnings stay ([#761](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/761))
+- `audit:run` says where it saved the report on a plain line whose path links to the file, in place of a green `[OK]` block stacked on the verdict, so a failed run no longer reads as a success. The temporary HTML report gets one line with its `file://` link ([#765](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/765))
 - The console, HTML and Markdown reports of a run on a Claude or ChatGPT subscription show the subscription and plan the run checked it bills, such as `billed to your Claude subscription (team plan)`, in place of a `$0.0000` cost with a note about API keys. The account email stays out of the report ([#767](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/767))
 
 ### Bugfixes 🐛
