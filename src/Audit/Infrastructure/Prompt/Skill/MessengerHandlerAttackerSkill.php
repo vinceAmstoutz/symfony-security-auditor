@@ -46,6 +46,8 @@ final readonly class MessengerHandlerAttackerSkill implements AttackerSkillInter
             - Handler swallowing exceptions silently → poisoned messages re-driven infinitely.
             - A CQRS command or query handler on the bus that takes the acting user or tenant from the message while the message is built from request data, or that authorizes through `Security::getUser()` and skips the check when it is `null` — on an async transport the worker runs it with no token.
             - Privileged action triggered solely by message presence with no authorization (`InvalidateUserCommand`, `PromoteToAdmin`, etc.).
+            - {requires symfony>=8.2} A `StampHeaderMapperInterface` for `InteropSerializer` (Symfony ≥ 8.2) rebuilding a tenant, user or `TrustStamp` from a plain message header, or a handler trusting a `PropagatedStampInterface` stamp (tenant or user id) on a message from a transport other applications write to: the producer chooses the identity the handler acts for.
+            - {requires symfony>=8.2} A `ClaimCheckSerializer` wrapped in a `SigningSerializer` instead of wrapping it (Symfony ≥ 8.2): only the claim reference is signed, the stored body is not, so a spoofed type header bypasses the signature.
             Do NOT flag:
             - Handlers using a transport explicitly configured with `messenger.transport.symfony_serializer` — well-typed via Symfony Serializer (this is an opt-in, not Messenger's default).
             - {requires symfony>=8.2} Missing idempotency on a handler whose messages are deduplicated by the transport `inbox` option (Symfony ≥ 8.2) or a `DeduplicateStamp`.

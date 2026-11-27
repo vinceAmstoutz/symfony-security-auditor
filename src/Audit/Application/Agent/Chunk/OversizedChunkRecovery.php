@@ -107,7 +107,7 @@ final readonly class OversizedChunkRecovery
      */
     private function failSingleFile(ProjectFile $projectFile, ChunkContext $chunkContext, string $reason, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
     {
-        ChunkCoverageRecorder::recordErrored([$projectFile], ChunkFailureReason::FILE_TOO_LARGE, $coverageRecorder);
+        ChunkCoverageRecorder::recordErrored([$projectFile], ChunkFailureReason::fileTooLarge($projectFile, $chunkContext->promptedFileBytes), $coverageRecorder);
 
         $bytes = $chunkContext->promptedFileBytes;
         $promptBytes = \strlen($chunkContext->systemPrompt) + \strlen($chunkContext->userMessage);
