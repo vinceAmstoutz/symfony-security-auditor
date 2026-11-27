@@ -22,8 +22,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ClaudeCodeSubscriptionCli;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CodexSubscriptionCli;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionCliInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionClis;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\HiddenInputUnavailableException;
@@ -36,12 +34,16 @@ final readonly class AuthSetCommand
 
     public const string DESCRIPTION = 'Store the provider API key on this machine, in a file only you can read';
 
+    private SubscriptionClis $subscriptionClis;
+
     public function __construct(
         private CredentialStoreInterface $credentialStore,
         private ConfiguredCredentialVariable $configuredCredentialVariable,
         private CredentialPromptInterface $credentialPrompt = new HiddenCredentialPrompt(),
-        private SubscriptionClis $subscriptionClis = new SubscriptionClis(new ClaudeCodeSubscriptionCli(), new CodexSubscriptionCli()),
-    ) {}
+        ?SubscriptionClis $subscriptionClis = null,
+    ) {
+        $this->subscriptionClis = $subscriptionClis ?? SubscriptionClis::bundled();
+    }
 
     public function __invoke(
         SymfonyStyle $symfonyStyle,

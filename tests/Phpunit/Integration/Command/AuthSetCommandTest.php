@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\C
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemCredentialStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionClis;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthSetCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingCredentialPrompt;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\UnhideableCredentialPrompt;
@@ -171,6 +172,17 @@ final class AuthSetCommandTest extends TestCase
     {
         yield 'ChatGPT through the Codex CLI' => ["provider: codex\nplatform:\n    codex: {}\nmodel: gpt-6.2-sol\n", 'Run "codex login" to sign in to your ChatGPT subscription, or name a variable with --env-var to store a key anyway.'];
         yield 'Claude through the Claude Code CLI' => ["provider: claudecode\nplatform:\n    claudecode: {}\nmodel: opus\n", 'Run "claude auth login" to sign in to your Claude subscription'];
+    }
+
+    public function test_it_names_the_sign_in_only_of_the_subscription_clis_it_is_given(): void
+    {
+        $this->writeConfig("provider: claudecode\nplatform:\n    claudecode: {}\nmodel: opus\n");
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null);
+        $commandTester = new CommandTester(new AuthSetCommand(new FilesystemCredentialStore($xdgConfigPathResolver), new ConfiguredCredentialVariable($xdgConfigPathResolver), subscriptionClis: new SubscriptionClis()));
+
+        $commandTester->execute([], ['interactive' => false]);
+
+        self::assertStringContainsString('The configured platform needs no API key, so there is none to store. Name one explicitly with --env-var to store a key anyway.', $this->flattened($commandTester));
     }
 
     public function test_it_refuses_an_empty_answer_rather_than_storing_nothing(): void
