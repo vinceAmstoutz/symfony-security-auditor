@@ -36,6 +36,7 @@ final readonly class ReviewerPromptSections implements ReviewerPromptSectionsInt
         - `Process` instantiated with a hardcoded argv array — no shell interpolation occurs.
         - Twig `{{ value }}` interpolation in HTML context — auto-escape covers this. Only `|raw`, broken `autoescape`, or wrong-context output (URL, JS) qualify.
         - `_profiler` / `_wdt` routes gated by `when@dev` / `when@test`.
+        - A credential only a test or dev environment reads: under `when@test` or `when@dev`, in `config/packages/test/` or `config/packages/dev/`, in `.env.test` or `.env.dev`, in fixtures, or a user of an in-memory provider declared there. Production never loads it. Find the enclosing `when@` key in the Full File Context; keep the finding when production reads the same value.
         - Form fields with `mapped: false` whose constraints validate the input — they never reach the entity setter.
         - Reflected user input echoed back as plain text inside a `Response` of `Content-Type: text/plain` (no HTML execution surface).
         - Webhook handlers calling `hash_equals($expected, $received)` against a configured secret — that IS the constant-time check.
