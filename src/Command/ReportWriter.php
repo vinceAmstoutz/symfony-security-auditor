@@ -14,10 +14,12 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Override;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Path;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\PrivateFileWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\SymlinkGuard;
@@ -88,7 +90,7 @@ final readonly class ReportWriter implements ReportWriterInterface
             throw ReportWriteFailedException::fromIOException($outputFile, $ioException);
         }
 
-        $symfonyStyle->success(\sprintf('Report saved to %s', $outputFile));
+        $symfonyStyle->writeln(\sprintf(' Report saved to <href=%s>%s</>', FileUrl::of($this->absolute($outputFile)), OutputFormatter::escape($outputFile)));
     }
 
     /**
@@ -119,6 +121,11 @@ final readonly class ReportWriter implements ReportWriterInterface
         }
     }
 
+    private function absolute(string $path): string
+    {
+        return Path::isAbsolute($path) ? $path : Path::join((string) getcwd(), $path);
+    }
+
     private function linkFromATemporaryFile(SymfonyStyle $symfonyStyle, string $content): void
     {
         try {
@@ -130,10 +137,7 @@ final readonly class ReportWriter implements ReportWriterInterface
             return;
         }
 
-        $url = FileUrl::of($path);
-
-        $symfonyStyle->success(\sprintf('Report saved to %s', $path));
-        $symfonyStyle->writeln(\sprintf(' Open it in your browser: <href=%1$s>%1$s</>', $url));
+        $symfonyStyle->writeln(\sprintf(' Report saved, open it in your browser: <href=%1$s>%1$s</>', FileUrl::of($path)));
     }
 
     /**
