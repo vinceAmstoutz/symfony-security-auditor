@@ -42,7 +42,7 @@ final readonly class AuditCommandHelp
           <info>%command.full_name% --dry-run</info>                          estimate the cost first
           <info>%command.full_name% -f sarif -o report.sarif</info>           write a SARIF report
           <info>%command.full_name% --generate-baseline=baseline.json</info>  accept the current findings
-          <info>%command.full_name% --baseline=baseline.json</info>           then report only new ones
+          <info>%command.full_name% --baseline=baseline.json</info>           then report and gate on new ones only
         <info>--no-output</info> prints the report when <info>audit.output</info> names a file.
 
         Exit codes:
