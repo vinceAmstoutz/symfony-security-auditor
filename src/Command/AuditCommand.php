@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\MapInput;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\AuditAbortedByBudgetException;
@@ -83,6 +84,7 @@ final readonly class AuditCommand
         private AuditCommandDefaults $auditCommandDefaults = new AuditCommandDefaults(),
         private BaselineFilePathsHolder $baselineFilePathsHolder = new BaselineFilePathsHolder(),
         private ?PulledModelNotice $pulledModelNotice = null,
+        private CommandOutputHolder $commandOutputHolder = new CommandOutputHolder(),
     ) {}
 
     /**
@@ -91,9 +93,11 @@ final readonly class AuditCommand
      */
     public function __invoke(
         InputInterface $input,
+        OutputInterface $output,
         SymfonyStyle $symfonyStyle,
         #[MapInput] AuditCommandInput $auditCommandInput,
     ): int {
+        $this->commandOutputHolder->set($output);
         $auditCommandInput->applyDefaults($this->auditCommandDefaults);
 
         $auditTarget = AuditTarget::named($auditCommandInput->resolvedProjectPath(), $auditCommandInput->scanPaths(), $this->holdsScanFiles(...));
