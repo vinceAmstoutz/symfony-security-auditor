@@ -43,9 +43,20 @@ final class UnpricedModelBudgetGuardTest extends TestCase
         self::assertStringNotContainsString('audit.budget.max_cost_usd', $rendered);
     }
 
-    public function test_it_says_a_subscription_is_not_priced_per_call_rather_than_suspecting_a_typo(): void
+    public function test_it_leaves_a_subscription_without_a_cost_budget_to_the_billing_line(): void
     {
         $unpricedModelBudgetGuard = new UnpricedModelBudgetGuard($this->pricingKnowing(), ['claude-opus-5-5'], null, 'claudecode');
+        $bufferedOutput = new BufferedOutput();
+        $input = $this->nonInteractiveInput();
+
+        $permitted = $unpricedModelBudgetGuard->permitsRun($input, new SymfonyStyle($input, $bufferedOutput));
+
+        self::assertSame([true, ''], [$permitted, $bufferedOutput->fetch()]);
+    }
+
+    public function test_with_a_cost_budget_it_says_a_subscription_is_not_priced_per_call_rather_than_suspecting_a_typo(): void
+    {
+        $unpricedModelBudgetGuard = new UnpricedModelBudgetGuard($this->pricingKnowing(), ['claude-opus-5-5'], 5.0, 'claudecode');
         $bufferedOutput = new BufferedOutput();
         $input = $this->nonInteractiveInput();
         $unpricedModelBudgetGuard->permitsRun($input, new SymfonyStyle($input, $bufferedOutput));
