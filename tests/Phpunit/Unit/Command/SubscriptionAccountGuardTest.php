@@ -142,6 +142,18 @@ final class SubscriptionAccountGuardTest extends TestCase
     /**
      * @throws RunRefusedException
      */
+    public function test_it_says_the_subscription_is_not_priced_per_call_when_the_cli_cannot_tell_which_account_it_bills(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+
+        $this->guard(CliAgentAccount::unknown('"claude auth status" failed'))->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), $bufferedOutput));
+
+        self::assertStringContainsString(', not priced per call', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws RunRefusedException
+     */
     public function test_it_refuses_an_unattended_run_while_the_cli_is_not_logged_in(): void
     {
         $this->expectExceptionObject(RunRefusedException::because('Run "claude auth login" to log the Claude Code CLI in to your Claude subscription before an audit.'));
