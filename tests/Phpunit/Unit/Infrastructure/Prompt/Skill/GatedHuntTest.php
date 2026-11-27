@@ -103,5 +103,20 @@ final class GatedHuntTest extends TestCase
         yield 'nosql operator injection' => [new RepositoryAttackerSkill(), 'NoSQL operator injection', ['doctrine/mongodb-odm' => '2.10.0']];
         yield 'query extensions scoping some operations' => [new RepositoryAttackerSkill(), 'leak through the operation it skips', ['api-platform/doctrine-orm' => 'v4.2.0']];
         yield 'state processors saving rewritten owners' => [new UseCaseAttackerSkill(), '`securityPostDenormalize`', ['api-platform/core' => 'v3.4.0']];
+        yield 'weakened oidc logins' => [new ConfigAttackerSkill(), '`id_token_signature.required: false`', $symfony82];
+        yield 'user checkers that only run at login' => [new ConfigAttackerSkill(), 'without `user_checker_on_refresh: true`', $symfony82];
+        yield 'role hierarchy wildcards' => [new ConfigAttackerSkill(), 'every role matching the pattern gets it', $symfony82];
+        yield 'stretched recent authentication windows' => [new ConfigAttackerSkill(), 'step-up checks ask for nothing', $symfony82];
+        yield 'mail encryption falling back to clear text' => [new ConfigAttackerSkill(), 'without `on_missing_certificate: fail`', [...$symfony82, 'symfony/mailer' => 'v8.2.0']];
+        yield 'http recorder outside tests' => [new ConfigAttackerSkill(), 'written to HAR files with their secrets', $symfony82];
+        yield 'default serializer groups' => [new ConfigAttackerSkill(), 'every property without `#[Groups]` joins the `Default` group', $symfony82];
+        yield 'routes pinned to a firewall' => [new ControllerAttackerSkill(), 'the route picks its firewall', $symfony82];
+        yield 'targeted cache directives' => [new ControllerAttackerSkill(), 'the CDN follows it over `Cache-Control: private`', $symfony82];
+        yield 'missing oauth2 scopes' => [new ControllerAttackerSkill(), 'a token granted a read-only scope can write', $symfony82];
+        yield 'object mapper mass assignment' => [new PhpAttackerSkill(), 'mass assignment one hop away from the payload', ['symfony/object-mapper' => 'v8.2.0']];
+        yield 'polymorphic form collections' => [new FormAttackerSkill(), 'the submitter picks the type of each entry', $symfony82];
+        yield 'stamps rebuilt from foreign headers' => [new MessengerHandlerAttackerSkill(), 'the producer chooses the identity the handler acts for', $symfony82];
+        yield 'claim checks signed from outside' => [new MessengerHandlerAttackerSkill(), 'only the claim reference is signed', $symfony82];
+        yield 'html translations with user attributes' => [new TemplateAttackerSkill(), 'attribute values are escaped but their scheme is not checked', $symfony82];
     }
 }
