@@ -336,6 +336,13 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringContainsString('messenger.transport.symfony_serializer', $prompt);
     }
 
+    public function test_false_positive_playbook_rejects_a_credential_only_a_test_or_dev_environment_reads(): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('A credential only a test or dev environment reads', $prompt);
+    }
+
     public function test_system_prompt_includes_tool_usage_discipline(): void
     {
         $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();

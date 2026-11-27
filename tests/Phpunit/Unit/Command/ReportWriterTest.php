@@ -44,6 +44,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteExce
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\StandardOutputInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\WorkflowCommandNeutralizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command\Fixture\DiscardDevice;
@@ -69,7 +70,7 @@ final class ReportWriterTest extends TestCase
             new HtmlReportRenderer(),
             new MarkdownReportRenderer(),
             new JunitReportRenderer(),
-        ], $this->filesystem);
+        ], $this->filesystem, standardOutput: $this->standardOutput(isTerminal: false));
         $this->tmpDir = sys_get_temp_dir().'/report_writer_test_'.uniqid('', true);
         $this->filesystem->mkdir($this->tmpDir);
     }
@@ -288,6 +289,91 @@ final class ReportWriterTest extends TestCase
         $display = $bufferedOutput->fetch();
         self::assertStringContainsString('<!doctype html>', $display);
         self::assertStringContainsString('Security Audit Report', $display);
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_the_link_to_a_temporary_html_report_encodes_a_space_in_its_path(): void
+    {
+        $temporaryDirectory = $this->tmpDir.'/with space';
+        $this->filesystem->mkdir($temporaryDirectory);
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $temporaryDirectory, standardOutput: $this->standardOutput(isTerminal: true));
+
+        $reportWriter->write($this->makeReport(), OutputFormat::Html, null, new SymfonyStyle(new StringInput(''), $bufferedOutput));
+
+        self::assertStringContainsString('/with%20space/symfony-security-auditor-report-', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_an_html_report_that_cannot_reach_a_temporary_file_is_printed(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $this->tmpDir.'/missing', standardOutput: $this->standardOutput(isTerminal: true));
+
+        $reportWriter->write($this->makeReport(), OutputFormat::Html, null, new SymfonyStyle(new StringInput(''), $bufferedOutput));
+
+        self::assertStringContainsString('<!doctype html>', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_the_temporary_html_report_is_readable_by_its_owner_only(): void
+    {
+        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $this->tmpDir, standardOutput: $this->standardOutput(isTerminal: true));
+
+        $reportWriter->write($this->makeReport(), OutputFormat::Html, null, new SymfonyStyle(new StringInput(''), new BufferedOutput(decorated: true)));
+
+        $savedReports = $this->savedHtmlReports();
+        self::assertSame(0o600, fileperms($savedReports[0]) & 0o777);
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_an_html_report_for_a_terminal_without_colours_is_still_saved_to_a_temporary_file(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: false);
+        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $this->tmpDir, standardOutput: $this->standardOutput(isTerminal: true));
+
+        $reportWriter->write($this->makeReport(), OutputFormat::Html, null, new SymfonyStyle(new StringInput(''), $bufferedOutput));
+
+        self::assertStringContainsString('file://', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    public function test_an_html_report_for_a_terminal_is_saved_to_a_temporary_file_it_links_to(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $this->tmpDir, standardOutput: $this->standardOutput(isTerminal: true));
+
+        $reportWriter->write($this->makeReport(), OutputFormat::Html, null, new SymfonyStyle(new StringInput(''), $bufferedOutput));
+
+        $savedReports = $this->savedHtmlReports();
+        self::assertCount(1, $savedReports);
+        self::assertStringContainsString('<!doctype html>', (string) file_get_contents($savedReports[0]));
+        self::assertStringContainsString('file://'.$savedReports[0], $bufferedOutput->fetch());
     }
 
     /**
@@ -723,5 +809,23 @@ final class ReportWriterTest extends TestCase
         $this->expectException(ReportWriteFailedException::class);
 
         $this->reportWriter->assertWritable($this->tmpDir, $this->tmpDir);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function savedHtmlReports(): array
+    {
+        $paths = glob($this->tmpDir.'/*.html');
+
+        return false === $paths ? [] : $paths;
+    }
+
+    private function standardOutput(bool $isTerminal): StandardOutputInterface
+    {
+        $standardOutput = self::createStub(StandardOutputInterface::class);
+        $standardOutput->method('isTerminal')->willReturn($isTerminal);
+
+        return $standardOutput;
     }
 }
