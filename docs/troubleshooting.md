@@ -296,7 +296,7 @@ The chunk's files are recorded as errored, left out of the cache and counted und
 | `the model returned no content` | Retry; switch model if every chunk fails. |
 | `the answer was not valid JSON` | See [`Failed to parse …`](#failed-to-parse-attacker-agent-json-response--failed-to-parse-reviewer-response). |
 | `a finding the record tool refused was never recorded again` | The model never repeated a refused `record_vulnerability` call, so that finding is lost. Retry; switch model if every chunk fails. |
-| `the file is too large for the model input limit` | See [`prompt is too long`](#prompt-is-too-long--context_length_exceeded--http-413). |
+| `the file is too large for the model input limit: …` | The rest of the line names the fix: `turn on audit.code_slicing.enabled` (only for a PHP file the run did not slice), `use a model with a larger context window` and `set scan.max_file_size_kb below N to skip it`, where `N` is the size of the file in KB. See [`prompt is too long`](#prompt-is-too-long--context_length_exceeded--http-413). |
 | any other message | An unexpected failure; the run went on. Read the message (also in the Symfony log). |
 
 ### `Audit incomplete: N file(s) could not be fully analyzed`
