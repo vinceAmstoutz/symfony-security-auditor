@@ -40,6 +40,18 @@ final class SubscriptionAccountGuardTest extends TestCase
         self::assertStringContainsString('Billing: your Claude subscription (max plan, dev@example.com)', (string) preg_replace('/\s+/', ' ', $bufferedOutput->fetch()));
     }
 
+    /**
+     * @throws RunRefusedException
+     */
+    public function test_it_says_on_the_billing_line_that_the_subscription_is_not_priced_per_call(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+
+        $this->guard(CliAgentAccount::subscription('max plan, dev@example.com'))->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), $bufferedOutput));
+
+        self::assertStringContainsString('Billing: your Claude subscription (max plan, dev@example.com), not priced per call', (string) preg_replace('/\s+/', ' ', $bufferedOutput->fetch()));
+    }
+
     public function test_it_says_in_its_header_which_api_key_it_refuses_to_bill(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -47,7 +59,7 @@ final class SubscriptionAccountGuardTest extends TestCase
         try {
             $this->guard(CliAgentAccount::apiKey('apiKeyHelper', 'Stop it.'))->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), $bufferedOutput));
         } catch (RunRefusedException) {
-            self::assertStringContainsString('Billing: the API key in apiKeyHelper, not your Claude subscription', (string) preg_replace('/\s+/', ' ', $bufferedOutput->fetch()));
+            self::assertStringContainsString(" Billing: the API key in apiKeyHelper, not your Claude subscription\n", $bufferedOutput->fetch());
 
             return;
         }
