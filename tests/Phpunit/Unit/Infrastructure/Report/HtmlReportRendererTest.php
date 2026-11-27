@@ -26,6 +26,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassif
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\BilledSubscriptionHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 
@@ -222,6 +223,20 @@ final class HtmlReportRendererTest extends AbstractReportRendererTestCase
         $output = (new HtmlReportRenderer(subscription: 'your ChatGPT subscription'))->render($this->makeReportWithCost(AuditCost::of(100, 50, 0.0, 'gpt-6-luna')));
 
         self::assertStringContainsString('$0.0000 (not priced per call: billed to your ChatGPT subscription, or to an API key the CLI uses in its place)', $output);
+    }
+
+    /**
+     * @throws InvalidAuditCostException
+     * @throws InvalidAuditContextException
+     */
+    public function test_render_names_only_the_subscription_the_run_was_billed_to_once_it_is_known(): void
+    {
+        $billedSubscriptionHolder = new BilledSubscriptionHolder();
+        $billedSubscriptionHolder->set('your Claude subscription (team plan)');
+
+        $output = (new HtmlReportRenderer(subscription: 'your Claude subscription', billedSubscriptionHolder: $billedSubscriptionHolder))->render($this->makeReportWithCost(AuditCost::of(100, 50, 0.0, 'claude-opus-5-5')));
+
+        self::assertStringContainsString('<dd>billed to your Claude subscription (team plan)</dd>', $output);
     }
 
     /**

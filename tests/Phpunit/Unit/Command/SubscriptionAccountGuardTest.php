@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Console\Input\ArrayInput;
@@ -21,6 +22,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ClaudeCodeSubscriptionCli;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentAccount;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentAccountProbeInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\BilledSubscriptionHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\RunRefusedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\SubscriptionAccountGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
@@ -38,6 +40,52 @@ final class SubscriptionAccountGuardTest extends TestCase
         $this->guard(CliAgentAccount::subscription('max plan, dev@example.com'))->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), $bufferedOutput));
 
         self::assertStringContainsString('Billing: your Claude subscription (max plan, dev@example.com)', (string) preg_replace('/\s+/', ' ', $bufferedOutput->fetch()));
+    }
+
+    /**
+     * @throws RunRefusedException
+     */
+    public function test_it_hands_the_reports_the_plan_it_bills_without_the_account(): void
+    {
+        $billedSubscriptionHolder = new BilledSubscriptionHolder();
+
+        $this->guard(CliAgentAccount::subscription('max plan, dev@example.com', 'max plan'), $billedSubscriptionHolder)->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), new BufferedOutput()));
+
+        self::assertSame('your Claude subscription (max plan)', $billedSubscriptionHolder->billedSubscription());
+    }
+
+    /**
+     * @throws RunRefusedException
+     */
+    #[DataProvider('accountsAndTheSubscriptionReportsName')]
+    public function test_it_hands_the_reports_only_the_subscription_it_knows_it_bills(CliAgentAccount $cliAgentAccount, ?string $billedSubscription): void
+    {
+        $billedSubscriptionHolder = new BilledSubscriptionHolder();
+
+        $this->guard($cliAgentAccount, $billedSubscriptionHolder)->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), new BufferedOutput()));
+
+        self::assertSame($billedSubscription, $billedSubscriptionHolder->billedSubscription());
+    }
+
+    /**
+     * @throws RunRefusedException
+     */
+    public function test_an_unattended_run_hands_the_reports_the_plan_it_bills(): void
+    {
+        $billedSubscriptionHolder = new BilledSubscriptionHolder();
+
+        $this->guard(CliAgentAccount::subscription('max plan, dev@example.com', 'max plan'), $billedSubscriptionHolder)->assertUnattendedRunPermitted(new NullLogger());
+
+        self::assertSame('your Claude subscription (max plan)', $billedSubscriptionHolder->billedSubscription());
+    }
+
+    /**
+     * @return iterable<string, array{CliAgentAccount, ?string}>
+     */
+    public static function accountsAndTheSubscriptionReportsName(): iterable
+    {
+        yield 'no plan' => [CliAgentAccount::subscription(null), 'your Claude subscription'];
+        yield 'unknown account' => [CliAgentAccount::unknown('"claude auth status" failed'), null];
     }
 
     public function test_it_says_in_its_header_which_api_key_it_refuses_to_bill(): void
@@ -162,13 +210,13 @@ final class SubscriptionAccountGuardTest extends TestCase
         self::assertSame([], $warningCollectingLogger->warnings);
     }
 
-    private function guard(CliAgentAccount $cliAgentAccount): SubscriptionAccountGuard
+    private function guard(CliAgentAccount $cliAgentAccount, BilledSubscriptionHolder $billedSubscriptionHolder = new BilledSubscriptionHolder()): SubscriptionAccountGuard
     {
         $unpricedModelBudgetGuard = self::createStub(UnpricedModelBudgetGuardInterface::class);
         $unpricedModelBudgetGuard->method('permitsRun')->willReturn(true);
         $cliAgentAccountProbe = self::createStub(CliAgentAccountProbeInterface::class);
         $cliAgentAccountProbe->method('probe')->willReturn($cliAgentAccount);
 
-        return new SubscriptionAccountGuard($unpricedModelBudgetGuard, new ClaudeCodeSubscriptionCli(), null, $cliAgentAccountProbe);
+        return new SubscriptionAccountGuard($unpricedModelBudgetGuard, new ClaudeCodeSubscriptionCli(), null, $cliAgentAccountProbe, $billedSubscriptionHolder);
     }
 }

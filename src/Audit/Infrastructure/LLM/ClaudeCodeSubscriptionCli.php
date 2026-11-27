@@ -156,12 +156,10 @@ final readonly class ClaudeCodeSubscriptionCli implements SubscriptionCliInterfa
             return CliAgentAccount::apiKey($apiKeySource, $this->remedy($apiKeySource));
         }
 
-        $account = array_filter([
-            \is_string($status['subscriptionType'] ?? null) ? \sprintf('%s plan', $status['subscriptionType']) : null,
-            \is_string($status['email'] ?? null) ? $status['email'] : null,
-        ], static fn (?string $part): bool => null !== $part);
+        $plan = \is_string($status['subscriptionType'] ?? null) ? \sprintf('%s plan', $status['subscriptionType']) : null;
+        $account = array_filter([$plan, \is_string($status['email'] ?? null) ? $status['email'] : null], static fn (?string $part): bool => null !== $part);
 
-        return CliAgentAccount::subscription([] === $account ? null : implode(', ', $account));
+        return CliAgentAccount::subscription([] === $account ? null : implode(', ', $account), $plan);
     }
 
     private function remedy(string $apiKeySource): string

@@ -48,6 +48,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Unob
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ProcessCliAgentAccountProbe;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionCliInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionClis;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\BilledSubscriptionHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
@@ -248,7 +249,7 @@ final readonly class StandaloneContainerFactory
         $settings = $standalonePlatformConfig->platform[$cliAgent] ?? null;
         $containerBuilder->register(SubscriptionAccountGuard::class, SubscriptionAccountGuard::class)
             ->setDecoratedService(UnpricedModelBudgetGuardInterface::class)
-            ->setArguments([new Reference('.inner'), new Definition($subscriptionCli::class), \is_array($settings) ? ($settings['cli_binary'] ?? null) : null, new Definition(ProcessCliAgentAccountProbe::class)]);
+            ->setArguments([new Reference('.inner'), new Definition($subscriptionCli::class), \is_array($settings) ? ($settings['cli_binary'] ?? null) : null, new Definition(ProcessCliAgentAccountProbe::class), new Reference(BilledSubscriptionHolder::class)]);
     }
 
     private function registerAuditHeaderBanner(ContainerBuilder $containerBuilder, StandalonePlatformConfig $standalonePlatformConfig): void

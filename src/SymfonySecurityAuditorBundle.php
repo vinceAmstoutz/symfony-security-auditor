@@ -103,6 +103,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\UsageBookingCl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfiguredAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\BilledSubscriptionHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
@@ -268,7 +269,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
 
         $servicesConfigurator->set(SubscriptionAccountGuard::class)
             ->decorate(UnpricedModelBudgetGuardInterface::class)
-            ->args([service('.inner'), inline_service($subscriptionCli::class), $cliBinary, inline_service(ProcessCliAgentAccountProbe::class)]);
+            ->args([service('.inner'), inline_service($subscriptionCli::class), $cliBinary, inline_service(ProcessCliAgentAccountProbe::class), service(BilledSubscriptionHolder::class)]);
     }
 
     private function registerSubscriptionPricing(ServicesConfigurator $servicesConfigurator, ?string $cliAgent): void
