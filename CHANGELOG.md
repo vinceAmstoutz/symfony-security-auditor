@@ -52,6 +52,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `init --no-interaction` without `--model` picks the first model Ollama pulled and warns when it writes `claude-opus-5-5` as a placeholder for a provider it cannot list models for, marking that line of `config.yaml` with a comment ([#733](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/733))
 - `doctor` warns about that placeholder or a model the Ollama server has not pulled; `audit:run` on Ollama notes a configured model the server has not pulled, in the binary and the bundle; an error from a provider that does not know the model names it and the setting that fixes it ([#733](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/733))
 - An interactive `init` preselects no answer to how you access AI models and which provider or subscription you use: an empty answer asks again. `init --no-interaction` still configures `anthropic` ([#752](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/752))
+- `audit:run --format=html` without `--output` on a terminal saves the report to a file only you can read in the temporary directory and prints a `file://` link to open it in a browser, instead of printing the HTML; piped or redirected, it still prints the HTML ([#757](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/757))
 - `audit:run --help` describes each argument and option in one short line. Its help text fits a 100-column terminal ([#755](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/755))
 
 ### Bugfixes 🐛
@@ -63,6 +64,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - A standalone configuration file that reuses YAML anchors many times is read again with `symfony/yaml` 7.4.24 or later. One whose aliases expand past 10,000 values is refused with the auditor's own message, not the parser's ([#724](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/724), [#725](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/725))
 - The `redirect_with_input` pre-scan marker the attacker reads flags a redirect only when its own argument holds a variable, on the line of the redirect call, instead of a redirect to a fixed path followed by any variable up to 200 characters further, on the line of that variable ([#734](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/734))
 - The `native_query_concat` pre-scan marker flags native SQL built by string concatenation in `executeQuery()`, `executeStatement()`, `query()` and `prepare()`; it matched none before ([#734](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/734))
+- The attacker and the reviewer leave out a credential only a test or dev environment reads (under `when@test` or `when@dev`, in `.env.test`, fixtures or an in-memory test user) instead of reporting it as a critical hardcoded secret. Chunks and verdicts cached by an earlier release are analyzed and reviewed again ([#758](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/758))
 
 ### Performance Improvements 🚀
 
