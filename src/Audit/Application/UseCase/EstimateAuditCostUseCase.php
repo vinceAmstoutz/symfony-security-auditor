@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase;
 use Psr\Log\LoggerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\AttackerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunking\FileChunker;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\ReviewerAgent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\CostCalculator;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\ScopedScan;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
@@ -27,9 +28,11 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\SymfonyMapping;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\StageInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerSkillPromptRendererInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CandidateFindingSourceInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\GitChangedFilesResolverInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProjectFileScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterface;
@@ -41,8 +44,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\TokenEstimatorInterfa
  * The attacker input of an iteration is the scanned content, each chunk's
  * system prompt and the project mapping, raised by `toolRoundTripRatio` when
  * `audit.tools_enabled` is on. The reviewer input is `reviewerInputRatio` of
- * the file content alone. Each output is `outputRatio` of its input and both
- * inputs count `max_iterations` times.
+ * the file content alone, counted `max_iterations` times, plus each file the
+ * static candidates are reviewed against, counted once. Each output is
+ * `outputRatio` of its input.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -91,6 +95,7 @@ final readonly class EstimateAuditCostUseCase
         private ?AttackerPromptBuilderInterface $attackerPromptBuilder = null,
         private ?StageInterface $mappingStage = null,
         private ?SinceClosurePreview $sinceClosurePreview = null,
+        private ?CandidateFindingSourceInterface $candidateFindingSource = null,
     ) {}
 
     /**
@@ -139,7 +144,7 @@ final readonly class EstimateAuditCostUseCase
         $attackerCostUsd = $this->costCalculator->costForCall($attackerInputTokens, $attackerOutputTokens, $this->primaryModel);
 
         $reviewerModel = '' === $this->reviewerModel ? $this->primaryModel : $this->reviewerModel;
-        $reviewerInputTokens = $this->tokenCount($fileContentPerRoundInput * $this->maxIterations * $this->reviewerInputRatio);
+        $reviewerInputTokens = $this->tokenCount($fileContentPerRoundInput * $this->maxIterations * $this->reviewerInputRatio + $this->staticCandidateReviewTokens($files, $reviewerModel));
         $reviewerOutputTokens = (int) ceil($reviewerInputTokens * $this->outputRatio);
         $reviewerCostUsd = $this->costCalculator->costForCall($reviewerInputTokens, $reviewerOutputTokens, $reviewerModel);
 
@@ -174,6 +179,38 @@ final readonly class EstimateAuditCostUseCase
         ]);
 
         return AuditReport::fromContext($auditContext, $auditCost);
+    }
+
+    /**
+     * Counts the files the reviewer is sent with the static candidates: each
+     * file once per review call of its candidates, which holds at most
+     * {@see ReviewerAgent::MAX_FILE_GROUP_SIZE} of them.
+     *
+     * @param list<ProjectFile> $files
+     */
+    private function staticCandidateReviewTokens(array $files, string $reviewerModel): int
+    {
+        if (!$this->candidateFindingSource instanceof CandidateFindingSourceInterface) {
+            return 0;
+        }
+
+        $filesByPath = [];
+        foreach ($files as $file) {
+            $filesByPath[$file->relativePath()] = $file;
+        }
+
+        $candidatesByPath = array_count_values(array_map(
+            static fn (Vulnerability $vulnerability): string => $vulnerability->filePath(),
+            $this->candidateFindingSource->candidatesIn($files),
+        ));
+
+        $tokens = 0;
+        foreach ($candidatesByPath as $path => $candidates) {
+            $reviewCalls = (int) ceil($candidates / ReviewerAgent::MAX_FILE_GROUP_SIZE);
+            $tokens += $reviewCalls * $this->tokenEstimator->estimateTokens(($filesByPath[$path] ?? null)?->content() ?? '', $reviewerModel);
+        }
+
+        return $tokens;
     }
 
     /**

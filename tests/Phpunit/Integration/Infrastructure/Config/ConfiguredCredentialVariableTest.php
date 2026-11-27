@@ -18,7 +18,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredCredentialVariable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\WorkloadIdentityFederation;
 
 final class ConfiguredCredentialVariableTest extends TestCase
 {
@@ -84,9 +86,59 @@ final class ConfiguredCredentialVariableTest extends TestCase
         self::assertNull((new ConfiguredCredentialVariable(new XdgConfigPathResolver(null, null, null)))->name());
     }
 
+    public function test_it_names_no_provider_among_several_platforms_none_selects(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n    openai:\n        api_key: '%env(OPENAI_API_KEY)%'\n");
+
+        self::assertNull($this->configuredCredentialVariable()->provider());
+    }
+
+    public function test_it_names_the_only_platform_as_the_provider(): void
+    {
+        $this->writeConfig("platform:\n    openai:\n        api_key: '%env(OPENAI_API_KEY)%'\n");
+
+        self::assertEquals(new ConfiguredProvider('openai', takesApiKey: true, apiKeyVariable: 'OPENAI_API_KEY'), $this->configuredCredentialVariable()->provider());
+    }
+
+    public function test_the_anthropic_provider_signs_in_through_the_federation_the_run_uses(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n");
+
+        self::assertEquals(
+            new ConfiguredProvider('anthropic', takesApiKey: true, apiKeyVariable: 'ANTHROPIC_API_KEY', federatedCredential: 'workload identity federation (rule fdrl_rule)'),
+            $this->federatedConfiguredCredentialVariable()->provider(),
+        );
+    }
+
+    public function test_another_provider_selected_beside_an_anthropic_block_does_not_sign_in_through_the_federation(): void
+    {
+        $this->writeConfig("provider: openai\nplatform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n    openai:\n        api_key: '%env(OPENAI_API_KEY)%'\n");
+
+        self::assertEquals(new ConfiguredProvider('openai', takesApiKey: true, apiKeyVariable: 'OPENAI_API_KEY'), $this->federatedConfiguredCredentialVariable()->provider());
+    }
+
+    public function test_it_reads_the_cli_the_subscription_runs(): void
+    {
+        $this->writeConfig("provider: claudecode\nplatform:\n    claudecode: { cli_binary: /opt/claude/bin/claude, effort: low }\nmodel: opus\n");
+
+        self::assertEquals(new ConfiguredProvider('claudecode', 'opus', effort: 'low', cliBinary: '/opt/claude/bin/claude'), $this->configuredCredentialVariable()->provider());
+    }
+
+    public function test_it_reads_a_blank_model_as_none(): void
+    {
+        $this->writeConfig("provider: claudecode\nplatform:\n    claudecode: {}\nmodel: ''\n");
+
+        self::assertNull($this->configuredCredentialVariable()->provider()?->model);
+    }
+
     private function writeConfig(string $contents): void
     {
         $this->filesystem->dumpFile($this->configHome.'/symfony-security-auditor/config.yaml', $contents);
+    }
+
+    private function federatedConfiguredCredentialVariable(): ConfiguredCredentialVariable
+    {
+        return new ConfiguredCredentialVariable(new XdgConfigPathResolver($this->configHome, null, null), workloadIdentityFederation: new WorkloadIdentityFederation('fdrl_rule', 'org-uuid'));
     }
 
     private function configuredCredentialVariable(): ConfiguredCredentialVariable
@@ -127,6 +179,25 @@ final class ConfiguredCredentialVariableTest extends TestCase
         $this->writeConfig("provider: mistral\nplatform:\n    claudecode: {}\n");
 
         self::assertFalse($this->configuredCredentialVariable()->platformNeedsNoApiKey());
+    }
+
+    #[DataProvider('blocksWithoutSettings')]
+    public function test_a_selected_platform_configured_without_settings_needs_no_api_key(string $yaml): void
+    {
+        $this->writeConfig($yaml);
+
+        self::assertTrue($this->configuredCredentialVariable()->platformNeedsNoApiKey());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function blocksWithoutSettings(): iterable
+    {
+        yield 'an empty map' => ["provider: claudecode\nplatform:\n    claudecode: {}\n"];
+        yield 'a null' => ["provider: claudecode\nplatform:\n    claudecode: ~\n"];
+        yield 'no value' => ["provider: claudecode\nplatform:\n    claudecode:\n"];
+        yield 'an instance with no value' => ["provider: generic.gateway\nplatform:\n    generic:\n        gateway:\n"];
     }
 
     public function test_an_empty_platform_block_is_not_a_platform_needing_no_api_key(): void

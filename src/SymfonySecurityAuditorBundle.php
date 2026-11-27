@@ -68,23 +68,33 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AttackerAge
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditConfigurationDefinition;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CheapAttackerClientNoticePass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ConfiguredOutputCaps;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterRegistrar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingCliAgentBridgeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\TypedNodeEnvPlaceholderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PulledModelNoticePass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\TypedNodeEnvPlaceholderFinder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\UnselectedPlatformsPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\GitTrackedIgnoredFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\RegexSecretScrubber;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Delay\SleeperInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\LlmClientRole;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ModelSetting;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformAccountingConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformRequestConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformResilienceConfig;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ProcessCliAgentAccountProbe;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\RetryAfterHeaderParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RetryPolicy;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionCliInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionClis;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TokenEstimator\ProviderTokenEstimatorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\TransientFailureClassifier;
@@ -93,11 +103,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\UsageBookingCl
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfiguredAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlicer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\SubscriptionAccountGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
@@ -114,6 +129,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $container->addCompilerPass(new PricingPlatformPass(PlatformInterface::class));
         $container->addCompilerPass(new UnselectedPlatformsPass(PlatformInterface::class));
         $container->addCompilerPass(new CheapAttackerClientNoticePass());
+        $container->addCompilerPass(new PulledModelNoticePass());
     }
 
     #[Override]
@@ -129,6 +145,8 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
      * @throws JsonException
      * @throws InvalidAuditExecutionConfigurationException
      * @throws InvalidRateLimitConfigurationException
+     * @throws MissingCliAgentBridgeException
+     * @throws NonLocalPlatformEndpointException
      * @throws TypedNodeEnvPlaceholderException
      */
     #[Override]
@@ -146,21 +164,36 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         }
 
         $platformServiceId = null === $cliAgent ? PlatformInterface::class : CliAgentPlatforms::serviceIdOf($cliAgent);
+        $builder->setParameter(PulledModelNoticePass::PLATFORM_SERVICE_PARAMETER, $platformServiceId);
 
         /** @var BundleConfigArray $config */
         $bundleConfiguration = BundleConfiguration::fromArray($config);
+        $this->assertCliAgentAllowed($bundleConfiguration, $cliAgent);
+        $reviewerModelSetting = ModelSetting::ReviewerModel->ifSet($config['reviewer_model']);
 
         $this->registerParameters($builder, $bundleConfiguration);
 
         $services = $container->services();
         $this->registerSubscriptionPricing($services, $cliAgent);
+        $this->registerSubscriptionAccountGuard($services, $cliAgent, CliAgentPlatforms::cliBinaryIn($config));
         $this->registerBudget($services, $bundleConfiguration);
         $this->registerRateLimiter($services, $bundleConfiguration);
-        $this->registerLlmClients($services, $bundleConfiguration, $platformServiceId);
+        $configuredOutputCaps = ConfiguredOutputCaps::in($config);
+        $this->registerLlmClients($services, $bundleConfiguration, $platformServiceId, new LlmClientRole(ModelSetting::AttackerModel->ifSet($config['attacker_model']), $configuredOutputCaps->attacker), new LlmClientRole($reviewerModelSetting, $configuredOutputCaps->reviewer));
         $this->registerImplementationAliases($services, $bundleConfiguration);
         $this->registerTrackedIgnoredFiles($services, $bundleConfiguration);
         $this->registerCustomSkills($services, $bundleConfiguration);
-        $this->registerEscalation($services, $bundleConfiguration, $platformServiceId);
+        $this->registerEscalation($services, $bundleConfiguration, $platformServiceId, new LlmClientRole(ModelSetting::CheapModel->ifSet($bundleConfiguration->audit->escalationCheapModel, $reviewerModelSetting), $configuredOutputCaps->attacker));
+    }
+
+    /**
+     * @throws NonLocalPlatformEndpointException
+     */
+    private function assertCliAgentAllowed(BundleConfiguration $bundleConfiguration, ?string $cliAgent): void
+    {
+        if (null !== $cliAgent && $bundleConfiguration->privacy->offlineOnly) {
+            (new OfflineOnlyPlatformGuard())->assertIsNoCliAgent($cliAgent);
+        }
     }
 
     /**
@@ -226,6 +259,18 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         }
     }
 
+    private function registerSubscriptionAccountGuard(ServicesConfigurator $servicesConfigurator, ?string $cliAgent, ?string $cliBinary): void
+    {
+        $subscriptionCli = null === $cliAgent ? null : SubscriptionClis::bundled()->of($cliAgent);
+        if (!$subscriptionCli instanceof SubscriptionCliInterface) {
+            return;
+        }
+
+        $servicesConfigurator->set(SubscriptionAccountGuard::class)
+            ->decorate(UnpricedModelBudgetGuardInterface::class)
+            ->args([service('.inner'), inline_service($subscriptionCli::class), $cliBinary, inline_service(ProcessCliAgentAccountProbe::class)]);
+    }
+
     private function registerSubscriptionPricing(ServicesConfigurator $servicesConfigurator, ?string $cliAgent): void
     {
         if (null === $cliAgent) {
@@ -236,6 +281,9 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $servicesConfigurator->alias(PricingProviderInterface::class, NullPricingProvider::class);
         $servicesConfigurator->get(UnpricedModelBudgetGuard::class)->arg('$cliAgent', $cliAgent);
         $servicesConfigurator->get(AuditPresenter::class)->arg('$cliAgent', $cliAgent);
+        foreach ([ConsoleReportRenderer::class, MarkdownReportRenderer::class, HtmlReportRenderer::class] as $renderer) {
+            $servicesConfigurator->get($renderer)->arg('$subscription', SubscriptionClis::bundled()->of($cliAgent)?->subscription());
+        }
     }
 
     /**
@@ -290,7 +338,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $servicesConfigurator->alias(RateLimiterInterface::class, TokenBucketRateLimiter::class);
     }
 
-    private function registerLlmClients(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration, string $platformServiceId): void
+    private function registerLlmClients(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration, string $platformServiceId, LlmClientRole $attacker, LlmClientRole $reviewer): void
     {
         $servicesConfigurator->set(RetryAfterHeaderParser::class)->private();
 
@@ -301,6 +349,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $bundleConfiguration->llm->attackerModel(),
                 $bundleConfiguration->llm->attackerMaxOutputTokens(),
                 $platformServiceId,
+                $attacker,
             ));
 
         $servicesConfigurator->set('security_auditor.reviewer_client', SymfonyAiLLMClient::class)
@@ -310,6 +359,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $bundleConfiguration->llm->reviewerModel(),
                 $bundleConfiguration->llm->reviewerMaxOutputTokens(),
                 $platformServiceId,
+                $reviewer,
             ));
 
         $servicesConfigurator->alias(LLMClientInterface::class, 'security_auditor.attacker_client');
@@ -428,7 +478,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
         $servicesConfigurator->alias(StaticPreScannerInterface::class, SarifImportingPreScanner::class);
     }
 
-    private function registerEscalation(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration, string $platformServiceId): void
+    private function registerEscalation(ServicesConfigurator $servicesConfigurator, BundleConfiguration $bundleConfiguration, string $platformServiceId, LlmClientRole $cheapAttacker): void
     {
         if (!$bundleConfiguration->audit->escalationEnabled) {
             return;
@@ -443,6 +493,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 $cheapModel,
                 $bundleConfiguration->llm->attackerMaxOutputTokens(),
                 $platformServiceId,
+                $cheapAttacker,
             ));
         $this->bookUsageOf($servicesConfigurator, 'security_auditor.cheap_attacker_client');
 
@@ -501,7 +552,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
     /**
      * @return list<mixed>
      */
-    private function llmClientArguments(BundleConfiguration $bundleConfiguration, string $model, ?int $maxOutputTokens, string $platformServiceId): array
+    private function llmClientArguments(BundleConfiguration $bundleConfiguration, string $model, ?int $maxOutputTokens, string $platformServiceId, LlmClientRole $llmClientRole): array
     {
         return [
             inline_service(PlatformBinding::class)->args([
@@ -510,6 +561,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 service('logger'),
                 $maxOutputTokens,
                 param(UnselectedPlatformsPass::PARAMETER),
+                $llmClientRole->modelSetting,
             ]),
             inline_service(PlatformRequestConfig::class)->args([
                 SymfonyAiLLMClient::DEFAULT_TEMPERATURE,
@@ -517,6 +569,7 @@ final class SymfonySecurityAuditorBundle extends AbstractBundle
                 service(TokenEstimatorInterface::class),
                 param(PricingPlatformPass::PARAMETER),
                 $this->streamsCalls($platformServiceId),
+                $llmClientRole->capsEveryModel,
             ]),
             inline_service(PlatformResilienceConfig::class)->args([
                 service(RetryPolicy::class),

@@ -57,8 +57,6 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
         'claudecode' => 'claude-code',
     ];
 
-    private const string COMPOSER_VARIABLE = 'SYMFONY_SECURITY_AUDITOR_COMPOSER';
-
     private const string MANIFEST_FILENAME = 'composer.json';
 
     private const string PLATFORM_PACKAGE = 'symfony/ai-platform';
@@ -86,17 +84,14 @@ final readonly class ComposerBridgeInstaller implements BridgeInstallerInterface
      */
     public static function embeddedProcessBuilder(SelfInvocation $selfInvocation, ComposerPhar $composerPhar): Closure
     {
-        return static function (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages) use ($selfInvocation, $composerPhar): Process {
-            $composerDirectory = \sprintf('%s/.composer', $targetDirectory);
+        $embeddedComposer = new EmbeddedComposer($selfInvocation, $composerPhar);
 
-            $process = new Process(
-                [...$selfInvocation->command(), ...self::requireArguments($package, $aiPlatformPin, $targetDirectory, ...$morePackages)],
-                env: [
-                    self::COMPOSER_VARIABLE => $composerPhar->in($composerDirectory),
-                    'COMPOSER_HOME' => \sprintf('%s/home', $composerDirectory),
-                    'COMPOSER_CACHE_DIR' => \sprintf('%s/cache', $composerDirectory),
-                ],
-            );
+        return static function (string $package, ?string $aiPlatformPin, string $targetDirectory, string ...$morePackages) use ($embeddedComposer): Process {
+            $composerDirectory = \sprintf('%s/.composer', $targetDirectory);
+            $process = $embeddedComposer->process($composerDirectory, self::requireArguments($package, $aiPlatformPin, $targetDirectory, ...$morePackages), [
+                'COMPOSER_HOME' => \sprintf('%s/home', $composerDirectory),
+                'COMPOSER_CACHE_DIR' => \sprintf('%s/cache', $composerDirectory),
+            ]);
             $process->setTimeout(null);
 
             return $process;

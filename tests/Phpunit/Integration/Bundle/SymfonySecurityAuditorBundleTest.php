@@ -21,6 +21,7 @@ use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
+use ReflectionProperty;
 use Symfony\AI\Platform\Bridge\Anthropic\ModelCatalog as AnthropicModelCatalog;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\PlatformOptions;
@@ -61,6 +62,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Exception\NegativeTokenCountException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\AuditPipeline;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\CandidateFindingSource;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\AuditStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\DependencyExpansionStage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Pipeline\Stage\MappingStage;
@@ -70,10 +72,15 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\EstimateAudit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\UseCase\RunAuditUseCase;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\CustomAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Configuration\ToolsScope;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsageException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditContext;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFileType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AdvisoryDatabaseInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterface;
@@ -102,6 +109,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemRe
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\FilesystemTriageMemoryStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\GitTrackedIgnoredFiles;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\NullSecretScrubber;
@@ -110,15 +118,22 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Inva
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ModelSetting;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\NullRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\RateLimit\TokenBucketRateLimiter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelNotice;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\CompositeReviewerFeedbackProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\ReviewerFeedbackHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\ReviewerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\ConfiguredAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\MemoizedStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NestingDepthGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
@@ -127,6 +142,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexCodeSlic
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\RegexStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\SarifImportingPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\RunRefusedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\SymfonySecurityAuditorBundle;
@@ -242,6 +258,74 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
+    public function test_an_output_cap_the_configuration_sets_reaches_a_model_other_than_claude(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-5.6', 'max_output_tokens' => 8000], registerPlatform: false, registerHostServices: $this->servedBy('openai'));
+        $llmClient = $this->getPrivateService($kernel, LLMClientInterface::class);
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        $llmClient->complete('sys', 'usr');
+
+        self::assertSame(8000, OptionsRecordingPlatform::$lastOptions[PlatformOptions::MAX_OUTPUT_TOKENS] ?? null);
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_an_attacker_output_cap_the_configuration_sets_reaches_an_attacker_model_other_than_claude(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-5.6', 'attacker_max_output_tokens' => 8192], registerPlatform: false, registerHostServices: $this->servedBy('openai'));
+        $llmClient = $this->getPrivateService($kernel, 'security_auditor.attacker_client');
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        $llmClient->complete('sys', 'usr');
+
+        self::assertSame(8192, OptionsRecordingPlatform::$lastOptions[PlatformOptions::MAX_OUTPUT_TOKENS] ?? null);
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_reviewer_output_cap_the_configuration_sets_reaches_a_reviewer_model_other_than_claude(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-5.6', 'reviewer_max_output_tokens' => 2048], registerPlatform: false, registerHostServices: $this->servedBy('openai'));
+        $llmClient = $this->getPrivateService($kernel, 'security_auditor.reviewer_client');
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        $llmClient->complete('sys', 'usr');
+
+        self::assertSame(2048, OptionsRecordingPlatform::$lastOptions[PlatformOptions::MAX_OUTPUT_TOKENS] ?? null);
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_an_attacker_output_cap_the_configuration_sets_reaches_a_cheap_escalation_model_other_than_claude(): void
+    {
+        $kernel = $this->boot([
+            'model' => 'claude-opus-5-5',
+            'attacker_max_output_tokens' => 8192,
+            'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'gpt-5.6-mini']],
+        ], registerPlatform: false, registerHostServices: $this->servedBy('openai'));
+        $llmClient = $this->getPrivateService($kernel, 'security_auditor.cheap_attacker_client');
+        self::assertInstanceOf(LLMClientInterface::class, $llmClient);
+
+        $llmClient->complete('sys', 'usr');
+
+        self::assertSame(8192, OptionsRecordingPlatform::$lastOptions[PlatformOptions::MAX_OUTPUT_TOKENS] ?? null);
+    }
+
+    /**
+     * @throws LLMProviderException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
     public function test_the_auditor_runs_on_the_claude_code_cli_its_cli_agent_names(): void
     {
         $kernel = $this->boot(['model' => 'opus', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
@@ -266,6 +350,56 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertStringContainsString('The audit runs on a subscription through the Codex CLI, which is not priced per call', (string) preg_replace('/[\s!]+/', ' ', $commandTester->getDisplay()));
     }
 
+    /**
+     * @return iterable<string, array{class-string<ReportRendererInterface>}>
+     */
+    public static function costLabellingRenderers(): iterable
+    {
+        yield 'console' => [ConsoleReportRenderer::class];
+        yield 'markdown' => [MarkdownReportRenderer::class];
+        yield 'html' => [HtmlReportRenderer::class];
+    }
+
+    /**
+     * @param class-string<ReportRendererInterface> $rendererClass
+     *
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    #[DataProvider('costLabellingRenderers')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_cli_agent_report_says_it_is_not_priced_per_call(string $rendererClass): void
+    {
+        $kernel = $this->boot(['model' => 'claude-opus-5-5', 'cli_agent' => ['platform' => 'codex', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
+        $reportRenderer = $this->getPrivateService($kernel, $rendererClass);
+        self::assertInstanceOf(ReportRendererInterface::class, $reportRenderer);
+
+        self::assertStringContainsString('not priced per call: billed to your ChatGPT subscription, or to an API key the CLI uses in its place', $reportRenderer->render(AuditReport::fromContext(AuditContext::forProject($this->tmpDir), AuditCost::of(100, 50, 0.0, 'gpt-6-luna'))));
+    }
+
+    /**
+     * @throws RunRefusedException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_cli_agent_run_names_the_subscription_its_cli_bills(): void
+    {
+        $kernel = $this->boot(['model' => 'claude-opus-5-5', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
+        $unpricedModelBudgetGuard = $this->getPrivateService($kernel, UnpricedModelBudgetGuardInterface::class);
+        self::assertInstanceOf(UnpricedModelBudgetGuardInterface::class, $unpricedModelBudgetGuard);
+        $input = new ArrayInput([]);
+        $input->setInteractive(false);
+
+        $bufferedOutput = new BufferedOutput();
+        $unpricedModelBudgetGuard->permitsRun($input, new SymfonyStyle($input, $bufferedOutput));
+
+        self::assertStringContainsString('Billing: your Claude subscription (pro plan)', (string) preg_replace('/\s+/', ' ', $bufferedOutput->fetch()));
+    }
+
+    /**
+     * @throws RunRefusedException
+     */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
     public function test_a_cli_agent_run_says_the_subscription_is_not_priced_per_call(): void
@@ -311,6 +445,15 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertStringContainsString("--effort\0high\0", (string) file_get_contents($this->tmpDir.'/claude-arguments'));
     }
 
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_an_audit_on_the_ollama_platform_of_the_application_names_the_models_its_server_has_not_pulled(): void
+    {
+        $kernel = $this->boot(['model' => 'qwen9'], registerPlatform: false, registerHostServices: $this->servedBy('ollama'));
+
+        self::assertInstanceOf(PulledModelNotice::class, (new ReflectionProperty(AuditCommand::class, 'pulledModelNotice'))->getValue($this->getPrivateService($kernel, AuditCommand::class)));
+    }
+
     /**
      * @throws LLMProviderException
      */
@@ -354,6 +497,16 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertInstanceOf(PlatformInterface::class, $platform);
 
         self::assertSame(['OK', 'stub-response'], [$llmClient->complete('sys', 'usr')->content(), $platform->invoke('model', 'usr')->asText()]);
+    }
+
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_an_offline_only_run_refuses_the_cli_agent_its_configuration_names(): void
+    {
+        $this->expectException(NonLocalPlatformEndpointException::class);
+        $this->expectExceptionMessageContaining('privacy.offline_only is enabled, but "codex" runs a coding agent\'s CLI');
+
+        $this->boot(['model' => 'opus', 'privacy' => ['offline_only' => true], 'cli_agent' => ['platform' => 'codex', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
     }
 
     public function test_the_auditor_asks_a_cli_for_json_answers_since_the_cli_cannot_carry_its_tools(): void
@@ -545,6 +698,34 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'privacy' => ['offline_only' => true]]);
 
         self::assertSame(InMemoryAdvisoryDatabase::class, (string) $containerBuilder->getAlias(AdvisoryDatabaseInterface::class));
+    }
+
+    /**
+     * @param array<string, mixed> $bundleConfig
+     */
+    #[DataProvider('modelSettingsOfTheClients')]
+    public function test_each_client_names_the_setting_its_model_comes_from(array $bundleConfig, string $clientId, ModelSetting $expectedModelSetting): void
+    {
+        $platformBinding = $this->loadParameters($bundleConfig)->getDefinition($clientId)->getArgument(0);
+
+        self::assertInstanceOf(Definition::class, $platformBinding);
+        self::assertSame($expectedModelSetting, $platformBinding->getArgument(5));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, string, ModelSetting}>
+     */
+    public static function modelSettingsOfTheClients(): iterable
+    {
+        $escalation = ['audit' => ['escalation' => ['enabled' => true]]];
+
+        yield 'the attacker on model' => [['model' => 'm'], 'security_auditor.attacker_client', ModelSetting::Model];
+        yield 'the attacker on attacker_model' => [['model' => 'm', 'attacker_model' => 'a'], 'security_auditor.attacker_client', ModelSetting::AttackerModel];
+        yield 'the reviewer on model' => [['model' => 'm', 'attacker_model' => 'a'], 'security_auditor.reviewer_client', ModelSetting::Model];
+        yield 'the reviewer on reviewer_model' => [['model' => 'm', 'reviewer_model' => 'r'], 'security_auditor.reviewer_client', ModelSetting::ReviewerModel];
+        yield 'the cheap pass on cheap_model' => [['model' => 'm', 'reviewer_model' => 'r', 'audit' => ['escalation' => ['enabled' => true, 'cheap_model' => 'c']]], 'security_auditor.cheap_attacker_client', ModelSetting::CheapModel];
+        yield 'the cheap pass on reviewer_model' => [['model' => 'm', 'reviewer_model' => 'r', ...$escalation], 'security_auditor.cheap_attacker_client', ModelSetting::ReviewerModel];
+        yield 'the cheap pass on model' => [['model' => 'm', ...$escalation], 'security_auditor.cheap_attacker_client', ModelSetting::Model];
     }
 
     public function test_bundle_does_not_register_escalation_services_by_default(): void
@@ -1371,6 +1552,23 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         self::assertInstanceOf(RegexStaticPreScanner::class, $this->getPrivateService($kernel, StaticPreScannerInterface::class));
     }
 
+    public function test_bundle_shares_one_memoized_pre_scan_between_the_attacker_and_the_static_findings(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        $decorated = $containerBuilder->getDefinition(MemoizedStaticPreScanner::class)->getArgument(0);
+        self::assertInstanceOf(Reference::class, $decorated);
+        self::assertSame(StaticPreScannerInterface::class, (string) $decorated);
+        $candidatePreScanner = $containerBuilder->getDefinition(CandidateFindingSource::class)->getArgument(0);
+        self::assertInstanceOf(Reference::class, $candidatePreScanner);
+        self::assertSame(MemoizedStaticPreScanner::class, (string) $candidatePreScanner);
+        $attackerScanCollaborators = $containerBuilder->getDefinition(AttackerAgent::class)->getArgument(1);
+        self::assertInstanceOf(Definition::class, $attackerScanCollaborators);
+        $attackerPreScanner = $attackerScanCollaborators->getArgument(1);
+        self::assertInstanceOf(Reference::class, $attackerPreScanner);
+        self::assertSame(MemoizedStaticPreScanner::class, (string) $attackerPreScanner);
+    }
+
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
     public function test_bundle_wires_null_static_pre_scanner_when_disabled(): void
@@ -1870,6 +2068,15 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
         $containerBuilder = $this->loadParameters(['model' => 'gpt-4o', 'audit' => ['since_closure' => 'direct']]);
 
         self::assertSame('direct', $containerBuilder->getParameter('symfony_security_auditor.audit.since_closure'));
+    }
+
+    public function test_bundle_searches_the_files_the_since_closure_adds_for_static_findings(): void
+    {
+        $containerBuilder = $this->loadParameters(['model' => 'gpt-4o']);
+
+        $candidateFindingSource = $containerBuilder->getDefinition(DependencyExpansionStage::class)->getArgument(2);
+        self::assertInstanceOf(Reference::class, $candidateFindingSource);
+        self::assertSame(CandidateFindingSource::class, (string) $candidateFindingSource);
     }
 
     public function test_bundle_accepts_an_explicit_none_since_closure(): void
@@ -2580,7 +2787,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     private function fakeClaudeCli(): string
     {
         $cli = $this->tmpDir.'/claude';
-        (new Filesystem())->dumpFile($cli, "#!/bin/sh\necho '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"OK\",\"usage\":{\"input_tokens\":3,\"output_tokens\":1}}'\n");
+        (new Filesystem())->dumpFile($cli, "#!/bin/sh\nif [ \"\$1\" = auth ]; then echo '{\"loggedIn\":true,\"subscriptionType\":\"pro\"}'; exit 0; fi\necho '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"OK\",\"usage\":{\"input_tokens\":3,\"output_tokens\":1}}'\n");
         (new Filesystem())->chmod($cli, 0o755);
 
         return $cli;

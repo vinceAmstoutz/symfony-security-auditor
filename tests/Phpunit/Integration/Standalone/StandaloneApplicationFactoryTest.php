@@ -27,7 +27,11 @@ use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeInstallerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPhar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\EmbeddedComposer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\StaleBridgeTreeException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\SelfInvocation;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialIdentity;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfigLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
@@ -36,6 +40,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\ModelsD
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\SelfUpdate\NullPricingCatalogRefresher;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\FederatedAnthropicAccess;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneApplicationFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingBridgeInstaller;
 
@@ -445,6 +450,20 @@ final class StandaloneApplicationFactoryTest extends TestCase
         return new XdgConfigPathResolver($this->configHome, $this->cacheHome, null);
     }
 
+    /**
+     * @return array<string, string>
+     */
+    private function federatedEnvironment(): array
+    {
+        return [
+            'XDG_CONFIG_HOME' => $this->configHome,
+            'XDG_CACHE_HOME' => $this->cacheHome,
+            'SSA_NO_UPDATE_CHECK' => '1',
+            'ANTHROPIC_FEDERATION_RULE_ID' => 'fdrl_rule',
+            'ANTHROPIC_ORGANIZATION_ID' => 'org-uuid',
+        ];
+    }
+
     private function writeConfig(string $yaml): void
     {
         (new Filesystem())->dumpFile($this->configHome.'/symfony-security-auditor/config.yaml', $yaml);
@@ -741,6 +760,105 @@ final class StandaloneApplicationFactoryTest extends TestCase
             [$statusCode, str_contains((string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay()), 'was installed for symfony/ai-platform v0.12.0, but this binary bundles v0.14.1')],
             $applicationTester->getDisplay(),
         );
+    }
+
+    public function test_auth_status_reports_workload_identity_federation_as_the_credential_an_audit_uses(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\nmodel: claude-opus-5-5\n");
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment($this->federatedEnvironment())->create();
+        $standaloneApplication->setAutoExit(false);
+
+        $applicationTester = new ApplicationTester($standaloneApplication);
+
+        $statusCode = $applicationTester->run(['command' => 'auth:status']);
+        $display = (string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay());
+
+        self::assertSame(Command::SUCCESS, $statusCode, $display);
+        self::assertStringContainsString('Billing per call, through workload identity federation (rule fdrl_rule)', $display);
+        self::assertStringContainsString('[OK] An audit uses no API key: it signs in through workload identity federation (rule fdrl_rule).', $display);
+    }
+
+    public function test_doctor_names_the_workload_identity_federation_an_audit_signs_in_with_and_no_api_key(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\nmodel: claude-opus-5-5\n");
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment($this->federatedEnvironment())->create();
+        $standaloneApplication->setAutoExit(false);
+
+        $applicationTester = new ApplicationTester($standaloneApplication);
+
+        $applicationTester->run(['command' => 'doctor']);
+
+        $display = (string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay());
+
+        self::assertStringContainsString('[OK] Configuration: Config resolves and an audit signs in through workload identity federation (rule fdrl_rule), with no API key.', $display);
+        self::assertStringContainsString('Billing: per call, through workload identity federation (rule fdrl_rule).', $display);
+        self::assertStringNotContainsString(CredentialIdentity::of(FederatedAnthropicAccess::API_KEY_PLACEHOLDER)->fingerprint, $display);
+    }
+
+    public function test_doctor_reports_the_missing_anthropic_key_of_several_platforms_none_selects_under_workload_identity_federation_as_without_it(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n    openai:\n        api_key: 'sk-proj-0123456789abcdefghij'\nmodel: claude-opus-5-5\n");
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment($this->federatedEnvironment())->create();
+        $standaloneApplication->setAutoExit(false);
+
+        $applicationTester = new ApplicationTester($standaloneApplication);
+
+        $applicationTester->run(['command' => 'doctor']);
+
+        $display = (string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay());
+
+        self::assertStringContainsString('[ERROR] API key: No API key available. Your config reads it from "ANTHROPIC_API_KEY"', $display);
+        self::assertStringNotContainsString(CredentialIdentity::of(FederatedAnthropicAccess::API_KEY_PLACEHOLDER)->fingerprint, $display);
+        self::assertStringNotContainsString(CredentialIdentity::of(FederatedAnthropicAccess::API_KEY_PLACEHOLDER)->maskedPreview, $display);
+    }
+
+    public function test_auth_status_names_no_placeholder_key_for_several_platforms_none_selects_under_workload_identity_federation(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n    openai:\n        api_key: 'sk-proj-0123456789abcdefghij'\nmodel: claude-opus-5-5\n");
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment($this->federatedEnvironment())->create();
+        $standaloneApplication->setAutoExit(false);
+
+        $applicationTester = new ApplicationTester($standaloneApplication);
+
+        $applicationTester->run(['command' => 'auth:status']);
+
+        $display = (string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay());
+
+        self::assertStringNotContainsString(CredentialIdentity::of(FederatedAnthropicAccess::API_KEY_PLACEHOLDER)->fingerprint, $display);
+        self::assertStringNotContainsString(CredentialIdentity::of(FederatedAnthropicAccess::API_KEY_PLACEHOLDER)->maskedPreview, $display);
+    }
+
+    public function test_doctor_reports_the_missing_key_of_another_platform_reading_anthropic_api_key_under_workload_identity_federation_as_without_it(): void
+    {
+        $this->writeConfig("provider: generic.gw\nplatform:\n    generic:\n        gw:\n            base_url: 'https://gateway.example'\n            api_key: '%env(ANTHROPIC_API_KEY)%'\nmodel: claude-opus-5-5\n");
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment($this->federatedEnvironment())->create();
+        $standaloneApplication->setAutoExit(false);
+
+        $applicationTester = new ApplicationTester($standaloneApplication);
+
+        $applicationTester->run(['command' => 'doctor']);
+
+        self::assertStringContainsString(
+            '[ERROR] API key: No API key available. Your config reads it from "ANTHROPIC_API_KEY"',
+            (string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay()),
+        );
+    }
+
+    public function test_doctor_probes_the_composer_the_binary_bundles(): void
+    {
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, $this->cacheHome, null, $this->cacheHome.'/data');
+        $standaloneApplication = (new StandaloneApplicationFactory(
+            new StandaloneConfigLoader($xdgConfigPathResolver, new StandalonePlatformConfigResolver([])),
+            $xdgConfigPathResolver,
+            self::createStub(BridgeInstallerInterface::class),
+            embeddedComposer: new EmbeddedComposer(new SelfInvocation('/opt/symfony-security-auditor'), new ComposerPhar('/nonexistent/composer.phar')),
+        ))->create();
+        $standaloneApplication->setAutoExit(false);
+
+        $applicationTester = new ApplicationTester($standaloneApplication);
+        $applicationTester->run(['command' => 'doctor']);
+
+        self::assertStringContainsString('"/nonexistent/composer.phar" does not exist', (string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay()));
     }
 
     /**

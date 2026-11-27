@@ -33,7 +33,7 @@ final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWrite
      * @throws UnsafeStandaloneConfigWriteException
      */
     #[Override]
-    public function write(string $configFile, array $config): void
+    public function write(string $configFile, array $config, array $comments = []): void
     {
         $this->assertSafeToWrite($configFile);
 
@@ -44,11 +44,23 @@ final readonly class YamlStandaloneConfigWriter implements StandaloneConfigWrite
                 $this->filesystem->chmod($configFile, 0o600);
             }
 
-            $this->filesystem->dumpFile($configFile, RoundTripYaml::dump($config, 2, 4));
+            $this->filesystem->dumpFile($configFile, $this->commented(RoundTripYaml::dump($config, 2, 4), $comments));
             $this->filesystem->chmod($configFile, 0o600);
         } catch (IOException $ioException) {
             throw StandaloneConfigWriteException::fromIOException($configFile, $ioException);
         }
+    }
+
+    /**
+     * @param array<string, string> $comments
+     */
+    private function commented(string $yaml, array $comments): string
+    {
+        foreach ($comments as $key => $comment) {
+            $yaml = (string) preg_replace(\sprintf('/^(?=%s:)/m', preg_quote($key, '/')), \sprintf("# %s\n", $comment), $yaml);
+        }
+
+        return $yaml;
     }
 
     /**

@@ -96,6 +96,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttacker
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullReviewerCache;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AttackerAgentDefinitionFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PulledModelNoticePass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\UnselectedPlatformsPass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Diff\ProcessGitChangedFilesResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\GitTrackedIgnoredFiles;
@@ -167,6 +168,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPacka
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportPathPrefix;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\SarifReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\MemoizedStaticPreScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\NestingDepthGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserControllerAccessControlParser;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\PhpParserFormBindingParser;
@@ -488,7 +490,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $defaultsConfigurator->set(CandidateFindingSource::class)
         ->args([
-            service(StaticPreScannerInterface::class),
+            service(MemoizedStaticPreScanner::class),
             param('symfony_security_auditor.audit.report_static_findings'),
         ]);
 
@@ -528,6 +530,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->args([
             service('logger'),
             param('symfony_security_auditor.audit.since_closure'),
+            service(CandidateFindingSource::class),
+            service(ProgressReporterInterface::class),
         ]);
 
     $defaultsConfigurator->set(SinceClosurePreview::class)
@@ -666,6 +670,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->alias(ToolRegistryFactoryInterface::class, SymfonyToolRegistryFactory::class);
 
     $defaultsConfigurator->set(NullStaticPreScanner::class);
+    $defaultsConfigurator->set(MemoizedStaticPreScanner::class)
+        ->args([service(StaticPreScannerInterface::class)]);
     $defaultsConfigurator->set(RegexStaticPreScanner::class)
         ->args([param('symfony_security_auditor.scan.custom_risk_patterns'), service('logger')]);
 
@@ -735,6 +741,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service(AttackerPromptBuilderInterface::class),
             service(MappingStage::class),
             service(SinceClosurePreview::class),
+            service(CandidateFindingSource::class),
         ]);
 
     $defaultsConfigurator->set(ListScannedFilesUseCase::class)
@@ -793,6 +800,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
                 param('symfony_security_auditor.audit.output'),
             ]),
             service(BaselineFilePathsHolder::class),
+            service(PulledModelNoticePass::SERVICE)->nullOnInvalid(),
         ])
         ->tag('console.command');
 

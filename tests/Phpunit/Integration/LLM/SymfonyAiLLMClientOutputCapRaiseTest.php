@@ -16,9 +16,15 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use RuntimeException;
+use Symfony\AI\Platform\Exception\BadRequestException;
+use Symfony\AI\Platform\Exception\ContentFilterException;
 use Symfony\AI\Platform\Exception\MaxOutputTokensException;
+use Symfony\AI\Platform\Exception\RateLimitExceededException;
 use Symfony\AI\Platform\PlatformOptions;
 use Symfony\AI\Platform\Result\TextResult;
+use Symfony\AI\Platform\Result\ToolCall;
+use Symfony\AI\Platform\Result\ToolCallResult;
 use Symfony\AI\Platform\TokenUsage\TokenUsage;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk\StructuredVulnerabilityCollectionSession;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\BudgetTracker;
@@ -30,6 +36,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidTokenUsag
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditBudget;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\InvalidRetryConfigurationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformAccountingConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformBinding;
@@ -37,6 +44,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformReques
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformResilienceConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SymfonyAiLLMClient;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Tool\RecordVulnerabilityToolFactory;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\CallbackTool;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FakeSleeper;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\FixedPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\LLM\Fixture\MessageCollectingLogger;
@@ -85,6 +93,126 @@ final class SymfonyAiLLMClientOutputCapRaiseTest extends TestCase
      * @throws NegativeTokenCountException
      * @throws InvalidTokenUsageException
      * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_tool_call_whose_raised_cap_the_provider_refuses_ends_as_the_length_response_it_was_cut_to(): void
+    {
+        $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform([new MaxOutputTokensException('cut off'), new BadRequestException('max_tokens: 8192 > 4096, which is the maximum allowed')], [new TokenUsage(), new TokenUsage()]);
+
+        $llmResponse = $this->client($scriptedTokenUsagePlatform)->completeWithTools('sys', 'usr', StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry, 3);
+
+        self::assertSame(['length', 2], [$llmResponse->stopReason(), $scriptedTokenUsagePlatform->invocations]);
+    }
+
+    /**
+     * @throws LLMProviderException
+     * @throws BudgetExceededException
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_tool_call_of_a_concurrent_conversation_cut_off_by_the_output_cap_is_asked_again_once_with_twice_the_cap(): void
+    {
+        $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform([new MaxOutputTokensException('cut off'), new TextResult('done')], [new TokenUsage(), new TokenUsage()]);
+
+        $llmResponses = $this->client($scriptedTokenUsagePlatform)->completeBatchWithTools([['system' => 'sys', 'user' => 'usr', 'tools' => StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry]], 4, 3);
+
+        self::assertSame(['done', [4096, 8192]], [$llmResponses[0]->content(), array_column($scriptedTokenUsagePlatform->invokedOptions, PlatformOptions::MAX_OUTPUT_TOKENS)]);
+    }
+
+    /**
+     * @throws LLMProviderException
+     * @throws BudgetExceededException
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_refused_raised_cap_is_reported_before_the_call_ends_as_the_answer_it_was_cut_to(): void
+    {
+        $messageCollectingLogger = new MessageCollectingLogger();
+
+        $this->client(new ScriptedTokenUsagePlatform([new MaxOutputTokensException('cut off'), new BadRequestException('max_tokens too high')], [new TokenUsage(), new TokenUsage()]), $messageCollectingLogger)
+            ->completeWithTools('sys', 'usr', $this->lookupTool(), 3);
+
+        self::assertContains(['LLM request with a raised output token cap refused, keeping the answer the cap cut off', ['error' => 'max_tokens too high']], $messageCollectingLogger->records);
+    }
+
+    /**
+     * @throws LLMProviderException
+     * @throws BudgetExceededException
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_raised_request_the_content_filter_stops_ends_as_the_content_filter_answer(): void
+    {
+        $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform([new MaxOutputTokensException('cut off'), new RuntimeException('filtered', previous: new ContentFilterException('Blocked by the safety system'))], [new TokenUsage(), new TokenUsage()]);
+
+        $llmResponse = $this->client($scriptedTokenUsagePlatform)->completeWithTools('sys', 'usr', $this->lookupTool(), 3);
+
+        self::assertSame('content-filter', $llmResponse->stopReason());
+    }
+
+    /**
+     * @throws LLMProviderException
+     * @throws BudgetExceededException
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_tool_call_of_a_concurrent_conversation_whose_raised_cap_the_provider_refuses_ends_as_the_length_response_it_was_cut_to(): void
+    {
+        $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform([new MaxOutputTokensException('cut off'), new BadRequestException('max_tokens: 8192 > 4096, which is the maximum allowed')], [new TokenUsage(), new TokenUsage()]);
+
+        $llmResponses = $this->client($scriptedTokenUsagePlatform)->completeBatchWithTools([['system' => 'sys', 'user' => 'usr', 'tools' => $this->lookupTool()]], 4, 3);
+
+        self::assertSame(['length', 2], [$llmResponses[0]->stopReason(), $scriptedTokenUsagePlatform->invocations]);
+    }
+
+    /**
+     * @throws LLMProviderException
+     * @throws BudgetExceededException
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_the_cap_raised_for_a_cut_tool_call_stays_raised_for_the_rest_of_the_conversation(): void
+    {
+        $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform([new MaxOutputTokensException('cut off'), new ToolCallResult([new ToolCall('call_1', 'lookup')]), new MaxOutputTokensException('cut off again'), new TextResult('done')], [new TokenUsage(), new TokenUsage(), new TokenUsage(), new TokenUsage()]);
+
+        $llmResponse = $this->client($scriptedTokenUsagePlatform)->completeWithTools('sys', 'usr', $this->lookupTool(), 3);
+
+        self::assertSame(['length', [4096, 8192, 8192]], [$llmResponse->stopReason(), array_column($scriptedTokenUsagePlatform->invokedOptions, PlatformOptions::MAX_OUTPUT_TOKENS)]);
+    }
+
+    /**
+     * @throws LLMProviderException
+     * @throws BudgetExceededException
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_the_cap_raised_for_a_cut_tool_call_of_a_concurrent_conversation_stays_raised_for_the_rest_of_it(): void
+    {
+        $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform([new MaxOutputTokensException('cut off'), new ToolCallResult([new ToolCall('call_1', 'lookup')]), new MaxOutputTokensException('cut off again'), new TextResult('done')], [new TokenUsage(), new TokenUsage(), new TokenUsage(), new TokenUsage()]);
+
+        $llmResponses = $this->client($scriptedTokenUsagePlatform)->completeBatchWithTools([['system' => 'sys', 'user' => 'usr', 'tools' => $this->lookupTool()]], 4, 3);
+
+        self::assertSame(['length', [4096, 8192, 8192]], [$llmResponses[0]->stopReason(), array_column($scriptedTokenUsagePlatform->invokedOptions, PlatformOptions::MAX_OUTPUT_TOKENS)]);
+    }
+
+    /**
+     * @throws LLMProviderException
+     * @throws BudgetExceededException
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidRetryConfigurationException
      */
     public function test_an_answer_without_tools_cut_off_by_the_output_cap_is_not_asked_again(): void
     {
@@ -113,6 +241,23 @@ final class SymfonyAiLLMClientOutputCapRaiseTest extends TestCase
         ))->completeWithTools('sys', 'usr', StructuredVulnerabilityCollectionSession::begin(new RecordVulnerabilityToolFactory(), new NullLogger(), [])->toolRegistry, 3);
 
         self::assertSame([4096, 8192], array_column($scriptedTokenUsagePlatform->invokedOptions, 'max_tokens'));
+    }
+
+    /**
+     * @throws LLMProviderException
+     * @throws BudgetExceededException
+     * @throws NegativeTokenCountException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_tool_call_retried_after_a_rate_limit_keeps_its_cap(): void
+    {
+        $scriptedTokenUsagePlatform = new ScriptedTokenUsagePlatform([new RateLimitExceededException(retryAfter: 1), new TextResult('done')], [new TokenUsage(), new TokenUsage()]);
+
+        $this->client($scriptedTokenUsagePlatform)->completeWithTools('sys', 'usr', $this->lookupTool(), 3);
+
+        self::assertSame([4096, 4096], array_column($scriptedTokenUsagePlatform->invokedOptions, PlatformOptions::MAX_OUTPUT_TOKENS));
     }
 
     /**
@@ -179,6 +324,14 @@ final class SymfonyAiLLMClientOutputCapRaiseTest extends TestCase
         } catch (BudgetExceededException) {
             self::assertSame(1, $scriptedTokenUsagePlatform->invocations);
         }
+    }
+
+    /**
+     * @throws InvalidToolRegistryException
+     */
+    private function lookupTool(): ToolRegistry
+    {
+        return new ToolRegistry([new CallbackTool('lookup', 'lookup')], new NullLogger());
     }
 
     private function client(ScriptedTokenUsagePlatform $scriptedTokenUsagePlatform, LoggerInterface $logger = new NullLogger()): SymfonyAiLLMClient

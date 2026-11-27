@@ -16,8 +16,12 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd;
 use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\AuditedProjectPathHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditAdvisoryDatabase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
 
 /**
  * Runs the real `bin/symfony-security-auditor` entry script in the hidden
@@ -65,6 +69,26 @@ final class StandaloneComposerModeEndToEndTest extends TestCase
         self::assertSame(var_export([false, false, false], true), $this->runInComposerMode([])->getOutput());
     }
 
+    public function test_the_advisory_lookup_reads_the_audit_of_a_composer_that_warns_about_the_sapi_it_runs_on(): void
+    {
+        $this->filesystem->dumpFile($this->composerPhar, <<<'PHP'
+            <?php
+            echo 'Warning: Composer should be invoked via the CLI version of PHP, not the '.PHP_SAPI.' SAPI'.PHP_EOL;
+            echo json_encode(['advisories' => ['symfony/http-kernel' => [['cve' => 'CVE-2099-0001', 'title' => 'Header injection', 'affectedVersions' => '<9.0', 'link' => 'https://example.com/advisory']]], 'abandoned' => []]);
+            PHP);
+
+        $advisoryDatabase = new ComposerAuditAdvisoryDatabase(
+            new SymfonyProcessComposerAuditRunner(processBuilder: fn (string $path): Process => $this->composerModeProcess(['audit', '--format=json', '--locked'], $path)),
+            new AuditedProjectPathHolder($this->base),
+            new NullLogger(),
+        );
+
+        self::assertSame(
+            [['cve' => 'CVE-2099-0001', 'title' => 'Header injection', 'summary' => 'Header injection', 'affected_versions' => '<9.0', 'link' => 'https://example.com/advisory']],
+            $advisoryDatabase->lookup('symfony/http-kernel', '6.4.0'),
+        );
+    }
+
     #[MaximumDuration(4000)]
     public function test_init_installs_the_bridge_with_its_own_composer_rather_than_one_on_the_host(): void
     {
@@ -89,9 +113,20 @@ final class StandaloneComposerModeEndToEndTest extends TestCase
      */
     private function runInComposerMode(array $arguments): Process
     {
-        $process = new Process(
+        $process = $this->composerModeProcess($arguments, $this->base);
+        $process->run();
+
+        return $process;
+    }
+
+    /**
+     * @param list<string> $arguments
+     */
+    private function composerModeProcess(array $arguments, string $workingDirectory): Process
+    {
+        return new Process(
             [\PHP_BINARY, \dirname(__DIR__, 3).'/bin/symfony-security-auditor', ...$arguments],
-            $this->base,
+            $workingDirectory,
             [
                 'HOME' => $this->base,
                 'XDG_CONFIG_HOME' => $this->base.'/config',
@@ -99,8 +134,5 @@ final class StandaloneComposerModeEndToEndTest extends TestCase
                 'SYMFONY_SECURITY_AUDITOR_COMPOSER' => $this->composerPhar,
             ],
         );
-        $process->run();
-
-        return $process;
     }
 }

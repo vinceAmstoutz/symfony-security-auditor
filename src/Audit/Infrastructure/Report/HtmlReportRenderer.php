@@ -27,6 +27,7 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
     public function __construct(
         private TemplateLoader $templateLoader = new TemplateLoader(),
         private DistributionBarChart $distributionBarChart = new DistributionBarChart(),
+        private ?string $subscription = null,
     ) {}
 
     #[Override]
@@ -52,7 +53,7 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
             '{{tokens}}' => $this->escape(\sprintf('%s in / %s out', number_format($cost->inputTokens()), number_format($cost->outputTokens()))),
             '{{primaryModel}}' => $this->escape('' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel()),
             '{{cost}}' => $this->escape(number_format($cost->estimatedCostUsd(), 4, '.', '')),
-            '{{costRateLabel}}' => $this->escape(CostRateLabel::of($cost)),
+            '{{costRateLabel}}' => $this->escape(CostRateLabel::of($cost, $this->subscription)),
             '{{riskLevel}}' => $this->escape($riskLevel),
             '{{riskLevelClass}}' => $this->escape(strtolower($riskLevel)),
             '{{riskDetail}}' => $this->escape(RiskHeadline::scoreDetail($auditReport, 'score')),

@@ -34,4 +34,12 @@ final class NonLocalPlatformEndpointException extends RuntimeException
             $provider,
         ));
     }
+
+    public static function forCliAgent(string $cliAgent): self
+    {
+        return new self(\sprintf(
+            'privacy.offline_only is enabled, but "%s" runs a coding agent\'s CLI, which sends every prompt to its vendor\'s cloud service. Configure a local platform (e.g. Ollama on http://localhost:11434) or disable privacy.offline_only.',
+            $cliAgent,
+        ));
+    }
 }

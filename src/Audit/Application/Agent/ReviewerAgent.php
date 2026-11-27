@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent;
 
 use Override;
 use Psr\Log\LoggerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\BatchAnswerReader;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\BatchReviewAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\BatchVerdictApplier;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Review\ConcurrentReviewAnalyzer;
@@ -53,6 +54,8 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = true;
 
+    public const int MAX_FILE_GROUP_SIZE = 20;
+
     private SequentialReviewAnalyzer $sequentialReviewAnalyzer;
 
     private ?StructuredReviewAnalyzer $structuredReviewAnalyzer;
@@ -62,6 +65,8 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
     private ?ConcurrentStructuredReviewAnalyzer $concurrentStructuredReviewAnalyzer;
 
     private BatchReviewAnalyzer $batchReviewAnalyzer;
+
+    private BatchVerdictApplier $batchVerdictApplier;
 
     private LoggerInterface $logger;
 
@@ -134,16 +139,17 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
             )
             : null;
 
+        $this->batchVerdictApplier = new BatchVerdictApplier($verdictApplier, $reviewerVerdictCache, $reviewerAgentCollaborators->logger, $reviewerAgentCollaborators->progressReporter, $reviewerAgentCollaborators->triageMemoryRecorder);
         $this->batchReviewAnalyzer = new BatchReviewAnalyzer(
             $reviewerAgentCollaborators->llmClient,
             $reviewerAgentCollaborators->reviewerPromptBuilder,
-            new BatchVerdictApplier($verdictApplier, $reviewerVerdictCache, $reviewerAgentCollaborators->logger, $reviewerAgentCollaborators->progressReporter, $reviewerAgentCollaborators->triageMemoryRecorder),
+            $this->batchVerdictApplier,
             $reviewerVerdictCache,
             $reviewOutcomeRecorder,
             $reviewerAgentCollaborators->logger,
             $reviewerModeConfiguration->maxToolIterations,
             $reviewerAgentCollaborators->recordReviewToolFactory,
-            $recordingToolClients,
+            new BatchAnswerReader($reviewerAgentCollaborators->llmClient, $this->batchVerdictApplier, $reviewerAgentCollaborators->logger, $recordingToolClients),
         );
     }
 
@@ -199,6 +205,73 @@ final readonly class ReviewerAgent implements ReviewerAgentInterface
         ]);
 
         return $reviewed;
+    }
+
+    /**
+     * Reviews a finding alone in its file as {@see self::review()} does. The
+     * findings that share a file go in calls of at most
+     * {@see self::MAX_FILE_GROUP_SIZE} findings of one file, so the file is
+     * sent once per call. An abort before those calls marks their findings
+     * unreached.
+     *
+     * @param list<Vulnerability> $vulnerabilities
+     * @param list<ProjectFile>   $projectFiles
+     * @param ?list<ProjectFile>  $toolFiles
+     *
+     * @return list<Vulnerability>
+     *
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    #[Override]
+    public function reviewByFile(array $vulnerabilities, array $projectFiles, CoverageRecorderInterface $coverageRecorder, bool $bypassCache, ?array $toolFiles): array
+    {
+        [$alone, $grouped] = $this->splitByFileGroup($vulnerabilities);
+
+        try {
+            $reviewed = $this->review($alone, $projectFiles, $coverageRecorder, $bypassCache, $toolFiles);
+        } catch (BudgetExceededException $budgetExceededException) {
+            $this->batchVerdictApplier->markBatchUnreached($grouped, 'aborted', $coverageRecorder);
+
+            throw $budgetExceededException;
+        } catch (LLMProviderException $llmProviderException) {
+            $this->batchVerdictApplier->markBatchUnreached($grouped, 'errored', $coverageRecorder);
+
+            throw $llmProviderException;
+        }
+
+        $useTools = $this->toolsEnabled && $this->toolRegistryFactory instanceof ToolRegistryFactoryInterface;
+        $reviewBatchSettings = new ReviewBatchSettings(
+            self::MAX_FILE_GROUP_SIZE,
+            $this->isStructuredEligible($useTools),
+            $bypassCache,
+            $coverageRecorder,
+            $useTools ? $this->toolRegistryFactory->forProjectFiles($toolFiles ?? $projectFiles) : null,
+            true,
+            max(1, $this->maxConcurrent),
+        );
+
+        return [...$reviewed, ...$this->batchReviewAnalyzer->analyze($grouped, [...$projectFiles, ...($toolFiles ?? [])], $reviewBatchSettings)];
+    }
+
+    /**
+     * Splits the findings into those alone in their file and those sharing it
+     * with another.
+     *
+     * @param list<Vulnerability> $findings
+     *
+     * @return array{list<Vulnerability>, list<Vulnerability>}
+     */
+    private function splitByFileGroup(array $findings): array
+    {
+        $countByFile = array_count_values(array_map(static fn (Vulnerability $vulnerability): string => $vulnerability->filePath(), $findings));
+        $isAlone = static fn (Vulnerability $vulnerability): bool => 1 === $countByFile[$vulnerability->filePath()];
+
+        return [
+            array_values(array_filter($findings, $isAlone)),
+            array_values(array_filter($findings, static fn (Vulnerability $vulnerability): bool => !$isAlone($vulnerability))),
+        ];
     }
 
     private function isStructuredEligible(bool $useTools): bool

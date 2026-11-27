@@ -19,14 +19,17 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Patch\UnifiedDiff;
 
 /**
  * A suggested fix as a GitHub `suggestion` block, which replaces one run of
- * lines: a fix that touches several hunks or files, or only adds lines, gets
- * none. Its fence outlasts any backtick run in the code.
+ * lines: a fix that touches several hunks or files, or only adds or only
+ * removes lines, gets none. Neither does a fix whose code holds a hidden
+ * marker of the auditor. Its fence outlasts any backtick run in the code.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class GithubSuggestion
 {
     public const string MARKER_PREFIX = '<!-- symfony-security-auditor:suggestion:';
+
+    private const string MARKER_NAMESPACE = '<!-- symfony-security-auditor:';
 
     private const int MINIMUM_FENCE_LENGTH = 3;
 
@@ -38,8 +41,13 @@ final readonly class GithubSuggestion
     public static function of(Vulnerability $vulnerability): ?self
     {
         $diffHunk = self::singleHunkOf($vulnerability);
+        if (!$diffHunk instanceof DiffHunk) {
+            return null;
+        }
 
-        return $diffHunk instanceof DiffHunk ? new self($vulnerability, $diffHunk) : null;
+        $githubSuggestion = new self($vulnerability, $diffHunk);
+
+        return str_contains($githubSuggestion->code(), self::MARKER_NAMESPACE) ? null : $githubSuggestion;
     }
 
     public function commentSection(): string
@@ -75,13 +83,18 @@ final readonly class GithubSuggestion
 
     private function block(): string
     {
-        $code = implode("\n", array_map(
-            static fn (string $line): string => TerminalTextSanitizer::stripControlCharacters(mb_scrub($line, 'UTF-8')),
-            $this->diffHunk->newLines,
-        ));
+        $code = $this->code();
         $fence = $this->fenceAround($code);
 
         return \sprintf("%ssuggestion\n%s\n%s", $fence, $code, $fence);
+    }
+
+    private function code(): string
+    {
+        return implode("\n", array_map(
+            static fn (string $line): string => TerminalTextSanitizer::stripControlCharacters(mb_scrub($line, 'UTF-8')),
+            $this->diffHunk->newLines,
+        ));
     }
 
     private static function singleHunkOf(Vulnerability $vulnerability): ?DiffHunk
@@ -94,7 +107,7 @@ final readonly class GithubSuggestion
 
         $diffHunk = $filePatches[0]->hunks[0];
 
-        return [] === $diffHunk->oldLines ? null : $diffHunk;
+        return [] === $diffHunk->oldLines || [] === $diffHunk->newLines ? null : $diffHunk;
     }
 
     private function fenceAround(string $code): string

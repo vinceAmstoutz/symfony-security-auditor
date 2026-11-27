@@ -13,18 +13,25 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Standalone;
 
+use Closure;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\AI\AiBundle\AiBundle;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBag;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Component\Process\Process;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullPricingProvider;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\SymfonyProcessComposerAuditRunner;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\EmbeddedComposer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ProviderKey;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\ContainerParameterSyntax;
@@ -33,15 +40,26 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\N
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FreeTextSettings;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\OfflineOnlyPlatformGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlatformPass;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PulledModelNoticePass;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnobtainableIdentityTokenException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ProcessCliAgentAccountProbe;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionCliInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionClis;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\MarkdownReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\CredentialConsoleBanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\NullConsoleBanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\SubscriptionAccountGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuardInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\ProviderBridgeException;
@@ -59,10 +77,28 @@ final readonly class StandaloneContainerFactory
 
     private const string PLATFORM_SERVICE_PREFIX = 'ai.platform.';
 
+    /**
+     * @param ?Closure(string): Process                           $advisoryProcessBuilder the `composer audit` process builder, `composer` on `PATH` when null
+     * @param array<key-of<CliAgentPlatforms::FACTORIES>, string> $cliAgentFactories
+     */
     public function __construct(
         private BundleExtensionLoader $bundleExtensionLoader = new BundleExtensionLoader(),
         private OfflineOnlyPlatformGuard $offlineOnlyPlatformGuard = new OfflineOnlyPlatformGuard(),
+        private ?Closure $advisoryProcessBuilder = null,
+        private array $cliAgentFactories = CliAgentPlatforms::FACTORIES,
+        private ?FederatedAnthropicAccess $federatedAnthropicAccess = null,
     ) {}
+
+    /**
+     * Audits advisories with the Composer this binary bundles, unpacked in the
+     * data directory, or with `composer` on `PATH` when it bundles none.
+     */
+    public static function withEmbeddedComposer(?EmbeddedComposer $embeddedComposer, XdgConfigPathResolver $xdgConfigPathResolver, ?FederatedAnthropicAccess $federatedAnthropicAccess = null): self
+    {
+        return $embeddedComposer instanceof EmbeddedComposer
+            ? new self(advisoryProcessBuilder: SymfonyProcessComposerAuditRunner::embeddedProcessBuilder($embeddedComposer, $xdgConfigPathResolver), federatedAnthropicAccess: $federatedAnthropicAccess)
+            : new self(federatedAnthropicAccess: $federatedAnthropicAccess);
+    }
 
     /**
      * @throws MissingBundleExtensionException
@@ -86,28 +122,53 @@ final readonly class StandaloneContainerFactory
             ->setArguments([$this->httpClientOptions($standaloneConfig)]);
 
         try {
-            $this->bundleExtensionLoader->load(new AiBundle(), $standaloneConfig->platform->toAiConfig(), $containerBuilder);
+            $this->bundleExtensionLoader->load(new AiBundle(), $this->aiConfigFor($standaloneConfig, $containerBuilder), $containerBuilder);
+            CliAgentPlatforms::register($containerBuilder, $standaloneConfig->platform->platform, $this->cliAgentFactories);
         } catch (RuntimeException $runtimeException) {
             throw ProviderBridgeException::forBundleFailure($runtimeException) ?? $runtimeException;
         }
-
-        CliAgentPlatforms::register($containerBuilder, $standaloneConfig->platform->platform);
 
         $this->bundleExtensionLoader->load(new SymfonySecurityAuditorBundle(), FreeTextSettings::literalIn(CliAgentPlatforms::auditConfigFor($standaloneConfig->auditConfig, $standaloneConfig->platform), $containerBuilder->getParameterBag()), $containerBuilder);
 
         $this->announceProjectConfigs($containerBuilder, $standaloneConfig);
         $this->registerAuditHeaderBanner($containerBuilder, $standaloneConfig->platform);
         $this->registerSubscriptionPricing($containerBuilder, CliAgentPlatforms::activeAgentOf($standaloneConfig->platform));
+        $this->registerSubscriptionAccountGuard($containerBuilder, $standaloneConfig->platform);
 
         $this->selectActivePlatform($containerBuilder, $standaloneConfig->platform);
+        $this->auditAdvisoriesWithEmbeddedComposer($containerBuilder);
 
         $containerBuilder->getDefinition(AuditCommand::class)->setPublic(true);
         $containerBuilder->getDefinition(McpServeCommand::class)->setPublic(true);
         $containerBuilder->getAlias(LLMClientInterface::class)->setPublic(true);
+        $containerBuilder->getAlias(ComposerAuditRunnerInterface::class)->setPublic(true);
         $containerBuilder->addCompilerPass(new PricingPlatformPass(PlatformInterface::class));
+        $containerBuilder->addCompilerPass(new PulledModelNoticePass());
         $containerBuilder->compile(true);
 
         return $containerBuilder;
+    }
+
+    /**
+     * @return array{platform: array<array-key, mixed>}
+     *
+     * @throws UnobtainableIdentityTokenException
+     */
+    private function aiConfigFor(StandaloneConfig $standaloneConfig, ContainerBuilder $containerBuilder): array
+    {
+        return $this->federatedAnthropicAccess instanceof FederatedAnthropicAccess
+            ? $this->federatedAnthropicAccess->configure($standaloneConfig->platform, $containerBuilder)
+            : $standaloneConfig->platform->toAiConfig();
+    }
+
+    private function auditAdvisoriesWithEmbeddedComposer(ContainerBuilder $containerBuilder): void
+    {
+        if (!$this->advisoryProcessBuilder instanceof Closure) {
+            return;
+        }
+
+        $containerBuilder->getDefinition(SymfonyProcessComposerAuditRunner::class)
+            ->setArgument('$processBuilder', $this->advisoryProcessBuilder);
     }
 
     /**
@@ -171,6 +232,23 @@ final readonly class StandaloneContainerFactory
         $containerBuilder->setAlias(PricingProviderInterface::class, NullPricingProvider::class);
         $containerBuilder->getDefinition(UnpricedModelBudgetGuard::class)->setArgument('$cliAgent', $cliAgent);
         $containerBuilder->getDefinition(AuditPresenter::class)->setArgument('$cliAgent', $cliAgent);
+        foreach ([ConsoleReportRenderer::class, MarkdownReportRenderer::class, HtmlReportRenderer::class] as $renderer) {
+            $containerBuilder->getDefinition($renderer)->setArgument('$subscription', SubscriptionClis::bundled()->of($cliAgent)?->subscription());
+        }
+    }
+
+    private function registerSubscriptionAccountGuard(ContainerBuilder $containerBuilder, StandalonePlatformConfig $standalonePlatformConfig): void
+    {
+        $cliAgent = CliAgentPlatforms::activeAgentOf($standalonePlatformConfig);
+        $subscriptionCli = null === $cliAgent ? null : SubscriptionClis::bundled()->of($cliAgent);
+        if (!$subscriptionCli instanceof SubscriptionCliInterface) {
+            return;
+        }
+
+        $settings = $standalonePlatformConfig->platform[$cliAgent] ?? null;
+        $containerBuilder->register(SubscriptionAccountGuard::class, SubscriptionAccountGuard::class)
+            ->setDecoratedService(UnpricedModelBudgetGuardInterface::class)
+            ->setArguments([new Reference('.inner'), new Definition($subscriptionCli::class), \is_array($settings) ? ($settings['cli_binary'] ?? null) : null, new Definition(ProcessCliAgentAccountProbe::class)]);
     }
 
     private function registerAuditHeaderBanner(ContainerBuilder $containerBuilder, StandalonePlatformConfig $standalonePlatformConfig): void

@@ -31,7 +31,21 @@ final readonly class OfflineOnlyPlatformGuard
     public function assertEveryPlatformIsLocal(StandalonePlatformConfig $standalonePlatformConfig): void
     {
         foreach ($standalonePlatformConfig->platform as $provider => $providerConfig) {
+            $this->assertIsNoCliAgent((string) $provider);
             $this->assertProviderIsLocal((string) $provider, \is_array($providerConfig) ? $providerConfig : []);
+        }
+    }
+
+    /**
+     * Refuses a coding agent's CLI, which talks to its vendor's cloud service
+     * whatever its settings say.
+     *
+     * @throws NonLocalPlatformEndpointException
+     */
+    public function assertIsNoCliAgent(string $platform): void
+    {
+        if (\array_key_exists($platform, CliAgentPlatforms::FACTORIES)) {
+            throw NonLocalPlatformEndpointException::forCliAgent($platform);
         }
     }
 

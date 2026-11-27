@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config;
 
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MalformedProjectConfigException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\WorkloadIdentityFederation;
 
 /**
  * Which environment variable the user's configuration reads the API key from;
@@ -27,6 +28,7 @@ final readonly class ConfiguredCredentialVariable
     public function __construct(
         private XdgConfigPathResolver $xdgConfigPathResolver,
         private StandaloneConfigFileReader $standaloneConfigFileReader = new StandaloneConfigFileReader(),
+        private ?WorkloadIdentityFederation $workloadIdentityFederation = null,
     ) {}
 
     /**
@@ -72,6 +74,32 @@ final readonly class ConfiguredCredentialVariable
         $block = PlatformApiKey::blockForProvider($platform, $this->activeProvider($parsed));
 
         return null !== $block && null === PlatformApiKey::valueIn($block);
+    }
+
+    /**
+     * Returns the provider `provider:` selects, else the only platform the
+     * configuration declares, else null. An `anthropic` provider names the
+     * workload identity federation it signs in with, when one is given.
+     */
+    public function provider(): ?ConfiguredProvider
+    {
+        $parsed = $this->parsedConfig();
+        $platform = $parsed['platform'] ?? null;
+        if (!\is_array($platform)) {
+            return null;
+        }
+
+        $name = $this->activeProvider($parsed) ?? (1 === \count($platform) ? (string) array_key_first($platform) : null);
+        if (null === $name) {
+            return null;
+        }
+
+        return ConfiguredProvider::of(
+            $name,
+            $parsed,
+            PlatformApiKey::blockForProvider($platform, $name) ?? [],
+            WorkloadIdentityFederation::PLATFORM === $name ? $this->workloadIdentityFederation?->credentialName() : null,
+        );
     }
 
     /**

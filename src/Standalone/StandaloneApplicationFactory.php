@@ -29,6 +29,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BridgeTree;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\BundledAiPlatformVersion;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPhar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\EmbeddedComposer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\StaleBridgeTreeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\SelfInvocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditedProjectConfig;
@@ -54,6 +55,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneC
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\YamlStandaloneConfigWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ProcessCliAgentAccountProbe;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\WorkloadIdentity\WorkloadIdentityFederation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\OllamaPulledModelList;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricedModelList;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevPricingProvider;
@@ -79,6 +82,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ComposerAvailabilityCheckerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ConfiguredModelCheck;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DoctorCommand;
@@ -88,6 +92,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnava
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Mcp\McpServeCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ProcessComposerAvailabilityChecker;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ProviderSetupDoctor;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ProviderSetupReader;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportDiffer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportFindingsLoader;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrendAnalyzer;
@@ -128,6 +134,7 @@ final readonly class StandaloneApplicationFactory
         private CredentialStoreInterface $credentialStore = new NullCredentialStore(),
         private array $environment = [],
         private ?string $bundledAiPlatformVersion = null,
+        private ?EmbeddedComposer $embeddedComposer = null,
     ) {}
 
     /**
@@ -151,15 +158,18 @@ final readonly class StandaloneApplicationFactory
         $pendingBinarySwap = new PendingBinarySwap();
         $filesystemCredentialStore = new FilesystemCredentialStore($xdgConfigPathResolver);
         $bundledAiPlatformVersion = BundledAiPlatformVersion::detect();
+        $embeddedComposer = EmbeddedComposer::bundled(new SelfInvocation($resolvedBinaryPath), new ComposerPhar(ComposerPhar::bundledPath()));
+        $federatedAnthropicAccess = FederatedAnthropicAccess::fromEnvironment($environment);
 
         return new self(
             new StandaloneConfigLoader(
                 $xdgConfigPathResolver,
-                new StandalonePlatformConfigResolver($environment, credentialStore: $filesystemCredentialStore),
+                new StandalonePlatformConfigResolver($environment, credentialStore: $filesystemCredentialStore, platformEnvironments: $federatedAnthropicAccess?->platformEnvironments() ?? []),
                 self::projectConfigFile($environment),
             ),
             $xdgConfigPathResolver,
             $bridgeInstaller ?? self::bridgeInstaller($resolvedBinaryPath, $bundledAiPlatformVersion),
+            StandaloneContainerFactory::withEmbeddedComposer($embeddedComposer, $xdgConfigPathResolver, $federatedAnthropicAccess),
             runningBinaryPath: $resolvedBinaryPath,
             pathEnvironment: $pathEnvironment,
             updateAvailabilityConsoleListener: self::updateAvailabilityConsoleListener(
@@ -173,6 +183,7 @@ final readonly class StandaloneApplicationFactory
             credentialStore: $filesystemCredentialStore,
             environment: $environment,
             bundledAiPlatformVersion: $bundledAiPlatformVersion,
+            embeddedComposer: $embeddedComposer,
         );
     }
 
@@ -255,9 +266,9 @@ final readonly class StandaloneApplicationFactory
         $standaloneApplication->addCommand($this->selfUpdateCommand());
         $standaloneApplication->addCommand($this->doctorCommand());
         $standaloneApplication->addCommand(new AuthSetCommand($this->credentialStore, $this->configuredCredentialVariable()));
-        $standaloneApplication->addCommand(new AuthStatusCommand($this->credentialStore, $this->configuredCredentialVariable(), $this->environment));
+        $standaloneApplication->addCommand(new AuthStatusCommand($this->credentialStore, $this->configuredCredentialVariable(), $this->environment, cliAgentAccountProbe: new ProcessCliAgentAccountProbe()));
         $standaloneApplication->addCommand(new AuthRemoveCommand($this->credentialStore, $this->configuredCredentialVariable()));
-        $standaloneApplication->addCommand(new AuthTestCommand(new StandaloneConnectionCheck($this->standaloneConfigLoader, $this->xdgConfigPathResolver, $this->standaloneContainerFactory)));
+        $standaloneApplication->addCommand(new AuthTestCommand(new StandaloneConnectionCheck($this->standaloneConfigLoader, $this->xdgConfigPathResolver, $this->standaloneContainerFactory), new ProviderSetupReader($this->configuredCredentialVariable(), new ProcessCliAgentAccountProbe())));
         $standaloneApplication->addCommand($this->lazyAuditCommand($standaloneApplication));
         $standaloneApplication->addCommand(new DiffCommand(new ReportDiffer(), new DiffPresenter()));
         $standaloneApplication->addCommand(new TrendCommand(new ReportTrendAnalyzer(new ReportDiffer()), new TrendPresenter()));
@@ -293,18 +304,25 @@ final readonly class StandaloneApplicationFactory
             $this->credentialStore,
             pricedModelList: new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath())),
             connectionTestRunner: new ProcessConnectionTestRunner(new SelfInvocation($this->runningBinaryPath)),
-            pulledModelList: new OllamaPulledModelList(HttpClient::create(['timeout' => 3])),
+            pulledModelList: new OllamaPulledModelList(HttpClient::create()),
         );
     }
 
     private function composerAvailabilityChecker(): ComposerAvailabilityCheckerInterface
     {
-        return new ProcessComposerAvailabilityChecker(ProcessComposerAvailabilityChecker::defaultProcessBuilder());
+        return new ProcessComposerAvailabilityChecker($this->embeddedComposer instanceof EmbeddedComposer
+            ? ProcessComposerAvailabilityChecker::embeddedProcessBuilder($this->embeddedComposer, $this->xdgConfigPathResolver)
+            : ProcessComposerAvailabilityChecker::defaultProcessBuilder());
     }
 
     private function configuredCredentialVariable(): ConfiguredCredentialVariable
     {
-        return new ConfiguredCredentialVariable($this->xdgConfigPathResolver);
+        return new ConfiguredCredentialVariable($this->xdgConfigPathResolver, workloadIdentityFederation: $this->workloadIdentityFederation());
+    }
+
+    private function workloadIdentityFederation(): ?WorkloadIdentityFederation
+    {
+        return FederatedAnthropicAccess::fromEnvironment($this->environment)?->workloadIdentityFederation;
     }
 
     private function selfUpdateCommand(): SelfUpdateCommand
@@ -407,7 +425,7 @@ final readonly class StandaloneApplicationFactory
     private function doctorCommand(): DoctorCommand
     {
         return new DoctorCommand(
-            new EnvironmentDoctor(
+            new ProviderSetupDoctor(new EnvironmentDoctor(
                 $this->standaloneConfigLoader,
                 $this->xdgConfigPathResolver,
                 $this->composerAvailabilityChecker(),
@@ -419,7 +437,12 @@ final readonly class StandaloneApplicationFactory
                 ),
                 new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath()),
                 bundledAiPlatformVersion: $this->bundledAiPlatformVersion,
-            ),
+                configuredModelCheck: new ConfiguredModelCheck(
+                    new ModelsDevPricedModelList(new ModelsDevPricingProvider(new NullLogger(), $this->refreshedCatalogPath())),
+                    new OllamaPulledModelList(HttpClient::create()),
+                ),
+                workloadIdentityFederation: $this->workloadIdentityFederation(),
+            ), $this->configuredCredentialVariable(), new ProcessCliAgentAccountProbe()),
             new StandaloneConnectionCheck($this->standaloneConfigLoader, $this->xdgConfigPathResolver, $this->standaloneContainerFactory),
         );
     }

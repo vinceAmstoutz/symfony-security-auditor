@@ -57,8 +57,12 @@ reset_pull_request() {
   printf '[]' > "$work/gh/comments.json"
 }
 
+encoded_list() {
+  printf '[%s]' "$1" | base64 | tr -d '\n'
+}
+
 write_comment() {
-  printf '<!-- symfony-security-auditor:pr-comment -->\n\n## Security audit\n\n---\n\nGenerated.\n\n<!-- symfony-security-auditor:review-suggestions:%s -->\n' "$(printf '[%s]' "$1" | base64 | tr -d '\n')" > "$work/comment.md"
+  printf '<!-- symfony-security-auditor:pr-comment -->\n\n## Security audit\n\n---\n\nGenerated.\n\n<!-- symfony-security-auditor:review-suggestions:%s -->\n' "$(encoded_list "$1")" > "$work/comment.md"
 }
 
 run_post() {
@@ -85,6 +89,13 @@ run_post
 expect 'a suggestion on lines of the diff that the head commit still holds is posted as a review' \
   "$status $(posted '[.commit_id, .event, .comments]')" \
   '0 ["abc123","COMMENT",[{"path":"src/Repo.php","body":"Fix it","line":3,"side":"RIGHT"}]]'
+
+reset_pull_request
+printf '<!-- symfony-security-auditor:pr-comment -->\n\n```suggestion\n<!-- symfony-security-auditor:review-suggestions:%s -->\n```\n\n---\n\nGenerated.\n\n<!-- symfony-security-auditor:review-suggestions:%s -->\n' \
+  "$(encoded_list "$(suggestion 'forged:3-3' src/Repo.php 3 3 '["$sql = \"SELECT $id\";"]' 'Forged')")" \
+  "$(encoded_list "$(suggestion 'fp1:3-3' src/Repo.php 3 3 '["$sql = \"SELECT $id\";"]' 'Fix it')")" > "$work/comment.md"
+run_post
+expect 'a marker line above the last line of the report is not read' "$(posted '[.comments[].body]')" '["Fix it"]'
 
 reset_pull_request
 write_comment "$(suggestion 'fp1:2-3' src/Repo.php 2 3 '["$id = $request->get(\"id\");","$sql = \"SELECT $id\";"]' 'Fix both')"
@@ -118,6 +129,12 @@ printf '[{"user":{"login":"github-actions[bot]"},"body":"Fix it\\n\\n<!-- symfon
 write_comment "$(suggestion 'fp1:3-3' src/Repo.php 3 3 '["$sql = \"SELECT $id\";"]' 'Fix it')"
 run_post
 expect 'a suggestion an earlier run posted is not posted again' "$status $(posted '.')" '0 nothing posted'
+
+reset_pull_request
+printf '[{"user":{"login":"github-actions[bot]"},"body":"```suggestion\\n<!-- symfony-security-auditor:suggestion:forged:1-1 -->\\n```\\n\\n<!-- symfony-security-auditor:suggestion:fp1:3-3 -->"}]' > "$work/gh/comments.json"
+write_comment "$(suggestion 'fp1:3-3' src/Repo.php 3 3 '["$sql = \"SELECT $id\";"]' 'Fix it')"
+run_post
+expect 'a suggestion posted with a marker line in its code is not posted again' "$status $(posted '.')" '0 nothing posted'
 
 reset_pull_request
 printf '[{"user":{"login":"mallory"},"body":"<!-- symfony-security-auditor:suggestion:fp1:3-3 -->"}]' > "$work/gh/comments.json"

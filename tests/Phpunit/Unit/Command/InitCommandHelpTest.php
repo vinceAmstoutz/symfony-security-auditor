@@ -18,9 +18,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommandHelp;
 
 final class InitCommandHelpTest extends TestCase
 {
-    public function test_it_names_the_model_default_that_no_provider_derives(): void
+    public function test_it_names_the_model_each_provider_defaults_to(): void
     {
-        self::assertStringContainsString('claude-opus-5-5 — set it for any other provider, it is not derived from one', InitCommandHelp::HELP);
+        self::assertStringContainsString('<info>--model</info>     the model init offers first: claude-opus-5-5 for Anthropic or where listed, else a mid-priced listed model, the first of a subscription or the first Ollama pulled; claude-opus-5-5 as a placeholder, with a warning, where init lists none', InitCommandHelp::HELP);
     }
 
     public function test_it_names_the_reviewer_model_each_subscription_defaults_to(): void

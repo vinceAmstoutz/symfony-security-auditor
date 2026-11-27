@@ -61,7 +61,7 @@ One install, many projects, zero footprint in the audited app. Each release ship
 
 ### Requirements
 
-Nothing but the binary and access to a model: an API key, a Claude or ChatGPT subscription through its CLI, or a [local model](#supported-platforms) such as Ollama. No PHP or Composer: the one-time [`init`](#2-configure-the-guided-init) fetches the provider bridge with the Composer the binary bundles. `--since` needs `git`. Live CVE lookups use `composer audit` when `composer` is present.
+Nothing but the binary and access to a model: an API key, a Claude or ChatGPT subscription through its CLI, or a [local model](#supported-platforms) such as Ollama. No PHP or Composer: the one-time [`init`](#2-configure-the-guided-init) fetches the provider bridge with the Composer the binary bundles. `--since` needs `git`. Live CVE lookups run `composer audit` with that bundled Composer too.
 
 ### 1. Install
 
@@ -124,6 +124,10 @@ symfony-security-auditor self-update --check  # only report whether a newer vers
 ```
 
 `self-update` verifies the checksum before replacing the binary. See the [CLI reference](docs/configuration.md#self-update-updating-the-standalone-binary). `self-update --snapshot` (or `SSA_VERSION=snapshot` with the installers) installs the pre-release built from every push to the development branch; a plain `self-update` returns to the latest release.
+
+### 5. Shell completion (optional)
+
+`symfony-security-auditor completion bash|zsh|fish` prints a script that makes <kbd>Tab</kbd> complete commands, options and arguments. [Shell completion](docs/configuration.md#shell-completion) shows where each shell loads it from. You write it once: it keeps working after a `self-update`.
 
 ## Use it as a Symfony bundle
 

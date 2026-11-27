@@ -76,10 +76,12 @@ final readonly class SequentialToolLoop
 
         for ($iteration = 0; $iteration <= $maxToolIterations; ++$iteration) {
             $this->budgetTracker?->assertWithinBudget();
-            $deferredResult = $this->invokeOrEndConversation($conversationState, $iteration);
-            if ($deferredResult instanceof LLMResponse) {
-                return $deferredResult;
+            $answered = $this->invokeOrEndConversation($conversationState, $iteration);
+            if ($answered instanceof LLMResponse) {
+                return $answered;
             }
+
+            [$deferredResult, $conversationState] = $answered;
 
             $platformResult = $deferredResult->getResult();
             $conversationState = $this->bookIteration($conversationState, $deferredResult);
@@ -114,9 +116,11 @@ final readonly class SequentialToolLoop
     }
 
     /**
-     * Returns the platform's answer, or the response that ends the
-     * conversation when the model answered nothing or the tool results
-     * outgrew its input limit.
+     * Returns the platform's answer with the conversation it continues, or
+     * the response that ends the conversation when the model answered
+     * nothing or the tool results outgrew its input limit.
+     *
+     * @return array{DeferredResult, ConversationState}|LLMResponse
      *
      * @throws MissingAiPlatformException
      * @throws TransientLLMFailureException
@@ -127,10 +131,10 @@ final readonly class SequentialToolLoop
      * @throws NegativeTokenCountException
      * @throws BudgetExceededException
      */
-    private function invokeOrEndConversation(ConversationState $conversationState, int $iteration): DeferredResult|LLMResponse
+    private function invokeOrEndConversation(ConversationState $conversationState, int $iteration): array|LLMResponse
     {
         try {
-            return $this->retryingPlatformInvoker->invoke($conversationState->bag, $conversationState->options, $conversationState->estimatedInputTokens);
+            return $this->retryingPlatformInvoker->invokeConversation($conversationState);
         } catch (EmptyLLMResponseException $emptyllmResponseException) {
             return $this->emptyToolLoopResponseAndLog($emptyllmResponseException, $iteration, $conversationState->tokenUsage());
         } catch (LLMRequestTooLargeException $llmRequestTooLargeException) {
@@ -187,7 +191,7 @@ final readonly class SequentialToolLoop
         return FinalRound::settled(LLMResponse::of(
             $content,
             $this->model,
-            $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
+            $this->platformResultExtractor->extractStopReason($deferredResult),
             $conversationState->tokenUsage(),
         ), $roundsLeft, $conversationState->askedToRead);
     }

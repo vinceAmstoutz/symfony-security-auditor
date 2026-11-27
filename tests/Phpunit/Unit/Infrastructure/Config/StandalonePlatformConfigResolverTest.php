@@ -184,6 +184,36 @@ final class StandalonePlatformConfigResolverTest extends TestCase
      * @throws UnreadableCredentialStoreException
      * @throws UnsupportedEnvPlaceholderException
      */
+    public function test_it_selects_a_lone_subscription_block_without_a_selector(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver())
+            ->resolve(['platform' => ['codex' => ['effort' => 'medium']]]);
+
+        self::assertSame('codex', $standalonePlatformConfig->activeProvider);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_it_leaves_a_subscription_block_beside_another_platform_to_the_selector(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver())
+            ->resolve(['platform' => ['claudecode' => [], 'anthropic' => ['api_key' => 'a']]]);
+
+        self::assertNull($standalonePlatformConfig->activeProvider);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
     public function test_it_rejects_a_config_without_a_platform_block(): void
     {
         $this->expectException(MissingPlatformException::class);
@@ -629,6 +659,127 @@ final class StandalonePlatformConfigResolverTest extends TestCase
     }
 
     /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_another_platform_the_provider_selects_never_reads_the_variables_kept_for_a_run_on_anthropic(): void
+    {
+        $this->expectException(MissingEnvironmentVariableException::class);
+        $this->expectExceptionMessageContaining('"ANTHROPIC_API_KEY"');
+
+        $this->resolverKeepingAnApiKeyForAnthropic()->resolve([
+            'provider' => 'generic.gw',
+            'platform' => ['generic' => ['gw' => ['base_url' => 'https://gateway.example', 'api_key' => '%env(ANTHROPIC_API_KEY)%']]],
+        ]);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_only_the_block_of_the_selected_platform_reads_the_variables_kept_for_a_run_on_it(): void
+    {
+        $standalonePlatformConfig = $this->resolverKeepingAnApiKeyForAnthropic()->resolve([
+            'provider' => 'anthropic',
+            'platform' => [
+                'generic' => ['gw' => ['base_url' => 'https://gateway.example', 'api_key' => '%env(ANTHROPIC_API_KEY)%']],
+                'anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%'],
+            ],
+        ]);
+
+        self::assertSame(
+            [
+                'generic' => ['gw' => ['base_url' => 'https://gateway.example', 'api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]],
+                'anthropic' => ['api_key' => 'stand-in-key'],
+            ],
+            $standalonePlatformConfig->platform,
+        );
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_an_anthropic_block_beside_the_platform_the_provider_selects_never_reads_the_variables_kept_for_it(): void
+    {
+        $standalonePlatformConfig = $this->resolverKeepingAnApiKeyForAnthropic()->resolve([
+            'provider' => 'openai',
+            'platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%'], 'openai' => ['api_key' => '%env(OPENAI_API_KEY)%']],
+        ]);
+
+        self::assertSame(['anthropic' => ['api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL], 'openai' => ['api_key' => 'sk-openai']], $standalonePlatformConfig->platform);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_provider_written_as_a_placeholder_is_read_as_written_and_keeps_no_variables_for_the_anthropic_block(): void
+    {
+        $standalonePlatformConfig = (new StandalonePlatformConfigResolver(['SSA_PROVIDER' => 'anthropic'], platformEnvironments: ['anthropic' => ['ANTHROPIC_API_KEY' => 'stand-in-key']]))->resolve([
+            'provider' => '%env(SSA_PROVIDER)%',
+            'platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']],
+        ]);
+
+        self::assertSame(['anthropic' => ['api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]], $standalonePlatformConfig->platform);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_several_platforms_no_provider_selects_read_no_variables_kept_for_anthropic(): void
+    {
+        $this->expectException(MissingEnvironmentVariableException::class);
+        $this->expectExceptionMessageContaining('"ANTHROPIC_API_KEY"');
+
+        $this->resolverKeepingAnApiKeyForAnthropic()->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%'], 'openai' => ['api_key' => '%env(OPENAI_API_KEY)%']]]);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_a_provider_naming_anthropic_without_its_block_resolves_the_other_blocks_as_unselected(): void
+    {
+        $standalonePlatformConfig = $this->resolverKeepingAnApiKeyForAnthropic()->resolve(['provider' => 'anthropic', 'platform' => ['openai' => ['api_key' => '%env(MISSING_OPENAI_KEY)%']]]);
+
+        self::assertSame(['openai' => ['api_key' => StandalonePlatformConfigResolver::UNNEEDED_CREDENTIAL]], $standalonePlatformConfig->platform);
+    }
+
+    /**
+     * @throws MissingPlatformException
+     * @throws MissingEnvironmentVariableException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    public function test_the_only_platform_reads_the_variables_kept_for_a_run_on_it(): void
+    {
+        $standalonePlatformConfig = $this->resolverKeepingAnApiKeyForAnthropic()->resolve(['platform' => ['anthropic' => ['api_key' => '%env(ANTHROPIC_API_KEY)%']]]);
+
+        self::assertSame(['anthropic' => ['api_key' => 'stand-in-key']], $standalonePlatformConfig->platform);
+    }
+
+    /**
      * @param array<array-key, mixed> $platform
      * @param array<array-key, mixed> $expected
      *
@@ -875,5 +1026,10 @@ final class StandalonePlatformConfigResolverTest extends TestCase
 
         self::assertInstanceOf(UnsupportedEnvPlaceholderException::class, $caught);
         self::assertStringNotContainsString($pastedKey, $caught->getMessage());
+    }
+
+    private function resolverKeepingAnApiKeyForAnthropic(): StandalonePlatformConfigResolver
+    {
+        return new StandalonePlatformConfigResolver(['OPENAI_API_KEY' => 'sk-openai'], platformEnvironments: ['anthropic' => ['ANTHROPIC_API_KEY' => 'stand-in-key']]);
     }
 }

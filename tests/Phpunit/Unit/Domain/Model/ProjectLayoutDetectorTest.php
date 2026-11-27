@@ -81,9 +81,19 @@ final class ProjectLayoutDetectorTest extends TestCase
     /**
      * @throws InvalidProjectFileException
      */
+    public function test_an_api_platform_state_processor_alone_is_no_cqrs(): void
+    {
+        $files = [ProjectFile::create('src/State/UserPasswordHasher.php', '/app/a', "<?php\nuse ApiPlatform\\State\\ProcessorInterface;\nfinal class UserPasswordHasher implements ProcessorInterface {}")];
+
+        self::assertSame([], ProjectLayoutDetector::stylesOf($files));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
     public function test_single_action_classes_mark_action_domain_responder(): void
     {
-        $files = [ProjectFile::create('src/Billing/UI/Http/Action/ShowInvoiceAction.php', '/app/a', '<?php final class ShowInvoiceAction {}')];
+        $files = [ProjectFile::create('src/Billing/UI/Http/Action/ShowInvoiceAction.php', '/app/a', '<?php final class ShowInvoiceAction { public function __invoke(Request $request): Response {} }')];
 
         self::assertSame([ArchitectureStyle::ACTION_DOMAIN_RESPONDER], ProjectLayoutDetector::stylesOf($files));
     }
@@ -93,9 +103,19 @@ final class ProjectLayoutDetectorTest extends TestCase
      */
     public function test_single_action_classes_in_an_actions_folder_mark_action_domain_responder(): void
     {
-        $files = [ProjectFile::create('src/Http/Actions/DeleteAccountAction.php', '/app/a', '<?php final class DeleteAccountAction {}')];
+        $files = [ProjectFile::create('src/Http/Actions/DeleteAccountAction.php', '/app/a', '<?php final class DeleteAccountAction { public function __invoke(Request $request): Response {} }')];
 
         self::assertSame([ArchitectureStyle::ACTION_DOMAIN_RESPONDER], ProjectLayoutDetector::stylesOf($files));
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     */
+    public function test_an_action_that_handles_no_http_request_is_no_single_action_class(): void
+    {
+        $files = [ProjectFile::create('src/Payum/Action/CaptureAction.php', '/app/a', '<?php final class CaptureAction implements ActionInterface { public function execute($request): void {} }')];
+
+        self::assertSame([], ProjectLayoutDetector::stylesOf($files));
     }
 
     /**

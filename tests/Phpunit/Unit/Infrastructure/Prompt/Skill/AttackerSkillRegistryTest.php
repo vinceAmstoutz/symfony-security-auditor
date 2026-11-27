@@ -342,4 +342,46 @@ final class AttackerSkillRegistryTest extends TestCase
 
         self::assertStringContainsString('a non-GET route cannot be hijacked this way.', $block);
     }
+
+    public function test_controller_trust_boundary_skill_does_not_wave_off_absolute_urls_the_router_builds(): void
+    {
+        $block = (new ControllerTrustBoundaryAttackerSkill())->block();
+
+        self::assertStringNotContainsString('the configured request context, not a manually read `Host` header', $block);
+    }
+
+    public function test_controller_trust_boundary_skill_hunts_links_the_router_builds_from_the_request_host(): void
+    {
+        $block = (new ControllerTrustBoundaryAttackerSkill())->block();
+
+        self::assertStringContainsString('Report as `host_header_injection`.', $block);
+    }
+
+    public function test_controller_trust_boundary_skill_does_not_flag_links_built_from_the_configured_default_uri(): void
+    {
+        $block = (new ControllerTrustBoundaryAttackerSkill())->block();
+
+        self::assertStringContainsString('`framework.router.default_uri`', $block);
+    }
+
+    public function test_controller_trust_boundary_skill_hunts_only_router_links_the_request_itself_returns_or_sends(): void
+    {
+        $block = (new ControllerTrustBoundaryAttackerSkill())->block();
+
+        self::assertStringContainsString("with `UrlGeneratorInterface::ABSOLUTE_URL` in the PHP that handles the request and returns or sends the link, or by Twig's `url()` in a template that request renders,", $block);
+    }
+
+    public function test_controller_trust_boundary_skill_caps_the_confidence_of_a_router_link_while_trusted_hosts_cannot_be_seen(): void
+    {
+        $block = (new ControllerTrustBoundaryAttackerSkill())->block();
+
+        self::assertStringContainsString('Unless you can see that `framework.trusted_hosts` is unset, in a configuration file of the chunk or one you read, set `confidence` no higher than 0.6 and name that unverified setting in `attack_vector`.', $block);
+    }
+
+    public function test_controller_trust_boundary_skill_does_not_flag_a_link_in_a_mail_the_messenger_worker_renders(): void
+    {
+        $block = (new ControllerTrustBoundaryAttackerSkill())->block();
+
+        self::assertStringContainsString("- Twig's `url()` in the template of a `TemplatedEmail`, unless the code handling the request visibly renders that template itself (`renderView()`, `Environment::render()`): a mail sent through Messenger is rendered by the worker, where `framework.router.default_uri` applies.", $block);
+    }
 }

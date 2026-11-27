@@ -212,6 +212,33 @@ Outputs: `exit-code`, `report-path`, `badge-path`, `comment-url`, `complete` (_s
           output: report.sarif
 ```
 
+#### Authenticate without a stored key
+
+_Since 1.23_, in `mode: standalone` with the `anthropic` provider, the audit can authenticate through [Anthropic workload identity federation](https://platform.claude.com/docs/en/manage-claude/workload-identity-federation) in place of `ANTHROPIC_API_KEY`, so the repository stores no key. Create a federation rule that trusts the issuer `https://token.actions.githubusercontent.com`, the audience `https://api.anthropic.com` and your workflow's subject (such as `repo:my-org/my-app:ref:refs/heads/main`). Then give the job `id-token: write` and pass the rule through the variables the Anthropic SDK and Claude Code read:
+
+```yaml
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # lets the audit request its GitHub identity token
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Symfony Security Audit
+        uses: vinceamstoutz/symfony-security-auditor@1.22.1
+        env:
+          ANTHROPIC_FEDERATION_RULE_ID: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID }}
+          ANTHROPIC_ORGANIZATION_ID: ${{ vars.ANTHROPIC_ORGANIZATION_ID }}
+          ANTHROPIC_SERVICE_ACCOUNT_ID: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID }} # optional
+          ANTHROPIC_WORKSPACE_ID: ${{ vars.ANTHROPIC_WORKSPACE_ID }} # optional
+        with:
+          mode: standalone
+```
+
+The audit asks the runner for a fresh identity token, exchanges it for an access token and sends that token as `Authorization: Bearer`, adding the `oauth-2025-04-20` beta Anthropic requires of such a token to the `anthropic-beta` header of each call. It exchanges a new one a minute before the previous one expires, so a long audit keeps running. When `ANTHROPIC_API_KEY` holds a key, the key wins and federation is not used, as in the Anthropic SDK. A job without `id-token: write` stops before the audit starts and says so. An exchange Anthropic refuses stops the run with the reason Anthropic gives.
+
 Accept the current findings as a baseline once (locally), then commit it so future PRs only report new findings:
 
 ```bash

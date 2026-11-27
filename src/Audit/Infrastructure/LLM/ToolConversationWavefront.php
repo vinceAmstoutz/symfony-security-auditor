@@ -290,8 +290,9 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * Ends the conversation without a retry on a degraded answer or a prompt
-     * the model cannot take in.
+     * Asks a tool call the output cap cut off again with a raised cap, once
+     * per conversation; ends the conversation without a retry on any other
+     * degraded answer or a prompt the model cannot take in.
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
@@ -301,6 +302,11 @@ final readonly class ToolConversationWavefront
      */
     private function recoverFailedInvocation(ConversationState $conversationState, Throwable $throwable, ToolLLMRequest $toolLLMRequest, int $maxToolIterations): ConversationState
     {
+        $raisedCapState = $this->retryingPlatformInvoker->conversationWithARaisedCap($throwable, $conversationState);
+        if ($raisedCapState instanceof ConversationState) {
+            return $this->retryOrAbortConversation($raisedCapState, $toolLLMRequest, $maxToolIterations, $throwable);
+        }
+
         $degradedStopReason = $this->transientFailureClassifier->degradedStopReason($throwable);
         if (null !== $degradedStopReason) {
             return $this->endDegradedConversation($conversationState, $throwable, $degradedStopReason);
@@ -340,7 +346,7 @@ final readonly class ToolConversationWavefront
         return $conversationState->withResponse(FinalRound::settled(LLMResponse::of(
             $this->platformResultExtractor->extractText($platformResult),
             $this->model,
-            $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
+            $this->platformResultExtractor->extractStopReason($deferredResult),
             $conversationState->tokenUsage(),
         ), $conversationState->roundsLeft, $conversationState->askedToRead));
     }
@@ -355,15 +361,17 @@ final readonly class ToolConversationWavefront
      * @throws NonTransientLLMFailureException
      * @throws TransientLLMFailureException
      */
-    private function retryOrAbortConversation(ConversationState $conversationState, ToolLLMRequest $toolLLMRequest, int $maxToolIterations): ConversationState
+    private function retryOrAbortConversation(ConversationState $conversationState, ToolLLMRequest $toolLLMRequest, int $maxToolIterations, ?Throwable $cutFailure = null): ConversationState
     {
-        $retried = $this->retryInvocation($conversationState, $toolLLMRequest, $maxToolIterations);
+        $retried = $this->retryInvocation($conversationState, $toolLLMRequest, $maxToolIterations, $cutFailure);
         if ($retried instanceof ConversationState) {
             return $retried;
         }
 
+        [$deferredResult, $conversationState] = $retried;
+
         try {
-            return $this->processDeferredResult($conversationState, $retried, $toolLLMRequest);
+            return $this->processDeferredResult($conversationState, $deferredResult, $toolLLMRequest);
         } catch (BudgetExceededException $budgetExceededException) {
             throw $budgetExceededException;
         } catch (Throwable) {
@@ -372,21 +380,23 @@ final readonly class ToolConversationWavefront
     }
 
     /**
-     * Returns the retried answer, or the state the conversation ends in when
-     * the retry fails. Checks the budget first; a retry that spends it aborts
-     * on the budget.
+     * Returns the retried answer with the conversation it continues, or the
+     * state the conversation ends in when the retry fails. Checks the budget
+     * first; a retry that spends it aborts on the budget.
+     *
+     * @return array{DeferredResult, ConversationState}|ConversationState
      *
      * @throws BudgetExceededException
      * @throws InvalidTokenUsageException
      * @throws NonTransientLLMFailureException
      * @throws TransientLLMFailureException
      */
-    private function retryInvocation(ConversationState $conversationState, ToolLLMRequest $toolLLMRequest, int $maxToolIterations): DeferredResult|ConversationState
+    private function retryInvocation(ConversationState $conversationState, ToolLLMRequest $toolLLMRequest, int $maxToolIterations, ?Throwable $cutFailure): array|ConversationState
     {
         $this->budgetTracker?->assertWithinBudget();
 
         try {
-            return $this->retryingPlatformInvoker->invoke($conversationState->bag, $conversationState->options, $conversationState->estimatedInputTokens);
+            return $this->retryingPlatformInvoker->invokeConversation($conversationState, $cutFailure);
         } catch (EmptyLLMResponseException $emptyLLMResponseException) {
             return $this->endDegradedConversation($conversationState, $emptyLLMResponseException, $emptyLLMResponseException->stopReason);
         } catch (LLMRequestTooLargeException $llmRequestTooLargeException) {

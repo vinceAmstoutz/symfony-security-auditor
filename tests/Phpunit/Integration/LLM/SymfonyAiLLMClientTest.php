@@ -21,6 +21,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
+use Symfony\AI\Platform\Exception\ModelNotFoundException;
 use Symfony\AI\Platform\Exception\RateLimitExceededException;
 use Symfony\AI\Platform\FinishReason\FinishReason;
 use Symfony\AI\Platform\FinishReason\FinishReasonCase;
@@ -64,6 +65,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\Inva
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\MissingAiPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\NonTransientLLMFailureException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\TransientLLMFailureException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ModelSetting;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformAccountingConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformBinding;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\PlatformRequestConfig;
@@ -577,6 +579,31 @@ final class SymfonyAiLLMClientTest extends TestCase
         $symfonyAiLLMClient = new SymfonyAiLLMClient(
             new PlatformBinding($platform, 'deepseek-v4-pro', new NullLogger(), maxOutputTokens: 4096),
             new PlatformRequestConfig(temperature: 0.2, servingPlatform: $servingPlatform),
+        );
+        $symfonyAiLLMClient->complete('s', 'u');
+
+        self::assertSame(['temperature' => 0.2], $invocationOptionsCapture->options);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws InvalidRetryConfigurationException
+     * @throws LLMRequestTooLargeException
+     */
+    #[DataProvider('platformsNotTranslatingTheCanonicalOutputCap')]
+    public function test_complete_sends_no_configured_output_cap_to_a_platform_that_would_not_translate_it(string $servingPlatform): void
+    {
+        $invocationOptionsCapture = new InvocationOptionsCapture();
+        $platform = $this->scriptedPlatformCapturingOptions(new TextResult('out'), $invocationOptionsCapture);
+
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($platform, 'deepseek-v4-pro', new NullLogger(), maxOutputTokens: 8000),
+            new PlatformRequestConfig(temperature: 0.2, servingPlatform: $servingPlatform, capsEveryModel: true),
         );
         $symfonyAiLLMClient->complete('s', 'u');
 
@@ -1808,7 +1835,7 @@ final class SymfonyAiLLMClientTest extends TestCase
      * @throws InvalidRetryConfigurationException
      * @throws LLMRequestTooLargeException
      */
-    public function test_complete_with_tools_falls_back_to_empty_text_when_platform_returns_unknown_result_type(): void
+    public function test_complete_with_tools_answers_an_unknown_result_type_as_no_verdict(): void
     {
         $tool = $this->makeTool('lookup', 'lookup');
         $toolRegistry = new ToolRegistry([$tool], new NullLogger());
@@ -1828,7 +1855,7 @@ final class SymfonyAiLLMClientTest extends TestCase
         $llmResponse = $symfonyAiLLMClient->completeWithTools('sys', 'usr', $toolRegistry, 3);
 
         self::assertSame('', $llmResponse->content());
-        self::assertSame('end_turn', $llmResponse->stopReason());
+        self::assertSame('empty_content', $llmResponse->stopReason());
     }
 
     /**
@@ -2535,6 +2562,91 @@ final class SymfonyAiLLMClientTest extends TestCase
             self::assertSame(1, $warnings[0][1]['attempt']);
             self::assertSame(2, $warnings[1][1]['attempt']);
         }
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
+     */
+    #[DataProvider('unknownModelFailures')]
+    public function test_a_model_the_provider_does_not_know_is_named_with_the_setting_that_fixes_it(RuntimeException $failure): void
+    {
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($this->flakyPlatform([$failure]), 'qwen9', new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(retryPolicy: new RetryPolicy(new BackoffSchedule(maxAttempts: 5), jitterSource: static fn (): float => 0.5), transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper()),
+        );
+
+        $this->expectException(NonTransientLLMFailureException::class);
+        $this->expectExceptionMessageContaining(\sprintf('The provider does not know the model "qwen9": %s. Set model: in the standalone config.yaml or run init --model=<model id>, or set symfony_security_auditor.model in a Symfony application.', $failure->getMessage()));
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
+     */
+    public function test_a_model_the_provider_does_not_know_names_the_reviewer_model_setting_that_configured_it(): void
+    {
+        $failure = new RuntimeException('HTTP 404: {"error":{"message":"model \'qwen9\' not found"}}');
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($this->flakyPlatform([$failure]), 'qwen9', new NullLogger(), modelSetting: ModelSetting::ReviewerModel),
+            platformResilienceConfig: new PlatformResilienceConfig(transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper()),
+        );
+
+        $this->expectException(NonTransientLLMFailureException::class);
+        $this->expectExceptionMessageContaining('Set reviewer_model: in the standalone config.yaml or run init --reviewer-model=<model id>, or set symfony_security_auditor.reviewer_model in a Symfony application.');
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+    }
+
+    /**
+     * @throws InvalidRetryConfigurationException
+     * @throws BudgetExceededException
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws LLMRequestTooLargeException
+     */
+    public function test_a_streaming_client_names_the_attacker_model_setting_that_configured_its_unknown_model(): void
+    {
+        $failure = new RuntimeException('HTTP 404: {"type":"error","error":{"type":"not_found_error","message":"model: qwen9"}}');
+        $symfonyAiLLMClient = new SymfonyAiLLMClient(
+            new PlatformBinding($this->flakyPlatform([$failure]), 'qwen9', new NullLogger(), modelSetting: ModelSetting::AttackerModel),
+            new PlatformRequestConfig(servingPlatform: 'anthropic', streaming: true),
+            new PlatformResilienceConfig(transientFailureClassifier: new TransientFailureClassifier(), sleeper: new FakeSleeper()),
+        );
+
+        $this->expectException(NonTransientLLMFailureException::class);
+        $this->expectExceptionMessageContaining('Set attacker_model: in the standalone config.yaml, or set symfony_security_auditor.attacker_model in a Symfony application.');
+
+        $symfonyAiLLMClient->complete('sys', 'usr');
+    }
+
+    /**
+     * @return iterable<string, array{RuntimeException}>
+     */
+    public static function unknownModelFailures(): iterable
+    {
+        yield 'OpenAI' => [new RuntimeException('HTTP 404: {"error":{"message":"The model `qwen9` does not exist or you do not have access to it.","code":"model_not_found"}}')];
+        yield 'Anthropic' => [new RuntimeException('HTTP 404: {"type":"error","error":{"type":"not_found_error","message":"model: qwen9"}}')];
+        yield 'Ollama' => [new RuntimeException('model "qwen9" not found, try pulling it first')];
+        yield 'Gemini' => [new RuntimeException('HTTP 404: models/qwen9 is not found for API version v1beta')];
+        yield 'a catalog that does not list it' => [new RuntimeException('Catalog lookup failed', 0, new ModelNotFoundException('qwen9'))];
     }
 
     /**

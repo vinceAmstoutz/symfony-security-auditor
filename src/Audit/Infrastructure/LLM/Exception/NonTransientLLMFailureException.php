@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exceptio
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\ProviderMessageRedactor;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\ModelSetting;
 
 /** @internal not part of the BC promise, see docs/versioning.md */
 final class NonTransientLLMFailureException extends LLMProviderException
@@ -24,6 +25,14 @@ final class NonTransientLLMFailureException extends LLMProviderException
     {
         return new self(
             \sprintf('LLM call failed with non-transient error: %s', ProviderMessageRedactor::redact($throwable->getMessage())),
+            previous: $throwable,
+        );
+    }
+
+    public static function forUnknownModel(string $model, ModelSetting $modelSetting, Throwable $throwable): self
+    {
+        return new self(
+            \sprintf('The provider does not know the model "%s": %s. %s', $model, ProviderMessageRedactor::redact($throwable->getMessage()), $modelSetting->advice()),
             previous: $throwable,
         );
     }

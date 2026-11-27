@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Standalone;
 
 use Ergebnis\PHPUnit\SlowTestDetector\Attribute\MaximumDuration;
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\AI\Platform\Message\Message;
@@ -27,6 +28,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\N
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\ProviderBridgeException;
@@ -66,6 +68,53 @@ final class ClaudeCodePlatformTest extends TestCase
         $this->invoke([]);
 
         self::assertContains(['--tools', ''], $this->consecutiveArgumentPairs());
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_claude_code_cli_loads_no_settings_file_so_no_api_key_helper_replaces_the_subscription(): void
+    {
+        $this->invoke([]);
+
+        self::assertContains(['--setting-sources', ''], $this->consecutiveArgumentPairs());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function variablesThatBillInPlaceOfTheSubscription(): iterable
+    {
+        yield 'an Anthropic API key' => ['ANTHROPIC_API_KEY'];
+        yield 'an Anthropic auth token' => ['ANTHROPIC_AUTH_TOKEN'];
+        yield 'AWS Bedrock' => ['CLAUDE_CODE_USE_BEDROCK'];
+        yield 'Google Vertex AI' => ['CLAUDE_CODE_USE_VERTEX'];
+        yield 'Microsoft Foundry' => ['CLAUDE_CODE_USE_FOUNDRY'];
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[DataProvider('variablesThatBillInPlaceOfTheSubscription')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_claude_code_cli_never_sees_a_variable_that_bills_in_place_of_the_subscription(string $variable): void
+    {
+        putenv(\sprintf('%s=1', $variable));
+        $_SERVER[$variable] = '1';
+        $this->invoke([]);
+
+        self::assertStringNotContainsString(\sprintf('%s=', $variable), (string) file_get_contents($this->environmentFile()));
     }
 
     /**
@@ -254,6 +303,75 @@ final class ClaudeCodePlatformTest extends TestCase
     }
 
     /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_the_report_of_a_run_on_a_claude_subscription_says_it_is_not_priced_per_call(): void
+    {
+        $project = $this->workingDirectory.'/project';
+        (new Filesystem())->dumpFile($project.'/src/Controller/HomeController.php', "<?php\n\nfinal class HomeController {}\n");
+        $auditCommand = $this->container([], ['model' => 'claude-opus-5-5'])->get(AuditCommand::class);
+        self::assertInstanceOf(AuditCommand::class, $auditCommand);
+        $commandTester = new CommandTester($auditCommand);
+
+        $commandTester->execute(['project-path' => $project], ['interactive' => false]);
+
+        self::assertStringContainsString('not priced per call: billed to your Claude subscription, or to an API key the CLI uses in its place', (string) preg_replace('/[\s!]+/', ' ', $commandTester->getDisplay()));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_the_audit_header_names_the_claude_subscription_the_run_bills(): void
+    {
+        $project = $this->workingDirectory.'/project';
+        (new Filesystem())->dumpFile($project.'/src/Controller/HomeController.php', "<?php\n\nfinal class HomeController {}\n");
+        $auditCommand = $this->container([], ['model' => 'claude-opus-5-5'])->get(AuditCommand::class);
+        self::assertInstanceOf(AuditCommand::class, $auditCommand);
+        $commandTester = new CommandTester($auditCommand);
+
+        $commandTester->execute(['project-path' => $project], ['interactive' => false]);
+
+        self::assertStringContainsString('Billing: your Claude subscription (max plan)', (string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_an_audit_on_a_claude_cli_that_is_not_logged_in_fails_before_it_starts(): void
+    {
+        $project = $this->workingDirectory.'/project';
+        (new Filesystem())->dumpFile($project.'/src/Controller/HomeController.php', "<?php\n\nfinal class HomeController {}\n");
+        $loggedOutCli = $this->workingDirectory.'/logged-out-claude';
+        (new Filesystem())->dumpFile($loggedOutCli, "#!/bin/sh\necho '{\"loggedIn\":false}'\nexit 1\n");
+        (new Filesystem())->chmod($loggedOutCli, 0o755);
+        $auditCommand = $this->container(['cli_binary' => $loggedOutCli], ['model' => 'claude-opus-5-5'])->get(AuditCommand::class);
+        self::assertInstanceOf(AuditCommand::class, $auditCommand);
+        $commandTester = new CommandTester($auditCommand);
+
+        $exitCode = $commandTester->execute(['project-path' => $project], ['interactive' => false]);
+
+        self::assertSame([ExitCode::Failure->value, true], [$exitCode, str_contains((string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()), '[ERROR] Run "claude auth login" to log the Claude Code CLI in to your Claude subscription before an audit.')]);
+    }
+
+    /**
      * @param array<string, string> $settings
      * @param array<string, mixed>  $auditConfig
      *
@@ -274,10 +392,15 @@ final class ClaudeCodePlatformTest extends TestCase
     private function fakeCli(): string
     {
         $cli = $this->workingDirectory.'/claude';
-        (new Filesystem())->dumpFile($cli, \sprintf("#!/bin/sh\npwd -P > %s\nls -ld . | cut -c1-10 > %s\nprintf '%%s\\0' \"\$@\" > %s\necho '%s'\n", escapeshellarg($this->workingDirectory.'/cwd'), escapeshellarg($this->workingDirectory.'/cwd-mode'), escapeshellarg($this->argumentsFile()), self::ANSWER));
+        (new Filesystem())->dumpFile($cli, \sprintf("#!/bin/sh\nif [ \"\$1\" = auth ]; then echo '{\"loggedIn\":true,\"subscriptionType\":\"max\"}'; exit 0; fi\npwd -P > %s\nls -ld . | cut -c1-10 > %s\nprintf '%%s\\0' \"\$@\" > %s\nenv > %s\necho '%s'\n", escapeshellarg($this->workingDirectory.'/cwd'), escapeshellarg($this->workingDirectory.'/cwd-mode'), escapeshellarg($this->argumentsFile()), escapeshellarg($this->environmentFile()), self::ANSWER));
         (new Filesystem())->chmod($cli, 0o755);
 
         return $cli;
+    }
+
+    private function environmentFile(): string
+    {
+        return $this->workingDirectory.'/environment';
     }
 
     private function argumentsFile(): string

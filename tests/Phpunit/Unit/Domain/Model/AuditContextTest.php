@@ -222,6 +222,27 @@ final class AuditContextTest extends TestCase
 
     /**
      * @throws InvalidAuditContextException
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_lists_the_baseline_skipped_findings_of_one_fingerprint(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $first = $this->makeVulnerability('first', VulnerabilitySeverity::HIGH);
+        $second = $this->makeVulnerability('second', VulnerabilitySeverity::LOW);
+        $firstAgain = $this->makeVulnerability('first', VulnerabilitySeverity::LOW);
+
+        $auditContext->recordBaselineSkippedFinding($first);
+        $auditContext->recordBaselineSkippedFinding($second);
+        $auditContext->recordBaselineSkippedFinding($firstAgain);
+
+        self::assertSame([$first, $firstAgain], $auditContext->baselineSkippedFindingsWith($first->fingerprint()));
+        self::assertSame([], $auditContext->baselineSkippedFindingsWith('SSA-000000000000'));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
      */
     public function test_audit_id_matches_expected_format(): void
     {
@@ -429,6 +450,32 @@ final class AuditContextTest extends TestCase
         $auditContext->removeVulnerability($vulnerability->id());
 
         self::assertSame([$kept->id() => $kept], $auditContext->vulnerabilities());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_lists_the_current_vulnerabilities_of_one_file(): void
+    {
+        $auditContext = AuditContext::forProject($this->tmpDir);
+        $removed = $this->makeVulnerability('a', VulnerabilitySeverity::HIGH);
+        $replaced = $this->makeVulnerability('a', VulnerabilitySeverity::LOW, VulnerabilityType::XSS);
+        $elsewhere = $this->makeVulnerability('b', VulnerabilitySeverity::HIGH);
+        $kept = $this->makeVulnerability('a', VulnerabilitySeverity::HIGH, VulnerabilityType::SSRF);
+        foreach ([$removed, $replaced, $elsewhere, $kept] as $vulnerability) {
+            $auditContext->addVulnerability($vulnerability);
+        }
+
+        $validated = $replaced->withReviewerValidation(true);
+        $auditContext->replaceVulnerability($validated);
+        $auditContext->removeVulnerability($removed->id());
+        $auditContext->removeVulnerability('VULN-00000000');
+
+        self::assertSame([$replaced->id() => $validated, $kept->id() => $kept], $auditContext->vulnerabilitiesIn('src/a.php'));
+        self::assertSame([], $auditContext->vulnerabilitiesIn('src/c.php'));
     }
 
     /**

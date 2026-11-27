@@ -89,7 +89,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         $this->rateLimiter = $platformResilienceConfig->rateLimiter;
         $this->promptTokenEstimator = new PromptTokenEstimator($platformRequestConfig->tokenEstimator, $platformBinding->model);
         $this->platformResultExtractor = new PlatformResultExtractor($platformAccountingConfig->tokenUsageRecorder, $platformBinding->logger);
-        $platformOptionsFactory = new PlatformOptionsFactory($platformBinding->model, $platformRequestConfig->temperature, $platformRequestConfig->providerJsonMode, $platformBinding->maxOutputTokens, $platformRequestConfig->servingPlatform);
+        $platformOptionsFactory = new PlatformOptionsFactory($platformBinding->model, $platformRequestConfig->temperature, $platformRequestConfig->providerJsonMode, $platformBinding->maxOutputTokens, $platformRequestConfig->servingPlatform, $platformRequestConfig->capsEveryModel);
         $this->platformOptionsFactory = $platformOptionsFactory;
 
         $conversionFailureExplainer = new ConversionFailureExplainer();
@@ -224,7 +224,7 @@ final readonly class SymfonyAiLLMClient implements ToolBatchCapableLLMClientInte
         $llmResponse = LLMResponse::of(
             $content,
             $this->model,
-            $this->platformResultExtractor->extractStopReason($deferredResult) ?? 'end_turn',
+            $this->platformResultExtractor->extractStopReason($deferredResult),
             $tokenUsageSnapshot,
         )->withReportedModel($this->platformResultExtractor->extractReportedModel($deferredResult));
         $this->budgetTracker?->recordCall($llmResponse, $this->platformResultExtractor->extractOneHourCacheCreationTokens($deferredResult, $cacheCreationTokens));

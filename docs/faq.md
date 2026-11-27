@@ -259,7 +259,7 @@ A note on recall: recent Claude models follow strict instructions literally, so 
 
 ### Can I tune model parameters (temperature, max_tokens)?
 
-Yes. For `max_tokens`, use the dedicated `max_output_tokens` key: it defaults to `4096` and avoids `symfony/ai`'s built-in ~1000-token cap. This key currently only takes effect for Claude/Anthropic-dialect models (see [Configuration → Top-level](configuration.md#top-level)):
+Yes. For `max_tokens`, use the dedicated `max_output_tokens` key: a Claude model gets `4096` when it is unset, which avoids `symfony/ai`'s built-in ~1000-token cap. Left unset, it caps Claude models only; set, it also caps other models on a platform that takes `symfony/ai`'s output cap (see [Configuration → Top-level](configuration.md#top-level)):
 
 ```yaml
 symfony_security_auditor:
@@ -282,7 +282,7 @@ symfony_security_auditor:
 
 ### What PHP versions are supported?
 
-Installing the **bundle** requires PHP **8.3+** in the host application (PHP 8.4, 8.5 and 8.6 are covered by the CI matrix). The **standalone binary** bundles its own PHP runtime, so the PHP version of the audited project does not matter and running audits needs no PHP or Composer on the host. Only its one-time `init` does (see the [requirements](../README.md#requirements)).
+Installing the **bundle** requires PHP **8.3+** in the host application (PHP 8.4, 8.5 and 8.6 are covered by the CI matrix). The **standalone binary** bundles its own PHP runtime, so the PHP version of the audited project does not matter and neither `init` nor an audit needs PHP or Composer on the host: both run the Composer the binary bundles (see the [requirements](../README.md#requirements)).
 
 ### What Symfony versions are supported?
 

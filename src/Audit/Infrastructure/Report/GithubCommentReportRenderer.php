@@ -19,9 +19,9 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 
 /**
  * Renders an audit report as a pull-request comment body: the grade, then
- * the `MAX_ROWS` most severe findings, so the body stays under GitHub's
- * comment length limit. `MARKER` lets a workflow find and edit its previous
- * comment.
+ * the `MAX_ROWS` most severe findings and as many of their suggested fixes as
+ * keep the body under GitHub's comment length limit, naming those left out.
+ * `MARKER` lets a workflow find and edit its previous comment.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
@@ -33,6 +33,12 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
     public const string MARKER = '<!-- symfony-security-auditor:pr-comment -->';
 
     public const int MAX_ROWS = 10;
+
+    private const int MAXIMUM_LENGTH = 65_535;
+
+    private const string SUGGESTED_FIXES_HEADING = '### Suggested fixes';
+
+    private const string LEFT_OUT_FIXES_NOTE = '_%d of %d suggested fixes are left out to keep this comment within the size GitHub accepts._';
 
     public function __construct(
         private ReportPathPrefix $reportPathPrefix = new ReportPathPrefix(),
@@ -47,17 +53,36 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
     #[Override]
     public function render(AuditReport $auditReport): string
     {
-        $reviewSuggestions = GithubReviewSuggestions::block($this->suggestionsOf($auditReport->vulnerabilities()), $this->reportPathPrefix);
+        $head = [self::MARKER, $this->headline($auditReport), $this->runSummary($auditReport), ...$this->findings($auditReport)];
+        $sections = array_map(
+            static fn (GithubSuggestion $githubSuggestion): string => $githubSuggestion->commentSection(),
+            $this->suggestionsOf(\array_slice($auditReport->vulnerabilities(), 0, self::MAX_ROWS)),
+        );
+        $tail = ['---', $this->credit()];
+        $reviewSuggestions = GithubReviewSuggestions::block(
+            $this->suggestionsOf($auditReport->vulnerabilities()),
+            $this->reportPathPrefix,
+            self::MAXIMUM_LENGTH - $this->lengthOf([...$head, ...$this->suggestedFixes($sections, 0), ...$tail, '']),
+        );
+        $tail = [...$tail, ...(null === $reviewSuggestions ? [] : [$reviewSuggestions])];
 
-        return implode("\n\n", [
-            self::MARKER,
-            $this->headline($auditReport),
-            $this->runSummary($auditReport),
-            ...$this->findings($auditReport),
-            '---',
-            $this->credit(),
-            ...(null === $reviewSuggestions ? [] : [$reviewSuggestions]),
-        ]);
+        $parts = [];
+        foreach (range(\count($sections), 0) as $kept) {
+            $parts = [...$head, ...$this->suggestedFixes($sections, $kept), ...$tail];
+            if ($this->lengthOf($parts) <= self::MAXIMUM_LENGTH) {
+                break;
+            }
+        }
+
+        return implode("\n\n", $parts);
+    }
+
+    /**
+     * @param list<string> $parts
+     */
+    private function lengthOf(array $parts): int
+    {
+        return mb_strlen(implode("\n\n", $parts));
     }
 
     private function headline(AuditReport $auditReport): string
@@ -102,7 +127,6 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
             ...$warning,
             $this->table($shown),
             ...$this->truncationNote(\count($shown), \count($vulnerabilities)),
-            ...$this->suggestedFixes($shown),
         ];
     }
 
@@ -142,15 +166,19 @@ final readonly class GithubCommentReportRenderer implements ReportRendererInterf
     }
 
     /**
-     * @param list<Vulnerability> $vulnerabilities
+     * @param list<string> $sections
      *
      * @return list<string>
      */
-    private function suggestedFixes(array $vulnerabilities): array
+    private function suggestedFixes(array $sections, int $kept): array
     {
-        $suggestions = array_map(static fn (GithubSuggestion $githubSuggestion): string => $githubSuggestion->commentSection(), $this->suggestionsOf($vulnerabilities));
+        if ([] === $sections) {
+            return [];
+        }
 
-        return [] === $suggestions ? [] : ['### Suggested fixes', ...$suggestions];
+        $leftOut = \count($sections) - $kept;
+
+        return [self::SUGGESTED_FIXES_HEADING, ...\array_slice($sections, 0, $kept), ...(0 === $leftOut ? [] : [\sprintf(self::LEFT_OUT_FIXES_NOTE, $leftOut, \count($sections))])];
     }
 
     /**

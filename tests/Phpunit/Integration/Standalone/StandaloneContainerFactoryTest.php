@@ -18,6 +18,7 @@ use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
 use Symfony\AI\Platform\Bridge\Ollama\Factory as OllamaFactory;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
@@ -27,7 +28,13 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMClientInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\ComposerAuditRunnerInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Advisory\Exception\AdvisorySourceUnavailableException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\ComposerPhar;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\EmbeddedComposer;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\SelfInvocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\AuditedProjectConfig;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CliAgentPlatforms;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingEnvironmentVariableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\NonLocalPlatformEndpointException;
@@ -38,11 +45,19 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\PricingPlat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandaloneConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfig;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\StandalonePlatformConfigResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatform;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnobtainableIdentityTokenException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Ollama\PulledModelNotice;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\CredentialConsoleBanner;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\NullConsoleBanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\ProviderBridgeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\UnknownPlatformProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Standalone\FederatedAnthropicAccess;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\StandaloneContainerFactory;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
@@ -65,6 +80,65 @@ final class StandaloneContainerFactoryTest extends TestCase
     }
 
     /**
+     * @param class-string $banner
+     *
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     * @throws UnobtainableIdentityTokenException
+     */
+    #[DataProvider('apiKeysUnderFederation')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_audit_header_names_no_api_key_when_federation_stands_in_for_it(string $apiKey, string $banner): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory(federatedAnthropicAccess: FederatedAnthropicAccess::fromEnvironment([
+            'ANTHROPIC_FEDERATION_RULE_ID' => 'fdrl_rule',
+            'ANTHROPIC_ORGANIZATION_ID' => 'org-uuid',
+            'ACTIONS_ID_TOKEN_REQUEST_URL' => 'https://pipelines.actions.githubusercontent.com/abc/idtoken',
+            'ACTIONS_ID_TOKEN_REQUEST_TOKEN' => 'request-token',
+        ])))->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost', 'api_key' => $apiKey]]])),
+            $this->cacheDir,
+        );
+
+        $auditPresenter = (new ReflectionProperty(AuditCommand::class, 'auditPresenter'))->getValue($containerBuilder->get(AuditCommand::class));
+        self::assertInstanceOf(AuditPresenter::class, $auditPresenter);
+
+        self::assertInstanceOf($banner, (new ReflectionProperty(AuditPresenter::class, 'consoleBanner'))->getValue($auditPresenter));
+    }
+
+    /**
+     * @return iterable<string, array{string, class-string}>
+     */
+    public static function apiKeysUnderFederation(): iterable
+    {
+        yield 'the federation placeholder' => [FederatedAnthropicAccess::API_KEY_PLACEHOLDER, NullConsoleBanner::class];
+        yield 'a real API key' => ['sk-ant-api03-real', CredentialConsoleBanner::class];
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     * @throws UnobtainableIdentityTokenException
+     */
+    public function test_federation_configures_the_anthropic_platform_before_its_bridge_loads(): void
+    {
+        $this->expectException(UnobtainableIdentityTokenException::class);
+        $this->expectExceptionMessageContaining('run in a job with the "id-token: write" permission');
+
+        (new StandaloneContainerFactory(federatedAnthropicAccess: FederatedAnthropicAccess::fromEnvironment(['ANTHROPIC_FEDERATION_RULE_ID' => 'fdrl_rule', 'ANTHROPIC_ORGANIZATION_ID' => 'org-uuid'])))->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(['anthropic' => ['api_key' => FederatedAnthropicAccess::API_KEY_PLACEHOLDER]])),
+            $this->cacheDir,
+        );
+    }
+
+    /**
      * @throws AmbiguousPlatformException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException
@@ -81,6 +155,35 @@ final class StandaloneContainerFactoryTest extends TestCase
         );
 
         self::assertInstanceOf(AuditCommand::class, $containerBuilder->get(AuditCommand::class));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     * @throws AdvisorySourceUnavailableException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_the_advisory_lookup_audits_with_the_composer_the_binary_bundles(): void
+    {
+        $fixturePhar = __DIR__.'/../../../Fixture/Composer/composer.phar';
+        $embeddedComposer = new EmbeddedComposer(
+            new SelfInvocation(\dirname(__DIR__, 4).'/bin/symfony-security-auditor', 'cli', \PHP_BINARY),
+            new ComposerPhar($fixturePhar, (string) hash_file('sha256', $fixturePhar)),
+        );
+        (new Filesystem())->dumpFile($this->cacheDir.'/project/composer.lock', '{"packages": []}');
+
+        $containerBuilder = StandaloneContainerFactory::withEmbeddedComposer($embeddedComposer, new XdgConfigPathResolver(null, null, null, $this->cacheDir.'/data'))->create(
+            new StandaloneConfig(['cache' => ['enabled' => false]], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']]])),
+            $this->cacheDir,
+        );
+        $composerAuditRunner = $containerBuilder->get(ComposerAuditRunnerInterface::class);
+        self::assertInstanceOf(ComposerAuditRunnerInterface::class, $composerAuditRunner);
+
+        self::assertSame('fixture composer', $composerAuditRunner->run($this->cacheDir.'/project'));
     }
 
     /**
@@ -409,6 +512,44 @@ final class StandaloneContainerFactoryTest extends TestCase
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]
+    public function test_an_audit_on_ollama_names_the_configured_models_its_server_has_not_pulled(): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig(['model' => 'qwen9'], new StandalonePlatformConfig(['ollama' => ['endpoint' => 'http://localhost:11434']], 'ollama')),
+            $this->cacheDir,
+        );
+
+        self::assertInstanceOf(PulledModelNotice::class, (new ReflectionProperty(AuditCommand::class, 'pulledModelNotice'))->getValue($containerBuilder->get(AuditCommand::class)));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_an_audit_on_another_platform_asks_no_ollama_server(): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], new StandalonePlatformConfig(['ollama' => ['endpoint' => 'http://localhost:11434'], 'generic' => ['gw' => ['base_url' => 'http://localhost:8080']]], 'generic.gw')),
+            $this->cacheDir,
+        );
+
+        self::assertNull((new ReflectionProperty(AuditCommand::class, 'pulledModelNotice'))->getValue($containerBuilder->get(AuditCommand::class)));
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
     public function test_it_provides_every_service_the_ollama_platform_demands_outright(): void
     {
         $containerBuilder = (new StandaloneContainerFactory())->create(
@@ -648,6 +789,39 @@ final class StandaloneContainerFactoryTest extends TestCase
      * @throws UnknownPlatformProviderException
      * @throws NonLocalPlatformEndpointException
      * @throws ProviderBridgeException
+     * @throws MissingEnvironmentVariableException
+     * @throws MissingPlatformException
+     * @throws UnreadableCredentialFileException
+     * @throws UnreadableCredentialStoreException
+     * @throws UnsupportedEnvPlaceholderException
+     */
+    #[DataProvider('cliAgents')]
+    #[RunInSeparateProcess]
+    public function test_a_lone_subscription_block_runs_the_audit_without_a_provider_as_a_lone_api_block_does(string $cliAgent): void
+    {
+        $containerBuilder = (new StandaloneContainerFactory())->create(
+            new StandaloneConfig([], (new StandalonePlatformConfigResolver())->resolve(['platform' => [$cliAgent => []]])),
+            $this->cacheDir,
+        );
+
+        self::assertInstanceOf(CliAgentPlatform::class, $containerBuilder->get(PlatformInterface::class));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function cliAgents(): iterable
+    {
+        yield 'Claude Code' => ['claudecode'];
+        yield 'Codex' => ['codex'];
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
      */
     #[RunInSeparateProcess]
     public function test_it_rejects_a_selector_absent_from_the_platform_block(): void
@@ -806,6 +980,36 @@ final class StandaloneContainerFactoryTest extends TestCase
             new StandaloneConfig([], new StandalonePlatformConfig(['generic' => ['default' => ['base_url' => 'http://localhost']], 'anthropic' => ['api_key' => 'sk-test']], 'generic.default')),
             $this->cacheDir,
         );
+    }
+
+    /**
+     * @param key-of<CliAgentPlatforms::FACTORIES> $cliAgent
+     *
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[DataProvider('cliAgentBridges')]
+    public function test_a_cli_agent_whose_bridge_is_not_installed_is_answered_with_the_init_command(string $cliAgent, string $package): void
+    {
+        $this->expectException(ProviderBridgeException::class);
+        $this->expectExceptionMessageContaining(\sprintf('The "%1$s" provider bridge (%2$s) is not installed under the standalone data directory. Run "symfony-security-auditor init --provider=%1$s" to download it;', $cliAgent, $package));
+
+        (new StandaloneContainerFactory(cliAgentFactories: [$cliAgent => 'Missing\\CliAgent\\Factory']))->create(
+            new StandaloneConfig([], new StandalonePlatformConfig([$cliAgent => []], $cliAgent)),
+            $this->cacheDir,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{key-of<CliAgentPlatforms::FACTORIES>, string}>
+     */
+    public static function cliAgentBridges(): iterable
+    {
+        yield 'Claude Code' => ['claudecode', 'symfony/ai-claude-code-platform'];
+        yield 'Codex' => ['codex', 'symfony/ai-codex-platform'];
     }
 
     /**

@@ -27,34 +27,6 @@ Two guards in this suite target these gaps directly. Keep them working, do not w
 - **Container-backed E2E** (`ContainerBackedAuditEndToEndTest`) boots the real bundle through a kernel and drives `audit:run` from the compiled container, stubbing only the `symfony/ai` platform (at `PlatformInterface`, **not** at `LLMClientInterface`), so `SymfonyAiLLMClient` and its retry / tool-loop / structured-collection collaborators (and the `config/services.php` DI defaults) run end to end. It golden-masters the full JSON and SARIF reports against committed snapshots in `__snapshots__/`, so any unintended behavior or schema drift fails loudly. When a change legitimately alters report output, regenerate the snapshot in the same commit and review the diff. The hand-wired `FullAuditEndToEndTest` stays useful for isolated pipeline shapes, but is **not** a substitute: it validates a graph users never run.
 - **Adversarial-input boundary tests** feed hostile payloads (malformed, truncated, duplicate, wrong-typed) to the parsing/response-shape boundaries (`LLMResponse::parseJson()`, `VulnerabilityFactory`, `TransientFailureClassifier`) because that is where a missing guard becomes a crash or a false SAFE.
 
-## Reproduce-or-Reject: triaging external review findings
-
-AI review scans over-report: they inflate severity and raise plausible-but-wrong findings. Do **not** patch a finding on the strength of its description. The acceptance test for any reported medium+ finding is a single question:
-
-> Can it be expressed as a failing PHPUnit test, red for the right reason on the current code?
-
-- **Yes → it is real.** That failing test _is_ the regression test; commit it with the fix (red → green). Which suite layer had to grow to express it tells you where the hole was: usually "no E2E ran this config combination."
-- **No → reject it.** A finding no one can turn red is noise; record why and move on. Never add production code, a guard, or a defensive branch for a scenario you cannot make a test reach: that is untested code by definition and it dilutes the signal of the next scan.
-
-This keeps the finding backlog honest and steadily converts each genuine discovery into a permanent guard, rather than repeatedly re-running the same broad scan to rediscover the same gaps.
-
-## Anti-Pattern: Horizontal Slices
-
-**Never** write all tests first and then all production code. "Horizontal slicing" produces brittle, imagined-behavior tests that pass when the real behavior breaks and fail when it doesn't.
-
-```text
-WRONG (horizontal):
-  RED:   test1, test2, test3, test4
-  GREEN: impl1, impl2, impl3, impl4
-
-RIGHT (vertical — tracer bullet):
-  RED → GREEN: test1 → impl1
-  RED → GREEN: test2 → impl2
-  RED → GREEN: test3 → impl3
-```
-
-One test, one minimum implementation, then the next test responds to what the previous cycle revealed. Each step is grounded in code that exists, not code you're imagining.
-
 ## TDD: Red / Green / Refactor
 
 All production code is written using TDD by the book.
@@ -65,17 +37,15 @@ All production code is written using TDD by the book.
 
 Every code change ships with tests. No production code without a test that justifies it. Mutation score is the quality bar: Infection MSI must stay at 100%; 100% line coverage sits on top as a mechanical floor, enforced by the custom `MinimumLineCoverageExtension` (`tools/PHPUnit/`). Write tests for behavior, not to chase the line number (see CI Pipeline in `CLAUDE.md`).
 
-### Planning Before Code
+### One Test at a Time
 
-Before any new feature or fix:
+Never write several tests first and then the production code: horizontal slices test imagined behavior, pass when the real behavior breaks and fail when it does not. Write one failing test, the minimum code that makes it pass, then let the next test respond to what that cycle revealed.
 
-- [ ] Confirm with the user which public interface (port, method, value object) is changing.
-- [ ] List the behaviors to test, ordered by importance, not implementation steps.
-- [ ] Identify opportunities for [deep modules](#deep-modules) (small interface, deep implementation).
-- [ ] Design interfaces for testability (see [below](#interface-design-for-testability)).
-- [ ] Get user approval on the plan.
+### Before Writing Code
 
-You can't test everything. Focus effort on critical paths (`AuditOrchestrator`, `VulnerabilityFactory`, `LLMResponse::parseJson`, the agent loop), not every conceivable edge case.
+- List the behaviors to test, ordered by importance, not implementation steps.
+- Name the public interface (port, method, value object) that changes. When it is public API (`CLAUDE.md` → Backward Compatibility), ask before writing code.
+- Spend the effort on critical paths (`AuditOrchestrator`, `VulnerabilityFactory`, `LLMResponse::parseJson`, the agent loop), not on every conceivable edge case.
 
 ### Per-Cycle Checklist
 
@@ -89,69 +59,18 @@ You can't test everything. Focus effort on critical paths (`AuditOrchestrator`, 
 
 ## Stubs vs Mocks
 
-See memory: `[[feedback_mock_vs_stub]]`.
+Use `createStub()` when a test only needs a collaborator to return something. Use `createMock()` with an expectation only when the interaction itself is the contract: a mock without an expectation is a stub in disguise.
 
 ### When to Mock at All
 
 Mock at **system boundaries** only:
 
-- `LLMClientInterface`: the sole seam to `symfony/ai` (see [[llm-seam]]).
+- `LLMClientInterface`: the sole seam to `symfony/ai`.
 - Filesystem / process / time / randomness adapters.
 - HTTP clients to external services.
 - `AttackerCacheInterface`, `AdvisoryDatabaseInterface`, tool ports.
 
 **Do not mock** your own Application or Domain classes. They are part of the unit under test. Mocking internal collaborators couples the test to the call graph and defeats TDD.
-
-## Interface Design for Testability
-
-Good interfaces make tests natural; bad interfaces make them painful. **When testing is painful, the design (not the test) is the problem.**
-
-1. **Accept dependencies, don't construct them.** Every collaborator that crosses a layer is an interface injected via the constructor (see [[php-classes]]). A class never `new`s a Symfony service or an LLM client.
-
-   ```php
-   // Testable
-   final readonly class ReviewerAgent
-   {
-       public function __construct(
-           private LLMClientInterface $llmClient,
-           private ReviewerPromptBuilderInterface $promptBuilder,
-           private LoggerInterface $logger,
-           private int $batchSize = self::DEFAULT_BATCH_SIZE,
-       ) {}
-   }
-   ```
-
-2. **Return results, avoid hidden side effects.** Pure functions and immutable factories beat mutating methods. `Vulnerability::withReviewerValidation(bool)` returns a new instance: easy to assert on, impossible to misuse.
-
-3. **Small surface area.** Fewer public methods = fewer tests needed. Fewer parameters = simpler arrange phase. If a constructor has six required collaborators, the class is doing too much.
-
-## Deep Modules
-
-From _A Philosophy of Software Design_:
-
-```text
-Deep module    = small interface + lots of implementation   ← prefer
-Shallow module = large interface + little implementation    ← avoid
-```
-
-When introducing a class, ask:
-
-- Can I reduce the number of public methods?
-- Can I simplify the parameters (introduce a value object)?
-- Can I hide more complexity behind a single call?
-
-`AuditOrchestrator::run()` is the canonical deep-module shape: one public method, large coordinated behavior hidden behind it. Replicate that pattern over thin wrappers that expose internal steps.
-
-## Refactor Candidates
-
-After all tests are green, look for:
-
-- **Duplication** → extract a private helper or shared collaborator.
-- **Long methods** → split into private helpers; keep tests on the public interface.
-- **Shallow modules** → combine, or push behavior deeper.
-- **Feature envy** → move logic to where the data lives (often into the value object).
-- **Primitive obsession** → introduce a value object (e.g. `VulnerabilitySeverity` over `string`).
-- **Existing code** that the new code newly reveals as problematic.
 
 ## Suite Layout & Conventions
 
@@ -199,4 +118,8 @@ Apply when: same arrange/act/assert shape, only literal values vary. **Do not** 
 - **100% mutation score** required (Infection). Avoid trivially-killed mutants: assert on **return values**, not just _"no exception thrown"_.
 - Never silence Infection / PHPStan / CS Fixer / Rector via annotations or config opt-outs (see `CLAUDE.md` → _Never Silence Quality Gates_).
 - Symplify PHPUnit rules enforce test hygiene at PHPStan level: data providers must be `public static` (`PublicStaticDataProviderRule`), assertions go through `$this->`/`self::` (`NoAssertFuncCallInTestsRule`, no global `assert()`) and repeated consecutive identical mock expectations (`NoDoubleConsecutiveTestMockRule`) signal a missing `#[DataProvider]`.
-- The custom `ForbiddenTestAttributeRule` (`tools/PHPStan/`) bans test attributes that opt out of a gate instead of fixing the code: `#[AllowMockObjectsWithoutExpectations]` (use `createStub`, see `[[feedback_mock_vs_stub]]`), `#[DoesNotPerformAssertions]` (assert a real outcome) and `#[WithoutErrorHandler]` (keeps `failOnWarning`/`failOnNotice` live). `#[IgnoreDeprecations]` is allowed **only** scoped to this library (`#[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]`) alongside an `expectUserDeprecationMessage*()` assertion (see `[[project_deprecation_testing_pattern]]`).
+- The custom `ForbiddenTestAttributeRule` (`tools/PHPStan/`) bans test attributes that opt out of a gate instead of fixing the code: `#[AllowMockObjectsWithoutExpectations]` (use `createStub()`), `#[DoesNotPerformAssertions]` (assert a real outcome) and `#[WithoutErrorHandler]` (keeps `failOnWarning`/`failOnNotice` live). `#[IgnoreDeprecations]` is allowed **only** scoped to this library (`#[IgnoreDeprecations('vinceamstoutz/symfony-security-auditor')]`) alongside an `expectUserDeprecationMessage*()` assertion.
+
+## Triaging External Review Findings
+
+Follow the [`triage-findings`](../skills/triage-findings/SKILL.md) skill: a reported finding is real only once it is a failing PHPUnit test. One nobody can turn red is rejected, never patched.

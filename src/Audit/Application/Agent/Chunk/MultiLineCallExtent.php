@@ -36,9 +36,20 @@ final readonly class MultiLineCallExtent
      */
     public function lineIndexes(array $lines, int $startIndex): array
     {
-        $endIndex = $this->endIndex(implode("\n", \array_slice($lines, $startIndex, self::MAX_LOOKAHEAD_LINES)), $startIndex);
+        $endIndex = $this->endIndex($this->lookahead($lines, $startIndex), $startIndex);
 
         return array_keys(\array_slice($lines, $startIndex, $endIndex - $startIndex + 1, true));
+    }
+
+    /**
+     * The text {@see self::lineIndexes()} reads for the statement starting at
+     * `$startIndex`: at most {@see self::MAX_LOOKAHEAD_LINES} lines from it.
+     *
+     * @param list<string> $lines
+     */
+    public function lookahead(array $lines, int $startIndex): string
+    {
+        return implode("\n", \array_slice($lines, $startIndex, self::MAX_LOOKAHEAD_LINES));
     }
 
     private function endIndex(string $text, int $startIndex): int

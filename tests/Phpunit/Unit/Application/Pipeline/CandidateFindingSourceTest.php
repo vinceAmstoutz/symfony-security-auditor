@@ -105,6 +105,35 @@ final class CandidateFindingSourceTest extends TestCase
     }
 
     /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidProjectFileException
+     * @throws InvalidRiskMarkerException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_it_lists_at_most_twenty_matches_of_one_pattern_per_file(): void
+    {
+        $markers = [];
+        foreach (range(1, 25) as $line) {
+            $markers[] = RiskMarker::create('src/A.php', $line, 'unserialize_call', 'Unsafe.');
+        }
+
+        $markers[] = RiskMarker::create('src/A.php', 30, 'eval_call', 'Unsafe.');
+        $markers[] = RiskMarker::create('src/B.php', 1, 'unserialize_call', 'Unsafe.');
+        $source = new CandidateFindingSource($this->scannerReturning($markers));
+
+        $candidates = $source->candidatesIn([
+            ProjectFile::create('src/A.php', '/p/src/A.php', '<?php'),
+            ProjectFile::create('src/B.php', '/p/src/B.php', '<?php'),
+        ]);
+
+        self::assertSame(
+            [...range(1, 20), 30, 1],
+            array_map(static fn (Vulnerability $vulnerability): int => $vulnerability->lineStart(), $candidates),
+        );
+    }
+
+    /**
      * @param list<RiskMarker> $markers
      */
     private function scannerReturning(array $markers): StaticPreScannerInterface

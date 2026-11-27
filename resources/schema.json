@@ -27,9 +27,9 @@
           "description": "Override the model for the reviewer role only. Falls back to `model` when null."
         },
         "max_output_tokens": {
-          "type": "integer",
+          "type": ["integer", "null"],
           "minimum": 1,
-          "description": "Maximum output tokens per LLM call of a Claude model; other models get no cap. Default: 4096."
+          "description": "Maximum output tokens per LLM call. A Claude model gets 4096 when unset; another model gets a cap only when one is set, and only on a platform whose bridge takes symfony/ai's max_output_tokens."
         },
         "attacker_max_output_tokens": {
           "type": ["integer", "null"],
@@ -159,7 +159,7 @@
             },
             "report_static_findings": {
               "type": "boolean",
-              "description": "Report every redacted credential and every static pre-scan match as a finding, validated by the reviewer. Default: false; the configuration init writes turns it on. Since 1.23."
+              "description": "Report every redacted credential and every static pre-scan match, up to 20 of one pattern per file, as a finding, validated by the reviewer. Default: false; the configuration init writes turns it on. Since 1.23."
             },
             "tools_enabled": {
               "type": "boolean",

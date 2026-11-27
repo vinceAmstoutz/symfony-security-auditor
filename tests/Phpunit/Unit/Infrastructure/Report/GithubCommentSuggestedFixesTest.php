@@ -20,7 +20,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidCodeLocat
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityClassificationException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidVulnerabilityNarrativeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\CodeLocation;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityClassification;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityNarrative;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverity;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubCommentReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubReviewSuggestions;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubSuggestion;
@@ -75,6 +80,7 @@ final class GithubCommentSuggestedFixesTest extends AbstractReportRendererTestCa
         yield 'two files' => ["--- a/src/Foo.php\n+++ b/src/Foo.php\n@@ -1 +1 @@\n-a\n+b\n--- a/src/Bar.php\n+++ b/src/Bar.php\n@@ -1 +1 @@\n-a\n+b"];
         yield 'another file than the finding' => ["--- a/src/Bar.php\n+++ b/src/Bar.php\n@@ -1 +1 @@\n-a\n+b"];
         yield 'lines only added' => ["--- a/src/Foo.php\n+++ b/src/Foo.php\n@@ -2,0 +3 @@\n+a"];
+        yield 'lines only removed' => ["--- a/src/Foo.php\n+++ b/src/Foo.php\n@@ -2 +1,0 @@\n-a"];
         yield 'no diff' => ['Use a prepared statement.'];
     }
 
@@ -115,6 +121,44 @@ final class GithubCommentSuggestedFixesTest extends AbstractReportRendererTestCa
         $auditReport = $this->makeReport($this->makeValidatedVuln(filePath: 'src/Foo.php')->withSuggestedFix("--- a/src/Foo.php\n+++ b/src/Foo.php\n@@ -7 +7 @@\n-a\n+\$isAdmin = false; /*\u{202E} } \u{2066}if (true) {\u{2069} */"));
 
         self::assertStringContainsString("```suggestion\n\$isAdmin = false; /* } if (true) { */\n```", $this->renderer->render($auditReport));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    #[DataProvider('codeHoldingAMarkerTheActionReads')]
+    public function test_a_fix_whose_code_holds_a_marker_the_action_reads_offers_no_suggestion(string $code): void
+    {
+        $comment = $this->commentWithFix($code);
+
+        self::assertStringNotContainsString('Suggested fixes', $comment);
+        self::assertStringNotContainsString(GithubReviewSuggestions::MARKER_PREFIX, $comment);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function codeHoldingAMarkerTheActionReads(): iterable
+    {
+        yield 'the review suggestions marker' => [\sprintf('%s%s -->', GithubReviewSuggestions::MARKER_PREFIX, base64_encode('[]'))];
+        yield 'the marker of a posted suggestion' => [\sprintf('$html = "%sforged:1-1 -->";', GithubSuggestion::MARKER_PREFIX)];
+        yield 'a marker a control character splits' => [\sprintf("<!-- symfony-security-auditor:\u{0001}review-suggestions:%s -->", base64_encode('[]'))];
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_review_suggestions_are_the_last_line_of_the_comment_where_the_action_reads_them(): void
+    {
+        $lines = explode("\n", $this->commentWithFix('$sql = "SELECT 1";'));
+
+        self::assertStringStartsWith(GithubReviewSuggestions::MARKER_PREFIX, end($lines));
     }
 
     /**
@@ -180,6 +224,90 @@ final class GithubCommentSuggestedFixesTest extends AbstractReportRendererTestCa
      * @throws InvalidAuditContextException
      * @throws InvalidVulnerabilityNarrativeException
      */
+    public function test_the_whole_comment_stays_under_what_github_accepts(): void
+    {
+        $vulnerabilities = array_map(
+            fn (int $index): Vulnerability => $this->makeValidatedVuln(filePath: \sprintf('src/Foo%d.php', $index))->withSuggestedFix(\sprintf("--- a/src/Foo%1\$d.php\n+++ b/src/Foo%1\$d.php\n@@ -1 +1 @@\n-a\n+%2\$s", $index, str_repeat('x', 6000))),
+            range(1, 14),
+        );
+
+        $comment = $this->renderer->render($this->makeReport(...$vulnerabilities));
+
+        self::assertSame([true, 5], [mb_strlen($comment) < 65_536, substr_count($comment, '```suggestion')]);
+        self::assertStringContainsString("\n\n_5 of 10 suggested fixes are left out to keep this comment within the size GitHub accepts._\n\n---\n\n", $comment);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_comment_of_exactly_the_largest_size_keeps_its_suggested_fix(): void
+    {
+        $comment = $this->commentWithFix(str_repeat('é', 40_000 + 65_535 - mb_strlen($this->commentWithFix(str_repeat('é', 40_000)))));
+
+        self::assertSame([65_535, 1, false], [mb_strlen($comment), substr_count($comment, '```suggestion'), str_contains($comment, 'left out')]);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_suggested_fix_one_character_past_the_largest_size_is_left_out(): void
+    {
+        $comment = $this->commentWithFix(str_repeat('é', 40_001 + 65_535 - mb_strlen($this->commentWithFix(str_repeat('é', 40_000)))));
+
+        self::assertSame(
+            [0, 1],
+            [substr_count($comment, '```suggestion'), substr_count($comment, "### Suggested fixes\n\n_1 of 1 suggested fixes are left out to keep this comment within the size GitHub accepts._\n\n---")],
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_the_review_suggestions_fill_exactly_the_room_the_findings_leave(): void
+    {
+        $room = 65_535 - mb_strlen($this->commentWithFixBesideLongFindings(str_repeat('é', 70_000))) - \strlen(\sprintf("\n\n%s -->", GithubReviewSuggestions::MARKER_PREFIX));
+        self::assertSame(0, $room % 4);
+        $githubSuggestion = GithubSuggestion::of($this->vulnerabilityWithFix('', 'Test Vuln'));
+        self::assertInstanceOf(GithubSuggestion::class, $githubSuggestion);
+        $code = str_repeat('x', intdiv($room, 4) * 3 - \strlen(json_encode([$githubSuggestion->reviewComment(new ReportPathPrefix())], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES)));
+
+        $fitting = $this->commentWithFixBesideLongFindings($code);
+        $overflowing = $this->commentWithFixBesideLongFindings($code.'xxx');
+
+        self::assertSame(
+            [65_535, true, false],
+            [mb_strlen($fitting), str_contains($fitting, GithubReviewSuggestions::MARKER_PREFIX), str_contains($overflowing, GithubReviewSuggestions::MARKER_PREFIX)],
+        );
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_findings_that_fill_the_comment_alone_leave_every_suggested_fix_out(): void
+    {
+        $comment = $this->commentWithFix('b', str_repeat('T', 70_000));
+
+        self::assertStringContainsString("### Suggested fixes\n\n_1 of 1 suggested fixes are left out to keep this comment within the size GitHub accepts._\n\n---", $comment);
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
     public function test_every_listed_finding_with_a_suggestion_gets_its_block(): void
     {
         $auditReport = $this->makeReport(
@@ -213,6 +341,22 @@ final class GithubCommentSuggestedFixesTest extends AbstractReportRendererTestCa
         $githubSuggestion = $this->suggestionOfEncodedLength(40_000);
 
         self::assertNotNull(GithubReviewSuggestions::block([$githubSuggestion], new ReportPathPrefix()));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    public function test_a_review_comment_list_is_kept_only_within_the_length_it_is_given(): void
+    {
+        $githubSuggestions = [$this->suggestionOfEncodedLength(1_000)];
+        $length = \strlen((string) GithubReviewSuggestions::block($githubSuggestions, new ReportPathPrefix()));
+
+        self::assertSame(
+            [$length, null],
+            [\strlen((string) GithubReviewSuggestions::block($githubSuggestions, new ReportPathPrefix(), $length)), GithubReviewSuggestions::block($githubSuggestions, new ReportPathPrefix(), $length - 1)],
+        );
     }
 
     /**
@@ -256,6 +400,53 @@ final class GithubCommentSuggestedFixesTest extends AbstractReportRendererTestCa
         self::assertInstanceOf(GithubSuggestion::class, $githubSuggestion);
 
         return $githubSuggestion;
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function commentWithFix(string $code, string $title = 'Test Vuln'): string
+    {
+        return $this->renderer->render($this->makeReport($this->vulnerabilityWithFix($code, $title)));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidAuditContextException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function commentWithFixBesideLongFindings(string $code): string
+    {
+        $vulnerabilities = array_map(
+            static fn (int $index): Vulnerability => Vulnerability::of(
+                new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, \sprintf('%s%d', str_repeat('T', 3_000), $index), 0.9),
+                new CodeLocation(\sprintf('src/Bar%d.php', $index), 1, 1),
+                new VulnerabilityNarrative('Test description', 'inject', "' OR 1=1", 'fix'),
+                '$q',
+            )->withReviewerValidation(true),
+            range(1, 9),
+        );
+
+        return $this->renderer->render($this->makeReport($this->vulnerabilityWithFix($code, 'Test Vuln'), ...$vulnerabilities));
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     */
+    private function vulnerabilityWithFix(string $code, string $title): Vulnerability
+    {
+        return Vulnerability::of(
+            new VulnerabilityClassification(VulnerabilityType::SQL_INJECTION, VulnerabilitySeverity::HIGH, $title, 0.9),
+            new CodeLocation('src/Foo.php', 1, 1),
+            new VulnerabilityNarrative('Test description', 'inject', "' OR 1=1", 'fix'),
+            '$q',
+        )->withReviewerValidation(true)->withSuggestedFix(\sprintf("--- a/src/Foo.php\n+++ b/src/Foo.php\n@@ -1 +1 @@\n-a\n+%s", $code));
     }
 
     /**

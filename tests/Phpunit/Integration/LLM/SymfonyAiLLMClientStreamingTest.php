@@ -263,6 +263,206 @@ final class SymfonyAiLLMClientStreamingTest extends TestCase
      * @throws NonTransientLLMFailureException
      * @throws TransientLLMFailureException
      */
+    public function test_a_provider_error_answered_in_one_piece_keeps_the_next_calls_streamed(): void
+    {
+        $answers = [$this->rateLimited()];
+        $streamed = [];
+        $platform = Factory::createPlatform('sk-test', new MockHttpClient(static function (string $method, string $url, array $options) use (&$answers, &$streamed): MockResponse {
+            $streamed[] = str_contains(self::requestBody($options), '"stream":true');
+
+            return array_shift($answers) ?? self::answerFor($options, 'Hello');
+        }));
+
+        $llmResponse = (new SymfonyAiLLMClient(
+            new PlatformBinding(new StreamingPlatform($platform), self::MODEL, new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(sleeper: new FakeSleeper()),
+        ))->complete('system', 'user');
+
+        self::assertSame(['Hello', [true, true]], [$llmResponse->content(), $streamed]);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidTokenUsageException
+     * @throws LLMRequestTooLargeException
+     * @throws MissingAiPlatformException
+     * @throws NegativeTokenCountException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     */
+    public function test_a_rate_limited_streamed_call_a_debug_kernel_traces_waits_and_is_streamed_again(): void
+    {
+        $answers = [$this->rateLimited()];
+        $streamed = [];
+        $platform = new TraceablePlatform(Factory::createPlatform('sk-test', new MockHttpClient(static function (string $method, string $url, array $options) use (&$answers, &$streamed): MockResponse {
+            $streamed[] = str_contains(self::requestBody($options), '"stream":true');
+
+            return array_shift($answers) ?? self::answerFor($options, 'Hello');
+        })));
+        $fakeSleeper = new FakeSleeper();
+
+        $llmResponse = (new SymfonyAiLLMClient(
+            new PlatformBinding(new StreamingPlatform($platform), self::MODEL, new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(sleeper: $fakeSleeper),
+        ))->complete('system', 'user');
+
+        self::assertSame(['Hello', [true, true], 1], [$llmResponse->content(), $streamed, \count($fakeSleeper->durations)]);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidTokenUsageException
+     * @throws LLMRequestTooLargeException
+     * @throws MissingAiPlatformException
+     * @throws NegativeTokenCountException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     */
+    public function test_a_rate_limited_streamed_call_a_debug_kernel_traces_is_sent_again_and_keeps_its_answer(): void
+    {
+        $answers = [$this->rateLimited()];
+        $platform = new TraceablePlatform(Factory::createPlatform('sk-test', new MockHttpClient(static function (string $method, string $url, array $options) use (&$answers): MockResponse {
+            return array_shift($answers) ?? self::answerFor($options, '[{"type":"sqli"}]');
+        })));
+
+        $llmResponse = (new SymfonyAiLLMClient(
+            new PlatformBinding(new StreamingPlatform($platform), self::MODEL, new NullLogger()),
+            platformResilienceConfig: new PlatformResilienceConfig(sleeper: new FakeSleeper()),
+        ))->complete('system', 'user');
+
+        self::assertSame(['[{"type":"sqli"}]', 'end_turn'], [$llmResponse->content(), $llmResponse->stopReason()]);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
+     * @throws LLMRequestTooLargeException
+     * @throws MissingAiPlatformException
+     * @throws NegativeTokenCountException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     */
+    public function test_a_provider_that_refuses_a_streamed_call_a_debug_kernel_traces_stops_the_audit(): void
+    {
+        $platform = new TraceablePlatform(Factory::createPlatform('sk-test', new MockHttpClient(static fn (): MockResponse => new MockResponse(self::json(['type' => 'error', 'error' => ['type' => 'authentication_error', 'message' => 'invalid x-api-key']]), ['http_code' => 401, 'response_headers' => ['content-type' => 'application/json']]))));
+
+        $this->expectException(NonTransientLLMFailureException::class);
+        $this->expectExceptionMessageContaining('invalid x-api-key');
+
+        $this->streamingClient($platform)->completeWithTools('system', 'user', new ToolRegistry([new CallbackTool('lookup', 'lookup')], new NullLogger()), 3);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidTokenUsageException
+     * @throws InvalidToolRegistryException
+     * @throws LLMRequestTooLargeException
+     * @throws MissingAiPlatformException
+     * @throws NegativeTokenCountException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     */
+    public function test_a_gateway_that_answers_a_streamed_call_a_debug_kernel_traces_in_one_piece_has_its_tool_call_run(): void
+    {
+        $lookedUp = [];
+        $toolRegistry = new ToolRegistry([new CallbackTool('lookup', 'lookup', static function (array $arguments) use (&$lookedUp): string {
+            $lookedUp[] = $arguments;
+
+            return 'found';
+        })], new NullLogger());
+        $answers = [$this->toolUseAnswer(), $this->toolUseAnswer()];
+        $platform = new TraceablePlatform(Factory::createPlatform('sk-test', new MockHttpClient(static function (string $method, string $url, array $options) use (&$answers): MockResponse {
+            return array_shift($answers) ?? self::answerFor($options, 'done');
+        })));
+
+        $llmResponse = $this->streamingClient($platform)->completeWithTools('system', 'user', $toolRegistry, 3);
+
+        self::assertSame([[['file' => 'a.php']], 'done'], [$lookedUp, $llmResponse->content()]);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidTokenUsageException
+     * @throws LLMRequestTooLargeException
+     * @throws MissingAiPlatformException
+     * @throws NegativeTokenCountException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     */
+    public function test_a_gateway_answer_in_one_piece_a_debug_kernel_traces_is_booked_at_the_usage_of_the_call_sent_again(): void
+    {
+        $tokenUsageRecorder = new TokenUsageRecorder();
+        $platform = new TraceablePlatform(Factory::createPlatform('sk-test', new MockHttpClient(static fn (string $method, string $url, array $options): MockResponse => self::answerFor(['body' => '{}'], 'Hello'))));
+
+        (new SymfonyAiLLMClient(
+            new PlatformBinding(new StreamingPlatform($platform), self::MODEL, new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(tokenUsageRecorder: $tokenUsageRecorder),
+        ))->complete('system', 'user');
+
+        self::assertSame([120, 7], [$tokenUsageRecorder->snapshot()->inputTokens(), $tokenUsageRecorder->snapshot()->outputTokens()]);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidTokenUsageException
+     * @throws LLMRequestTooLargeException
+     * @throws MissingAiPlatformException
+     * @throws NegativeTokenCountException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     */
+    public function test_a_stream_a_debug_kernel_traces_that_fails_without_its_usage_makes_the_booked_cost_a_minimum(): void
+    {
+        $budgetTracker = new BudgetTracker(AuditBudget::unlimited(), new CostCalculator(new OneModelPricingProvider()));
+        $platform = new TraceablePlatform($this->platform(self::sse(self::messageStart(120), ...self::textBlock(0, 'partial'), ...self::messageEnd('max_tokens', 4096))));
+
+        $llmResponse = (new SymfonyAiLLMClient(
+            new PlatformBinding(new StreamingPlatform($platform), self::MODEL, new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(budgetTracker: $budgetTracker),
+        ))->complete('system', 'user');
+
+        self::assertSame(['length', 1], [$llmResponse->stopReason(), $budgetTracker->interruptedCalls()]);
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidTokenUsageException
+     * @throws LLMRequestTooLargeException
+     * @throws MissingAiPlatformException
+     * @throws NegativeTokenCountException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     */
+    public function test_a_stream_that_fails_with_the_usage_it_reported_keeps_the_booked_cost_exact(): void
+    {
+        $budgetTracker = new BudgetTracker(AuditBudget::unlimited(), new CostCalculator(new OneModelPricingProvider()));
+
+        (new SymfonyAiLLMClient(
+            new PlatformBinding(new StreamingPlatform($this->platform(self::sse(self::messageStart(120), ...self::textBlock(0, 'partial'), ...self::messageEnd('max_tokens', 4096)))), self::MODEL, new NullLogger()),
+            platformAccountingConfig: new PlatformAccountingConfig(budgetTracker: $budgetTracker),
+        ))->complete('system', 'user');
+
+        self::assertSame(0, $budgetTracker->interruptedCalls());
+    }
+
+    /**
+     * @throws BudgetExceededException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidTokenUsageException
+     * @throws LLMRequestTooLargeException
+     * @throws MissingAiPlatformException
+     * @throws NegativeTokenCountException
+     * @throws NonTransientLLMFailureException
+     * @throws TransientLLMFailureException
+     */
     public function test_a_stream_that_carries_no_content_is_the_degraded_answer_a_buffered_call_without_content_gives(): void
     {
         $platform = $this->platform(self::sse(self::messageStart(120), ...self::messageEnd('end_turn', 1)));
@@ -827,6 +1027,28 @@ final class SymfonyAiLLMClientStreamingTest extends TestCase
         }
 
         return new MockResponse($body, ['response_headers' => ['content-type' => 'text/event-stream']]);
+    }
+
+    private function rateLimited(): MockResponse
+    {
+        return new MockResponse(self::json(['type' => 'error', 'error' => ['type' => 'rate_limit_error', 'message' => 'rate limit']]), ['http_code' => 429, 'response_headers' => ['content-type' => 'application/json', 'retry-after' => '1']]);
+    }
+
+    private function toolUseAnswer(): MockResponse
+    {
+        return new MockResponse(self::json(['id' => 'msg_1', 'type' => 'message', 'role' => 'assistant', 'model' => self::MODEL, 'content' => [['type' => 'tool_use', 'id' => 'toolu_1', 'name' => 'lookup', 'input' => ['file' => 'a.php']]], 'stop_reason' => 'tool_use', 'usage' => ['input_tokens' => 120, 'output_tokens' => 7]]), ['response_headers' => ['content-type' => 'application/json']]);
+    }
+
+    /**
+     * @param array<array-key, mixed> $options
+     */
+    private static function answerFor(array $options, string $text): MockResponse
+    {
+        if (str_contains(self::requestBody($options), '"stream":true')) {
+            return self::sse(self::messageStart(120), ...self::textBlock(0, $text), ...self::messageEnd('end_turn', 7));
+        }
+
+        return new MockResponse(self::json(['id' => 'msg_1', 'type' => 'message', 'role' => 'assistant', 'model' => self::MODEL, 'content' => [['type' => 'text', 'text' => $text]], 'stop_reason' => 'end_turn', 'usage' => ['input_tokens' => 120, 'output_tokens' => 7]]), ['response_headers' => ['content-type' => 'application/json']]);
     }
 
     /**

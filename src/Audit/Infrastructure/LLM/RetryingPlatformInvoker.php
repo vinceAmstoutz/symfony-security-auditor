@@ -77,13 +77,76 @@ final readonly class RetryingPlatformInvoker
      */
     public function invoke(MessageBag $messageBag, array $options, int $estimatedInputTokens): DeferredResult
     {
+        return $this->attempt($messageBag, $options, $estimatedInputTokens, null)[0];
+    }
+
+    /**
+     * Invokes the next round of a tool conversation. The state it returns
+     * keeps an output cap raised for a cut tool call for the rest of the
+     * conversation, which raises it once. `$cutFailure` is the cut a state's
+     * raised cap answers: a refused request ends as that cut.
+     *
+     * @return array{DeferredResult, ConversationState}
+     *
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws EmptyLLMResponseException
+     * @throws LLMRequestTooLargeException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws BudgetExceededException
+     */
+    public function invokeConversation(ConversationState $conversationState, ?Throwable $cutFailure = null): array
+    {
+        [$deferredResult, $raisedOptions] = $this->attempt($conversationState->bag, $conversationState->options, $conversationState->estimatedInputTokens, $cutFailure ?? ($conversationState->capRaised ? false : null));
+
+        return [$deferredResult, null === $raisedOptions ? $conversationState : $conversationState->withRaisedCap($raisedOptions)];
+    }
+
+    /**
+     * Returns the conversation asked again with a raised output cap when the
+     * failure is a tool call the cap cut off and the conversation has not
+     * raised it yet; null otherwise.
+     *
+     * @throws BudgetExceededException
+     */
+    public function conversationWithARaisedCap(Throwable $throwable, ConversationState $conversationState): ?ConversationState
+    {
+        $raisedOptions = $conversationState->capRaised ? null : $this->optionsWithARaisedCap($throwable, $conversationState->options);
+
+        return null === $raisedOptions ? null : $conversationState->withRaisedCap($raisedOptions);
+    }
+
+    /**
+     * Returns the answer and the options raised for a cut tool call, null
+     * when none was. `$cutFailure` false forbids a raise; a Throwable is the
+     * cut the options' raised cap already answers.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array{DeferredResult, array<string, mixed>|null}
+     *
+     * @throws MissingAiPlatformException
+     * @throws TransientLLMFailureException
+     * @throws EmptyLLMResponseException
+     * @throws LLMRequestTooLargeException
+     * @throws NonTransientLLMFailureException
+     * @throws InvalidRetryConfigurationException
+     * @throws InvalidTokenUsageException
+     * @throws NegativeTokenCountException
+     * @throws BudgetExceededException
+     */
+    private function attempt(MessageBag $messageBag, array $options, int $estimatedInputTokens, Throwable|false|null $cutFailure): array
+    {
         $platform = $this->platformBinding->platform();
 
         \assert('' !== $this->model, 'Model must be a non-empty string');
 
         $maxAttempts = $this->retryPolicy->maxAttempts();
         $attempt = 1;
-        $capRaisable = true;
+        $raisedOptions = null;
         while (true) {
             $this->rateLimiter->acquire($estimatedInputTokens);
             $deferredResult = null;
@@ -92,19 +155,20 @@ final readonly class RetryingPlatformInvoker
                 $deferredResult = $platform->invoke($this->model, $messageBag, $options);
                 $deferredResult->getResult();
 
-                return $deferredResult;
+                return [$deferredResult, $raisedOptions];
             } catch (Throwable $throwable) {
                 $failure = $this->explainedFailure($throwable, $deferredResult, $attempt >= $maxAttempts);
                 $this->degradedAnswerBooker->bookFailedCall($failure, $deferredResult, $estimatedInputTokens);
-                $raisedOptions = $this->optionsWithARaisedCap($failure, $options, $capRaisable);
-                if (null !== $raisedOptions) {
-                    $options = $raisedOptions;
-                    $capRaisable = false;
+                $raisedCapOptions = $this->firstRaiseOptions($failure, $options, $cutFailure);
+                if (null !== $raisedCapOptions) {
+                    $options = $raisedCapOptions;
+                    $raisedOptions = $raisedCapOptions;
+                    $cutFailure = $failure;
 
                     continue;
                 }
 
-                $this->rethrowWhenNonTransient($failure);
+                $this->rethrowWhenNonTransient($this->cutFailureOfARefusedRaise($failure, $cutFailure));
                 $this->prepareRetry($failure, $deferredResult, $attempt, $maxAttempts);
                 ++$attempt;
             }
@@ -127,8 +191,8 @@ final readonly class RetryingPlatformInvoker
     }
 
     /**
-     * Returns the options that ask again, once, with a higher cap for a tool
-     * call the output cap cut off.
+     * Returns the raised options for a cut tool call of a request whose cap
+     * has not been raised yet.
      *
      * @param array<string, mixed> $options
      *
@@ -136,9 +200,24 @@ final readonly class RetryingPlatformInvoker
      *
      * @throws BudgetExceededException
      */
-    private function optionsWithARaisedCap(Throwable $throwable, array $options, bool $capRaisable): ?array
+    private function firstRaiseOptions(Throwable $failure, array $options, Throwable|false|null $cutFailure): ?array
     {
-        if (!$capRaisable || !$this->transientFailureClassifier->isToolCallCutByTheOutputCap($throwable)) {
+        return null === $cutFailure ? $this->optionsWithARaisedCap($failure, $options) : null;
+    }
+
+    /**
+     * Returns the options that ask again with a higher cap for a tool call
+     * the output cap cut off.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>|null
+     *
+     * @throws BudgetExceededException
+     */
+    private function optionsWithARaisedCap(Throwable $throwable, array $options): ?array
+    {
+        if (!$this->transientFailureClassifier->isToolCallCutByTheOutputCap($throwable)) {
             return null;
         }
 
@@ -151,6 +230,23 @@ final readonly class RetryingPlatformInvoker
         }
 
         return $raisedOptions;
+    }
+
+    /**
+     * Returns the cut the raised cap answered when the provider refuses the
+     * raised request, so the call ends as the degraded answer it was cut to.
+     */
+    private function cutFailureOfARefusedRaise(Throwable $failure, Throwable|false|null $cutFailure): Throwable
+    {
+        if (!$cutFailure instanceof Throwable || $this->transientFailureClassifier->isTransient($failure) || null !== $this->transientFailureClassifier->degradedStopReason($failure)) {
+            return $failure;
+        }
+
+        $this->logger->warning('LLM request with a raised output token cap refused, keeping the answer the cap cut off', [
+            'error' => ProviderMessageRedactor::redact($failure->getMessage()),
+        ]);
+
+        return $cutFailure;
     }
 
     /**
@@ -178,6 +274,10 @@ final readonly class RetryingPlatformInvoker
 
         if ($this->transientFailureClassifier->isRequestTooLarge($throwable)) {
             throw LLMRequestTooLargeException::fromProviderRejection($throwable);
+        }
+
+        if ($this->transientFailureClassifier->isUnknownModel($throwable)) {
+            throw NonTransientLLMFailureException::forUnknownModel($this->model, $this->platformBinding->modelSetting, $throwable);
         }
 
         if (!$this->transientFailureClassifier->isTransient($throwable)) {

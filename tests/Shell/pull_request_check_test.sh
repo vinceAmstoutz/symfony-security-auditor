@@ -82,16 +82,16 @@ title="fix: $(repeat 46 a)"
 expect_error 'a 51-character title fails' 'The title is 51 characters; keep it to 50 or fewer.' "$(body)"
 
 valid_parts
-summary=$(repeat 500 é)
-expect_pass 'a 500-character Summary passes, counting characters rather than bytes' "$(body)"
+summary=$(repeat 750 é)
+expect_pass 'a 750-character Summary passes, counting characters rather than bytes' "$(body)"
 
 valid_parts
-summary=$(repeat 501 a)
-expect_error 'a 501-character Summary fails' "'## Summary' is 501 characters; keep it to 500 or fewer" "$(body)"
+summary=$(repeat 751 a)
+expect_error 'a 751-character Summary fails' "'## Summary' is 751 characters; keep it to 750 or fewer" "$(body)"
 
 valid_parts
 summary='<!-- What does this PR do and why? -->'
-expect_error 'a Summary holding only the template comment fails' "Fill in '## Summary'" "$(body)"
+expect_error 'a Summary holding only the template comment fails' "Fill in '## Summary': the user-visible outcome, in 750 characters or fewer." "$(body)"
 
 valid_parts
 type_of_change='- [x] Bug fix

@@ -19,6 +19,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\PrivateFileWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\FileSystem\SymlinkGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\BaselineSuppressingReportRendererInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ReportRendererInterface;
@@ -29,6 +30,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputForm
 /** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class ReportWriter implements ReportWriterInterface
 {
+    private const string TEMPORARY_REPORT_PREFIX = 'symfony-security-auditor-report-';
+
     /** @var array<string, ReportRendererInterface> */
     private array $renderers;
 
@@ -37,6 +40,8 @@ final readonly class ReportWriter implements ReportWriterInterface
         iterable $renderers,
         private Filesystem $filesystem,
         private WorkflowCommandNeutralizerInterface $workflowCommandNeutralizer = new WorkflowCommandNeutralizer(false),
+        private ?string $temporaryDirectory = null,
+        private StandardOutputInterface $standardOutput = new StandardOutput(),
     ) {
         $indexed = [];
         foreach ($renderers as $renderer) {
@@ -57,6 +62,12 @@ final readonly class ReportWriter implements ReportWriterInterface
     public function write(AuditReport $auditReport, OutputFormat $outputFormat, ?string $outputFile, SymfonyStyle $symfonyStyle, array $baselinedFingerprints = []): void
     {
         $content = $this->renderContent($outputFormat, $auditReport, $baselinedFingerprints);
+
+        if (null === $outputFile && OutputFormat::Html === $outputFormat && $this->standardOutput->isTerminal()) {
+            $this->linkFromATemporaryFile($symfonyStyle, $content);
+
+            return;
+        }
 
         if (null === $outputFile) {
             $this->keepOnConsole($symfonyStyle, $outputFormat, $content);
@@ -106,6 +117,23 @@ final readonly class ReportWriter implements ReportWriterInterface
         if (!WritableFilePath::canBeWritten($outputFile)) {
             throw ReportWriteFailedException::forUnwritablePath($outputFile);
         }
+    }
+
+    private function linkFromATemporaryFile(SymfonyStyle $symfonyStyle, string $content): void
+    {
+        try {
+            $path = $this->filesystem->tempnam($this->temporaryDirectory ?? sys_get_temp_dir(), self::TEMPORARY_REPORT_PREFIX, '.html');
+            PrivateFileWriter::write($this->filesystem, $path, $content);
+        } catch (IOException) {
+            $this->keepOnConsole($symfonyStyle, OutputFormat::Html, $content);
+
+            return;
+        }
+
+        $url = FileUrl::of($path);
+
+        $symfonyStyle->success(\sprintf('Report saved to %s', $path));
+        $symfonyStyle->writeln(\sprintf(' Open it in your browser: <href=%1$s>%1$s</>', $url));
     }
 
     /**

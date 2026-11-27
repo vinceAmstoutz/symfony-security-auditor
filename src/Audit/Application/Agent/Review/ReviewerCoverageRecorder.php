@@ -51,6 +51,16 @@ final readonly class ReviewerCoverageRecorder
         ]);
     }
 
+    /**
+     * @param list<Vulnerability> $vulnerabilities
+     */
+    public static function recordEach(array $vulnerabilities, string $status, CoverageRecorderInterface $coverageRecorder, ProgressReporterInterface $progressReporter): void
+    {
+        foreach ($vulnerabilities as $vulnerability) {
+            self::record($vulnerability, $status, $coverageRecorder, $progressReporter);
+        }
+    }
+
     private static function recordEntry(Vulnerability $vulnerability, string $status, CoverageRecorderInterface $coverageRecorder): void
     {
         if ($coverageRecorder instanceof FindingReviewRecorderInterface) {

@@ -21,6 +21,13 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 /** @internal not part of the BC promise, see docs/versioning.md */
 final readonly class MarkdownReportRenderer implements ReportRendererInterface
 {
+    /**
+     * @param ?string $subscription the subscription a coding agent's CLI runs the audit on, which is not priced per call
+     */
+    public function __construct(
+        private ?string $subscription = null,
+    ) {}
+
     #[Override]
     public function format(): string
     {
@@ -48,7 +55,7 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
                 number_format($cost->outputTokens()),
                 '' === $cost->primaryModel() ? 'unknown model' : MarkdownTextEscaper::fences($cost->primaryModel()),
                 number_format($cost->estimatedCostUsd(), 4, '.', ''),
-                CostRateLabel::of($cost),
+                CostRateLabel::of($cost, $this->subscription),
             ),
             '',
             \sprintf(

@@ -55,18 +55,15 @@ final class MultiLineCallExtentTest extends TestCase
 
     public function test_a_flood_of_open_calls_is_resolved_without_reading_the_rest_of_the_file_each_time(): void
     {
-        $lines = [];
-        for ($index = 0; $index < 4000; ++$index) {
-            $lines[] = \sprintf('exec($cmd%d,', $index);
-        }
-
+        $lines = array_map(static fn (int $index): string => \sprintf('exec($cmd%d,', $index), range(0, 1999));
         $multiLineCallExtent = new MultiLineCallExtent();
-        $start = hrtime(true);
-        foreach (array_keys($lines) as $startIndex) {
-            $multiLineCallExtent->lineIndexes($lines, $startIndex);
-        }
 
-        self::assertLessThan(1_000_000_000, hrtime(true) - $start);
+        $linesRead = array_map(
+            static fn (int $startIndex): int => \count(explode("\n", $multiLineCallExtent->lookahead($lines, $startIndex))),
+            array_keys($lines),
+        );
+
+        self::assertSame(MultiLineCallExtent::MAX_LOOKAHEAD_LINES, max($linesRead));
     }
 
     /**

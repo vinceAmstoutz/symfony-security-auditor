@@ -29,6 +29,15 @@ final class OllamaPulledModelListTest extends TestCase
         self::assertSame(['qwen3:8b', 'llama3.3:latest'], (new OllamaPulledModelList($mockHttpClient))->pulledModels('http://localhost:11434/'));
     }
 
+    public function test_it_gives_up_on_a_server_that_does_not_answer_within_a_few_seconds(): void
+    {
+        $mockResponse = new MockResponse('{"models":[]}');
+
+        (new OllamaPulledModelList(new MockHttpClient($mockResponse)))->pulledModels('http://localhost:11434');
+
+        self::assertSame([3.0, 3.0], [$mockResponse->getRequestOptions()['timeout'], $mockResponse->getRequestOptions()['max_duration']]);
+    }
+
     public function test_it_lists_nothing_when_the_server_cannot_be_reached(): void
     {
         $mockHttpClient = new MockHttpClient(new MockResponse('', ['error' => 'Connection refused']));

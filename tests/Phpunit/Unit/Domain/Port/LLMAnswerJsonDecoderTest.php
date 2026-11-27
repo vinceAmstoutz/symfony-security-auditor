@@ -16,6 +16,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Domain\Port;
 use JsonException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\BalancedBlockScanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\LLMAnswerJsonDecoder;
 
 final class LLMAnswerJsonDecoderTest extends TestCase
@@ -53,7 +54,14 @@ final class LLMAnswerJsonDecoderTest extends TestCase
     {
         $this->expectException(JsonException::class);
 
-        LLMAnswerJsonDecoder::decode('Findings: '.str_repeat('[', 10_000));
+        LLMAnswerJsonDecoder::decode('Findings: '.str_repeat('[', 2_000));
+    }
+
+    public function test_an_answer_that_is_all_unclosed_openers_is_searched_for_a_block_at_a_bounded_number_of_them(): void
+    {
+        $openerPositions = BalancedBlockScanner::openerPositions('Findings: '.str_repeat('[', 2_000));
+
+        self::assertSame(\array_slice($openerPositions, 0, 64), LLMAnswerJsonDecoder::recoveryCandidates($openerPositions));
     }
 
     public function test_it_rethrows_the_json_error_when_no_block_decodes(): void

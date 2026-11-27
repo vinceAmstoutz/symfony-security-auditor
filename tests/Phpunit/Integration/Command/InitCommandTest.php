@@ -41,6 +41,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\Unhid
 
 final class InitCommandTest extends TestCase
 {
+    private const string PLACEHOLDER_MODEL_WARNING = 'init cannot list the models of this provider, so it writes claude-opus-5-5 as a placeholder. Set model: in the written configuration to a model the provider serves, or run init again with --model.';
+
     private string $configHome;
 
     private string $dataHome;
@@ -92,7 +94,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('Which cloud do you use? [AWS Bedrock]: [1] AWS Bedrock [2] Google Vertex AI [3] Azure OpenAI >', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString('Which cloud do you use? Pick a number, or type a provider name: [1] AWS Bedrock [2] Google Vertex AI [3] Azure OpenAI >', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_lists_gateways_for_an_ai_gateway(): void
@@ -102,7 +104,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('Which gateway do you use? [OpenRouter]: [1] OpenRouter [2] Eden AI [3] Another OpenAI-compatible gateway (you give its URL) >', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString('Which gateway do you use? Pick a number, or type a provider name: [1] OpenRouter [2] Eden AI [3] Another OpenAI-compatible gateway (you give its URL) >', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_lists_neither_cloud_platforms_nor_gateways_for_an_api_key(): void
@@ -122,7 +124,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('Which subscription do you have? [Claude (through the Claude Code CLI)]: [1] Claude (through the Claude Code CLI) [2] ChatGPT (through the Codex CLI) >', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString('Which subscription do you have? Pick a number: [1] Claude (through the Claude Code CLI) [2] ChatGPT (through the Codex CLI) >', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_suggests_opus_5_5_for_a_claude_subscription(): void
@@ -152,6 +154,47 @@ final class InitCommandTest extends TestCase
         $commandTester->execute(['--provider' => 'claudecode', '--reviewer-model' => 'claude-sonnet-5-5'], ['interactive' => false]);
 
         self::assertSame('claude-sonnet-5-5', $this->configuredValue('reviewer_model'));
+    }
+
+    public function test_it_trims_the_reviewer_model_from_the_command_line_as_it_trims_the_model(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute(['--provider' => 'claudecode', '--model' => ' claude-opus-5-5 ', '--reviewer-model' => ' claude-sonnet-5-5 '], ['interactive' => false]);
+
+        self::assertSame(['claude-opus-5-5', 'claude-sonnet-5-5'], [$this->configuredValue('model'), $this->configuredValue('reviewer_model')]);
+    }
+
+    #[DataProvider('subscriptions')]
+    public function test_it_refuses_an_api_key_variable_for_a_subscription_that_takes_no_api_key(string $provider): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--provider' => $provider, '--env-var' => 'MY_KEY'], ['interactive' => false]);
+
+        self::assertSame(
+            [Command::INVALID, true, false],
+            [$exitCode, str_contains($this->unwrappedDisplay($commandTester), \sprintf('--env-var names the variable an API key is read from, but "%s" runs on a subscription, which takes no API key. Leave --env-var out.', $provider)), is_file($this->configFile())],
+        );
+    }
+
+    #[DataProvider('subscriptions')]
+    public function test_it_takes_no_api_key_for_a_subscription_as_already_written(string $provider): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--provider' => $provider, '--no-api-key' => true], ['interactive' => false]);
+
+        self::assertSame([Command::SUCCESS, [$provider => ['effort' => 'medium']]], [$exitCode, $this->configuredValue('platform')]);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function subscriptions(): iterable
+    {
+        yield 'Claude' => ['claudecode'];
+        yield 'ChatGPT' => ['codex'];
     }
 
     public function test_it_refuses_a_reviewer_model_the_container_would_read_as_a_parameter(): void
@@ -314,24 +357,24 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_configures_an_anthropic_api_key_when_every_answer_is_the_default(): void
+    public function test_it_asks_again_how_you_access_ai_models_after_an_empty_answer(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['', '', '', '', '']);
+        $commandTester->setInputs(['', 'anthropic', '', '', '']);
 
         $commandTester->execute([]);
 
         self::assertSame('anthropic', $this->configuredValue('provider'));
     }
 
-    public function test_it_asks_how_you_access_ai_models_in_a_few_words(): void
+    public function test_it_preselects_no_way_of_accessing_ai_models(): void
     {
         $commandTester = $this->commandTester();
         $commandTester->setInputs(['openai', 'gpt-5.4', '', '']);
 
         $commandTester->execute([]);
 
-        self::assertStringStartsWith(' How do you access AI models? Pick a number, or type a provider name [', $this->unwrappedDisplay($commandTester));
+        self::assertStringStartsWith(' How do you access AI models? Pick a number, or type a provider name: [1] ', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_asks_the_model_of_a_chatgpt_subscription_suggesting_gpt_6_2_sol(): void
@@ -357,11 +400,11 @@ final class InitCommandTest extends TestCase
     public function test_it_names_the_companies_an_api_key_comes_from_most_common_first(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([ModelAccess::ApiKey->value, '', '', '', '']);
+        $commandTester->setInputs([ModelAccess::ApiKey->value, '1', '', '', '']);
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('Which company is your API key from? Pick a number, or type a provider name [Anthropic (Claude)]: [1 ] Anthropic (Claude) [2 ] OpenAI (GPT) [3 ] Google AI Studio (Gemini) [4 ] Mistral AI [5 ] DeepSeek [6 ] Cerebras', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString('Which company is your API key from? Pick a number, or type a provider name: [1 ] Anthropic (Claude) [2 ] OpenAI (GPT) [3 ] Google AI Studio (Gemini) [4 ] Mistral AI [5 ] DeepSeek [6 ] Cerebras', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_asks_for_a_model_pulled_in_ollama_for_a_local_model(): void
@@ -402,6 +445,50 @@ final class InitCommandTest extends TestCase
         $commandTester->execute([]);
 
         self::assertStringContainsString('Which model should the auditor use? Type its id as your provider names it: >', $this->unwrappedDisplay($commandTester));
+    }
+
+    public function test_without_interaction_it_writes_claude_opus_5_5_as_a_placeholder_for_a_gateway_and_says_how_to_replace_it(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--provider' => 'generic.gw', '--base-url' => 'https://gateway.example'], ['interactive' => false]);
+
+        self::assertSame(
+            [Command::SUCCESS, 'claude-opus-5-5', true],
+            [$exitCode, $this->configuredValue('model'), str_contains($this->unwrappedDisplay($commandTester), self::PLACEHOLDER_MODEL_WARNING)],
+        );
+    }
+
+    public function test_without_interaction_it_marks_a_placeholder_model_in_the_written_configuration(): void
+    {
+        $this->commandTester()->execute(['--provider' => 'generic.gw', '--base-url' => 'https://gateway.example'], ['interactive' => false]);
+
+        self::assertStringContainsString("\n# A placeholder: replace it with a model the provider serves.\nmodel: claude-opus-5-5\n", "\n".file_get_contents($this->configFile()));
+    }
+
+    public function test_it_marks_no_model_it_did_not_write_as_a_placeholder(): void
+    {
+        $this->commandTester()->execute(['--provider' => 'generic.gw', '--base-url' => 'https://gateway.example', '--model' => 'claude-opus-5-5'], ['interactive' => false]);
+
+        self::assertStringNotContainsString('# A placeholder', (string) file_get_contents($this->configFile()));
+    }
+
+    public function test_without_interaction_it_writes_the_model_ollama_lists_first(): void
+    {
+        $commandTester = $this->commandTester(pulledModels: ['qwen3', 'llama3.3']);
+
+        $exitCode = $commandTester->execute(['--provider' => 'ollama', '--endpoint' => 'http://localhost:11434'], ['interactive' => false]);
+
+        self::assertSame([Command::SUCCESS, 'qwen3', false], [$exitCode, $this->configuredValue('model'), str_contains($this->unwrappedDisplay($commandTester), self::PLACEHOLDER_MODEL_WARNING)]);
+    }
+
+    public function test_without_interaction_it_writes_claude_opus_5_5_as_a_placeholder_for_an_ollama_it_cannot_list_models_of(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $exitCode = $commandTester->execute(['--provider' => 'ollama', '--endpoint' => 'http://localhost:11434'], ['interactive' => false]);
+
+        self::assertSame([Command::SUCCESS, 'claude-opus-5-5', true], [$exitCode, $this->configuredValue('model'), str_contains($this->unwrappedDisplay($commandTester), self::PLACEHOLDER_MODEL_WARNING)]);
     }
 
     public function test_it_defaults_to_claude_opus_5_5_listed_under_a_vendor_prefix(): void
@@ -2419,6 +2506,13 @@ final class InitCommandTest extends TestCase
         $commandTester->execute(['--provider' => 'higgsfield', '--model' => 'our-model', '--env-var' => ' HIGGSFIELD_API_KEY '], ['interactive' => false]);
 
         self::assertSame([['higgsfield', $this->dataHome.'/symfony-security-auditor']], $this->recordingBridgeInstaller->installations);
+    }
+
+    public function test_a_run_that_cannot_ask_configures_anthropic_when_no_provider_is_given(): void
+    {
+        $this->commandTester()->execute([], ['interactive' => false]);
+
+        self::assertSame('anthropic', $this->configuredValue('provider'));
     }
 
     public function test_a_run_that_cannot_ask_leaves_an_existing_configuration_untouched(): void

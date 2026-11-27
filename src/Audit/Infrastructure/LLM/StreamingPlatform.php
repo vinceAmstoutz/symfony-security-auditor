@@ -60,7 +60,7 @@ final readonly class StreamingPlatform implements PlatformInterface
 
         $streamOptions = \in_array($platformRequestConfig->servingPlatform, self::USAGE_REQUESTING_PLATFORMS, true) ? self::USAGE_REQUEST : [];
 
-        return new PlatformBinding(new self($platformBinding->platform, streamOptions: $streamOptions), $platformBinding->model, $platformBinding->logger, $platformBinding->maxOutputTokens, $platformBinding->unselectedPlatforms);
+        return new PlatformBinding(new self($platformBinding->platform, streamOptions: $streamOptions), $platformBinding->model, $platformBinding->logger, $platformBinding->maxOutputTokens, $platformBinding->unselectedPlatforms, $platformBinding->modelSetting);
     }
 
     private static function streams(?string $servingPlatform): bool
@@ -77,7 +77,9 @@ final readonly class StreamingPlatform implements PlatformInterface
 
         $streamedResult = $this->platform->invoke($model, $input, [...$options, ...$this->streamOptions, 'stream' => true]);
 
-        return new DeferredResult(new StreamedResultConverter($streamedResult, $this->streamMetering), $streamedResult->getRawResult(), $options);
+        $bufferedResend = new BufferedResend(fn (): DeferredResult => $this->platform->invoke($model, $input, $options));
+
+        return new DeferredResult(new StreamedResultConverter($streamedResult, $this->streamMetering, $bufferedResend), $streamedResult->getRawResult(), $options);
     }
 
     #[Override]

@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Console\Question\ChoiceQuestion;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MissingChoiceException;
 
 /**
  * A question answered by the number of a listed choice, or by typing any
@@ -52,14 +53,38 @@ final readonly class NumberedChoice
     }
 
     /**
+     * The prompt names no default.
+     *
+     * @param list<string> $choices
+     * @param list<string> $values  what each choice stands for
+     */
+    public static function askWithoutDefault(SymfonyStyle $symfonyStyle, string $question, array $choices, array $values): string
+    {
+        return self::askQuestion($symfonyStyle, new ChoiceQuestion($question, self::numberedFromOne($choices)), $values);
+    }
+
+    /**
      * @param list<string> $values
      */
     private static function askQuestion(SymfonyStyle $symfonyStyle, ChoiceQuestion $choiceQuestion, array $values): string
     {
-        $choiceQuestion->setValidator(static fn (mixed $answer): string => self::chosen($values, \is_string($answer) ? $answer : ''));
+        $labels = $choiceQuestion->getChoices();
+        $choiceQuestion->setValidator(static fn (mixed $answer): string => self::chosen($values, $labels, self::given($answer)));
 
         $answer = $symfonyStyle->askQuestion($choiceQuestion);
         \assert(\is_string($answer));
+
+        return $answer;
+    }
+
+    /**
+     * @throws MissingChoiceException
+     */
+    private static function given(mixed $answer): string
+    {
+        if (!\is_string($answer)) {
+            throw MissingChoiceException::forEmptyAnswer();
+        }
 
         return $answer;
     }
@@ -80,10 +105,16 @@ final readonly class NumberedChoice
     }
 
     /**
-     * @param list<string> $choices
+     * Maps a number or a label, which a terminal completes a typed value to,
+     * to the value it stands for.
+     *
+     * @param list<string> $values
+     * @param array<mixed> $labels the choices, numbered from 1
      */
-    private static function chosen(array $choices, string $answer): string
+    private static function chosen(array $values, array $labels, string $answer): string
     {
-        return ctype_digit($answer) ? $choices[(int) $answer - 1] ?? $answer : $answer;
+        $position = ctype_digit($answer) ? (int) $answer : array_search($answer, $labels, true);
+
+        return \is_int($position) ? $values[$position - 1] ?? $answer : $answer;
     }
 }

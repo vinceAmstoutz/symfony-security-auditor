@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge;
 
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Bridge\Exception\BridgeInstallationFailedException;
@@ -29,15 +31,25 @@ final readonly class ComposerPhar
 
     public const string SHA256 = 'f446ea719708bb85fcbf4ef18def5d0515f1f9b4d703f6d820c9c1656e10a2f2';
 
+    private const int CHECKSUM_PREFIX_LENGTH = 12;
+
+    private const int STAGING_SUFFIX_BYTES = 8;
+
     public function __construct(
         private string $bundledPhar,
         private string $sha256 = self::SHA256,
         private Filesystem $filesystem = new Filesystem(),
+        private LoggerInterface $logger = new NullLogger(),
     ) {}
 
     public static function bundledPath(): string
     {
         return \sprintf('%s/resources/composer.phar', \dirname(__DIR__, 4));
+    }
+
+    public function isBundled(): bool
+    {
+        return is_file($this->bundledPhar);
     }
 
     /**
@@ -47,24 +59,75 @@ final readonly class ComposerPhar
      */
     public function in(string $directory): string
     {
-        $path = \sprintf('%s/composer.phar', $directory);
-        $unpacked = \sprintf('%s/composer', $directory);
+        $unpacked = \sprintf('%s/composer-%s-%s', $directory, self::VERSION, substr($this->sha256, 0, self::CHECKSUM_PREFIX_LENGTH));
+        $entryScript = \sprintf('%s/bin/composer', $unpacked);
 
-        if (!is_file($this->bundledPhar)) {
+        if (!$this->isBundled()) {
             throw BridgeInstallationFailedException::forUnbundledComposerPhar(self::VERSION, $this->bundledPhar);
         }
 
+        if (is_file($entryScript)) {
+            return $entryScript;
+        }
+
+        $staging = \sprintf('%s.%s', $unpacked, bin2hex(random_bytes(self::STAGING_SUFFIX_BYTES)));
+        $path = \sprintf('%s.phar', $staging);
+
         try {
-            $this->filesystem->remove($path);
-            $this->filesystem->copy($this->bundledPhar, $path);
-            $this->assertPinnedRelease($path);
-            $this->filesystem->remove($unpacked);
-            $this->filesystem->mirror(\sprintf('phar://%s', $path), $unpacked);
+            $this->unpack($path, $staging);
+            $this->moveInPlace($staging, $unpacked, $entryScript);
         } catch (IOException $ioException) {
             throw BridgeInstallationFailedException::forUncopyableComposerPhar(self::VERSION, $directory, $ioException);
         }
 
-        return \sprintf('%s/bin/composer', $unpacked);
+        return $entryScript;
+    }
+
+    /**
+     * Deletes the staged copy of the phar where the system allows it.
+     *
+     * @throws BridgeInstallationFailedException
+     * @throws IOException
+     */
+    private function unpack(string $path, string $staging): void
+    {
+        try {
+            $this->filesystem->copy($this->bundledPhar, $path);
+            $this->assertPinnedRelease($path);
+            $this->filesystem->mirror(\sprintf('phar://%s', $path), $staging);
+        } finally {
+            $this->discardStagedCopy($path);
+        }
+    }
+
+    /**
+     * Keeps a copy Windows refuses to delete while this process still holds it.
+     */
+    private function discardStagedCopy(string $path): void
+    {
+        try {
+            $this->filesystem->remove($path);
+        } catch (IOException $ioException) {
+            $this->logger->info('Kept the copy of composer.phar the system refused to delete.', ['path' => $path, 'reason' => $ioException->getMessage()]);
+        }
+    }
+
+    /**
+     * Keeps the copy another run moved in place first.
+     *
+     * @throws IOException
+     */
+    private function moveInPlace(string $staging, string $unpacked, string $entryScript): void
+    {
+        try {
+            $this->filesystem->rename($staging, $unpacked);
+        } catch (IOException $ioException) {
+            if (!is_file($entryScript)) {
+                throw $ioException;
+            }
+
+            $this->filesystem->remove($staging);
+        }
     }
 
     /**
@@ -73,8 +136,7 @@ final readonly class ComposerPhar
     private function assertPinnedRelease(string $path): void
     {
         if (!hash_equals($this->sha256, (string) hash_file('sha256', $path))) {
-            $this->filesystem->remove($path);
-
+            // The finally block of unpack() discards the refused copy.
             throw BridgeInstallationFailedException::forTamperedComposerPhar(self::VERSION);
         }
     }

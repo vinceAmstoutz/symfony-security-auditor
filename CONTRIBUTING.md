@@ -235,7 +235,7 @@ A custom LLM client, advisory source or provider is wired in the audited applica
 6. Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md):
    - a title of 50 characters or fewer, in the [commit format](#commit-style);
    - only its four sections, in order: `## Summary`, `## Type of change`, `## Target branch`, `## Checklist`;
-   - a Summary of 500 characters or fewer, then a `Closes #N` or `Refs #N` line when an issue is involved;
+   - a Summary of 750 characters or fewer, then a `Closes #N` or `Refs #N` line when an issue is involved;
    - only the boxes you tick (the license box always) and no leftover template text.
 7. Run the `Pull request target` check before you open it:
 
@@ -245,6 +245,8 @@ A custom LLM client, advisory source or provider is wired in the audited applica
    ```
 
 All eight CI jobs must pass before merging ([`docs/ci.md`](docs/ci.md)).
+
+Into a version branch, the [Merge guard](.github/workflows/merge-guard.yaml) checks must pass too: `Signed commits` fails when GitHub did not verify a commit of the pull request. `Base branch is green` waits for the CI run of the pull request to finish, then fails while the latest completed, non-cancelled CI run of the base branch did not succeed. A pull request that fixes the base branch passes it once its own CI passes, with the label naming that branch: `fixes-1.x` for `1.x`, `fixes-2.x` for `2.x`. Neither check re-runs when the base branch changes state: push again or re-run the `Base branch is green` job.
 
 ## Commit Style
 

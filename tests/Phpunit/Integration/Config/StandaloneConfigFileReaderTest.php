@@ -72,6 +72,16 @@ final class StandaloneConfigFileReaderTest extends TestCase
     /**
      * @throws MalformedProjectConfigException
      */
+    public function test_a_file_reusing_one_anchor_more_times_than_the_yaml_parser_allows_by_default_is_read(): void
+    {
+        $this->filesystem->dumpFile($this->configFile, "base: &base [a]\nkeep:\n".str_repeat("  - *base\n", 200));
+
+        self::assertSame(['base' => ['a'], 'keep' => array_fill(0, 200, ['a'])], (new StandaloneConfigFileReader())->read($this->configFile));
+    }
+
+    /**
+     * @throws MalformedProjectConfigException
+     */
     public function test_a_file_holding_one_value_short_of_the_limit_is_read(): void
     {
         $this->writeExcludedPaths(9997);

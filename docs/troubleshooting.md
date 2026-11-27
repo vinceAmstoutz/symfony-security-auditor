@@ -270,9 +270,13 @@ symfony_security_auditor:
 
 The file or finding is then recorded as errored. The call still counts against `audit.budget`.
 
+### `The provider does not know the model "…"` after `init -n`
+
+`init --no-interaction` without `--model` writes `claude-opus-5-5` as a placeholder for a provider it cannot list models for (a gateway such as LM Studio or vLLM, an Ollama it could not reach or with no model pulled, a provider the price catalog does not list). It warns when it does so and marks the line in `config.yaml` with a comment. `doctor` warns about it too. Set `model:` in `config.yaml` to a model the provider serves, or run `init` again with `--model`. In a Symfony application, set `symfony_security_auditor.model`. The message names the setting the failing model comes from: `model`, `attacker_model`, `reviewer_model` or `audit.escalation.cheap_model`.
+
 ### `Ollama: model not found`
 
-Pull the model, then check it with `ollama list`. The `model` setting must match its name exactly.
+Pull the model, then check it with `ollama list`. The `model` setting must match its name exactly. On Ollama, `audit:run` notes each configured model the server has not pulled before the run starts and `doctor` warns about it.
 
 ```bash
 ollama pull llama3.3
@@ -287,7 +291,7 @@ The chunk's files are recorded as errored, left out of the cache and counted und
 | Reason | Fix |
 | --- | --- |
 | `tool-call limit reached (audit.max_tool_iterations)` | Raise `audit.max_tool_iterations` (try `16`) or set `audit.tools_enabled: false`. See [the cost](#attacker-loops-indefinitely-on-tool-calls). |
-| `output token limit reached (max_output_tokens)` | Raise `max_output_tokens` or `attacker_max_output_tokens` (Claude models only). |
+| `output token limit reached (max_output_tokens)` | Raise `max_output_tokens` or `attacker_max_output_tokens`. |
 | `answer withheld by the provider content filter` | Try another model or deployment. |
 | `the model returned no content` | Retry; switch model if every chunk fails. |
 | `the answer was not valid JSON` | See [`Failed to parse …`](#failed-to-parse-attacker-agent-json-response--failed-to-parse-reviewer-response). |
@@ -428,7 +432,7 @@ symfony_security_auditor:
 
 The audit goes on without CVE data and logs a `warning`. Fix the cause:
 
-- **`composer` not in `PATH`**: install Composer 2.4+ on the audit host. `doctor` checks it in the standalone binary.
+- **`composer` not in `PATH`** (bundle only): install Composer 2.4+ on the audit host. The standalone binary runs the Composer it bundles; `doctor` checks it.
 - **`composer.lock` missing, over 8 MiB or a symlink leaving the project**: run `composer install` and keep the lockfile a regular file (a symlink to one inside the project works).
 - **Malformed output**: regenerate the corrupted `composer.lock`.
 - **Advisories of a private repository missing**: the audited project's `composer.json` and `auth.json` are not read. Configure the repository in the global Composer configuration (`COMPOSER_HOME`) of the user running the audit.

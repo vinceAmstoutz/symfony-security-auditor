@@ -36,6 +36,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineFilePathsHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessorInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\AuditWithoutVerdictException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\InvalidProjectPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\RunRefusedException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ScanPathOutsideProjectException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ScanPathResolver;
@@ -107,7 +108,9 @@ final readonly class AuditTool
     /**
      * Runs the audit as `audit:run` does without options, the configured
      * baseline and muted types included. A budgeted run on an unpriced model
-     * still runs and logs that the cap cannot be enforced.
+     * still runs and logs that the cap cannot be enforced. A subscription's
+     * CLI that is logged out, or would bill an API key in place of the
+     * subscription, refuses the run as `audit:run` refuses it.
      *
      * @throws AuditAbortedByBudgetException
      * @throws AuditAbortedByProviderException
@@ -116,12 +119,13 @@ final readonly class AuditTool
      * @throws InvalidAuditCostException
      * @throws InvalidTokenUsageException
      * @throws ScanPathOutsideProjectException
+     * @throws RunRefusedException
      */
     private function auditReport(AuditTarget $auditTarget): AuditReport
     {
         $projectPath = $auditTarget->projectPath;
         $this->auditedProjectPathHolder->set($projectPath);
-        $this->unpricedModelBudgetGuard->warnWhenBudgetCannotBeEnforced($this->logger);
+        $this->unpricedModelBudgetGuard->assertUnattendedRunPermitted($this->logger);
         $this->reviewerFeedbackHolder->set($this->baselineProcessor->feedback(null));
         $this->baselineFilePathsHolder->set($projectPath, $this->baselineProcessor->filePaths(null));
 

@@ -29,4 +29,13 @@ final class ProjectConfigPlatformOverrideException extends RuntimeException
             implode(' and ', array_map(static fn (string $key): string => \sprintf('"%s"', $key), $keys)),
         ));
     }
+
+    public static function forCliAgent(string $projectConfigFile, string $key): self
+    {
+        return new self(\sprintf(
+            'The project config "%s" declares "%s", but the CLI agent a run starts is read from your user config only: a repository you audit must not be able to choose a program that runs with your environment and its credentials. Configure the CLI agent in your user config instead.',
+            $projectConfigFile,
+            $key,
+        ));
+    }
 }

@@ -79,7 +79,7 @@ Create `config/packages/symfony_security_auditor.yaml`. The bundle exposes the f
 | `model` | string | `'claude-opus-5-5'` | Model used by both the attacker and the reviewer. |
 | `attacker_model` | string | `null` | Attacker model; `model` when unset. |
 | `reviewer_model` | string | `null` | Reviewer model; `model` when unset. |
-| `max_output_tokens` | `int` (≥ 1) | `4096` | Output token cap per LLM call of a Claude model: sent as `symfony/ai`'s `max_output_tokens` on a platform whose bridge translates it (`anthropic`, `bedrock`, `vertexai`, the generic-bridge gateways, …) and as `max_tokens` on any other. Other models get no cap, since theirs would also count their reasoning tokens and cut a thinking model's answer short. _Since 1.23_ a tool call the cap cuts off is asked again once with twice the cap. |
+| `max_output_tokens` | `int` (≥ 1) | `4096` for a Claude model | Output token cap per LLM call. A Claude model gets it, `4096` when unset, as `symfony/ai`'s `max_output_tokens` on a platform whose bridge translates it (`anthropic`, `bedrock`, `vertexai`, `gemini`, `mistral`, `openai`, the generic-bridge gateways, …) and as `max_tokens` on any other. _Since 1.23_, another model gets it only when you set it (this key or the role's own) on a platform whose bridge translates it: its cap also counts its reasoning tokens, so a default one could cut a thinking model's answer short. _Since 1.23_ a tool call the cap cuts off is asked again with twice the cap, once per tool conversation, which keeps the raised cap for its later rounds; when the provider refuses the raised cap, the call ends as the answer the cap cut off. |
 | `attacker_max_output_tokens` | `int` (≥ 1) | `null` | Attacker output token cap; `max_output_tokens` when unset. |
 | `reviewer_max_output_tokens` | `int` (≥ 1) | `null` | Reviewer output token cap; `max_output_tokens` when unset. |
 | `provider_json_mode` | bool | `false` | Ask a gateway serving a Claude model (`openrouter`, `generic`, …) to enforce JSON output with `response_format: {type: json_object}`. Not sent on `anthropic` and `bedrock`; no effect on other models. |
@@ -110,7 +110,7 @@ Model names must be ones the platform configured in `ai.yaml` serves. When you r
 | `audit.max_iterations` | `int` (≥ 1) | profile | Maximum attacker/reviewer iterations (balanced/thorough: `3`, fast: `1`); the loop stops earlier when an iteration finds nothing new. |
 | `audit.min_confidence` | `float` 0-1 | `0.6` | Minimum attacker confidence for a finding to reach the reviewer. Higher favors precision (`0.8` for a CI gate), lower favors recall (`0.3` for discovery). |
 | `audit.reviewer_batch_size` | `int` (≥ 1) | `1` | Findings reviewed per LLM call. `1` is the most precise; larger values (try `5`) cut cost and latency. Cached verdicts are served first either way. |
-| `audit.report_static_findings` | `bool` | `false` | _Since 1.23._ Also report every credential the secret scrubber redacted and every pre-scan match as a finding on its line, validated or rejected by the reviewer like the attacker's. The configuration `init` writes turns it on. |
+| `audit.report_static_findings` | `bool` | `false` | _Since 1.23._ Also report every credential the secret scrubber redacted and every pre-scan match, up to 20 matches of one pattern per file, as a finding on its line, validated or rejected by the reviewer like the attacker's. An attacker finding of the same type on that line is reviewed in its place. The configuration `init` writes turns it on; see [Cost & Performance](cost-and-performance.md#speed--cost-levers) for what the review costs. |
 | `audit.tools_enabled` | `bool` | `true` | Let the attacker investigate across files with `read_file`, `grep`, `list_files` and `lookup_advisory`. Costs extra round-trips, mostly offset by prompt caching; set `false` only for the cheapest single-file scan. |
 | `audit.tools_scope` | `audited` \| `scanned` | `audited` | _Since 1.22._ Which files the file tools may open. `audited` limits them to the files the run audits (the narrowed set on a `--since`, `--path` or escalated run); `scanned` opens every scanned file, so the attacker can follow a changed controller into unchanged code, at the price of sending those files to the provider. User config only in the standalone binary. |
 | `audit.structured_collection` | `bool` | `true` | The attacker records each finding through a schema-enforced `record_vulnerability` tool call, so its answer cannot be malformed. Set `false` to fall back to a JSON array, for models without tool use. |
@@ -131,7 +131,7 @@ Model names must be ones the platform configured in `ai.yaml` serves. When you r
 | `audit.excluded_types` | `string[]` (VulnerabilityType values) | `[]` | Vulnerability types left out of the report and the exit code, to mute a noisy class such as `missing_rate_limiting`. Wins over `included_types`. `twig_injection` and `sensitive_data_exposure` also mute `xss` (_since 1.22_). |
 | `audit.included_types` | `string[]` (VulnerabilityType values) | `[]` | When non-empty, only these vulnerability types are reported and gated on. `twig_injection` and `sensitive_data_exposure` also keep `xss` (_since 1.22_). |
 | `audit.custom_skills` | `map` | `{}` | Your own attacker instructions, keyed by skill name: `file_type` (a file-type bucket, as in `scan.custom_risk_patterns`), `instructions` (what to hunt and what not to flag) and an optional `priority` (default `500`). Added to the prompt whenever a chunk holds a file of that type; editing one re-runs the affected chunks. |
-| `audit.reviewer_max_concurrent` | `int` (≥ 1) | profile | Reviewer calls run at once when findings are reviewed one per call (balanced/thorough: `1`, fast: `4`). `4`-`8`, within your rate limits, shortens the review phase accordingly. Ignored with reviewer tools on or on a platform without an async transport. |
+| `audit.reviewer_max_concurrent` | `int` (≥ 1) | profile | Reviewer calls run at once when findings are reviewed one per call or, for static findings, file by file (balanced/thorough: `1`, fast: `4`). `4`-`8`, within your rate limits, shortens the review phase accordingly. Ignored with reviewer tools on or on a platform without an async transport. |
 | `audit.attacker_max_concurrent` | `int` (≥ 1) | profile | Attacker chunks analyzed at once (balanced/thorough: `1`, fast: `4`). `4`-`8`, within your rate limits, shortens the longest phase accordingly. Needs `structured_collection` and a platform with an async transport. |
 | `audit.static_prescan.enabled` | `bool` | `true` | Run the zero-token regex pre-scan and show its risk markers to the attacker, so it focuses on concrete locations. |
 | `audit.static_prescan.lean_mode` | `bool` | profile | Skip files with no pre-scan marker (balanced/thorough: `false`, fast: `true`). Often cuts tokens by 40-70%, at the cost of what the regexes do not know. |
@@ -191,13 +191,13 @@ Each model is priced from the `symfony/models-dev` listing of the platform the a
 
 Cache reads and writes are billed at the model's own cache rates (for Anthropic, reads at `0.1x` and writes at `1.25x` the input rate, `2x` with `cache_retention: long`), so the budget and `estimated_cost_usd` reflect the discounted spend.
 
-_Since 1.23_ every call streams its answer, so a proxy that closes idle connections no longer cuts a long generation. Vertex AI, Venice, Cohere, MiniMax, Bedrock and `cli_agent` stay buffered, as does a gateway that cannot stream. When a call is cut mid-answer, the report states its cost as a minimum and counts it in `cost.interrupted_calls`.
+_Since 1.23_ every call streams its answer, so a proxy that closes idle connections no longer cuts a long generation. Vertex AI, Venice, Cohere, MiniMax, Bedrock and `cli_agent` stay buffered, as does a gateway that cannot stream. A gateway whose stream reports no usage is switched to buffered calls after its first call, which is booked at its estimated input. When a call is cut mid-answer, or a streamed call fails without the usage it reported, the report states its cost as a minimum and counts it in `cost.interrupted_calls`.
 
 ### `privacy.*`: data egress
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `privacy.offline_only` | `bool` | `false` | Refuse every network call the auditor itself makes: `composer audit` never runs, so `lookup_advisory` finds no advisory; `self-update` no longer refreshes the pricing catalog. The standalone binary also refuses to start unless every platform endpoint is loopback or private-range (Ollama, LM Studio, a LAN box) and ignores proxy variables for a loopback endpoint. In bundle mode, pointing `ai.yaml` at a local platform is up to you. See [How do I verify that nothing leaves my machine?](faq.md#how-do-i-verify-that-nothing-leaves-my-machine) |
+| `privacy.offline_only` | `bool` | `false` | Refuse every network call the auditor itself makes: `composer audit` never runs, so `lookup_advisory` finds no advisory; `self-update` no longer refreshes the pricing catalog. The standalone binary also refuses to start unless every platform endpoint is loopback or private-range (Ollama, LM Studio, a LAN box) and ignores proxy variables for a loopback endpoint. In bundle mode, pointing `ai.yaml` at a local platform is up to you; a `cli_agent` is refused. See [How do I verify that nothing leaves my machine?](faq.md#how-do-i-verify-that-nothing-leaves-my-machine) |
 
 ```yaml
 # config/packages/symfony_security_auditor.yaml
@@ -468,7 +468,7 @@ Maps merge key by key; a list such as `scan.included_paths` is replaced whole by
 
 A project file ships with the repository you audit, so it may not decide what the run trusts, where your key and code go, or what it writes:
 
-- **Keys it may not set:** `platform`, `provider` and `scan.import_sarif`, which could send your API key, your code or any file of yours elsewhere; and `cache`, `privacy`, `audit.custom_skills`, `audit.output`, `audit.tools_scope`, `scan.custom_risk_patterns` and `scan.secret_scrubbing`.
+- **Keys it may not set:** `platform`, `provider` and `scan.import_sarif`, which could send your API key, your code or any file of yours elsewhere; `cli_agent`, which could start a program of its choosing with your environment; and `cache`, `privacy`, `audit.custom_skills`, `audit.output`, `audit.tools_scope`, `scan.custom_risk_patterns` and `scan.secret_scrubbing`.
 - **Values it may not set:** a `%env()%` or other container reference, text that is not plain (control characters, `::`), a model name that is not a bare model id, a non-map value in place of one of your sections or an `audit.budget` that raises or removes your caps, which it may only lower. `http_timeout` may only be raised.
 - **Files refused:** a symlink, a file over 512 KiB, nested over 32 levels or expanding to 10,000 values or more, and, in the audited project, one naming an `audit.baseline` that is not a regular file of at most 1 MiB inside the project. `scan.included_paths` stays confined to the project root by real path.
 
@@ -516,7 +516,9 @@ Good to know:
 
 - Your plan's usage limits apply and its terms decide what automated use it allows.
 - The run has no price: `--dry-run` shows no cost and an `audit.budget` cost cap cannot be enforced.
+- Each call bills the subscription the CLI is logged in to: the auditor starts it without your API keys. The audit header, `auth:status`, `auth:test` and `doctor` name that account. An audit refuses to start while the CLI is not logged in.
 - `privacy.offline_only` refuses both platforms.
+- It does not run on Windows: the auditor's instructions do not fit the command line Windows starts the CLI with, so the run stops at its first call. Use WSL, Linux, macOS or an API platform.
 - The CLI runs outside the audited project with its own tools off, so the code it reads cannot make it act. It sees only the code the auditor sends: `audit.tools_enabled`, `audit.structured_collection`, `audit.reviewer_tools_enabled` and `audit.reviewer_structured_collection` are always off.
 
 #### Running on a Claude subscription
@@ -533,6 +535,7 @@ reviewer_model: claude-haiku-5-5
 
 - Any Claude model id works, as do the aliases `opus`, `sonnet` and `haiku`.
 - On a CI runner, set `CLAUDE_CODE_OAUTH_TOKEN` to the token `claude setup-token` prints.
+- The auditor ignores `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, the Bedrock, Vertex and Foundry switches and the `apiKeyHelper` of your settings files. You get a warning when an API key still bills in place of your subscription, such as one set by managed settings. When `claude` names no subscription plan, only such a helper, the audit refuses to start.
 - Claude Code ignores the MCP servers of the machine.
 - In a Symfony application, require `symfony/ai-claude-code-platform` and set `cli_agent: { platform: claudecode, effort: medium }` with `model: claude-opus-5-5` and `reviewer_model: claude-haiku-5-5` under `symfony_security_auditor:`. Your application's own `symfony/ai` platform is left as it is.
 
@@ -549,6 +552,7 @@ reviewer_model: gpt-6-luna
 ```
 
 - `init` also offers `gpt-6.2-astra` for the hardest projects. Any model id your Codex CLI runs works.
+- The auditor ignores `CODEX_API_KEY` and `OPENAI_API_KEY`. When `codex` is logged in with an API key, the audit refuses to start: run `codex logout`, then `codex login` with your ChatGPT account.
 - Codex runs read-only with its shell and web search off. It ignores your Codex configuration and rules and keeps nothing of the session.
 - In a Symfony application, require `symfony/ai-codex-platform` and set `cli_agent: { platform: codex, effort: medium }` with `model: gpt-6.2-sol` and `reviewer_model: gpt-6-luna` under `symfony_security_auditor:`. Your application's own `symfony/ai` platform is left as it is.
 
@@ -593,9 +597,9 @@ The prompt never echoes, so the key stays out of the terminal and the shell hist
 | Command | What it does |
 | --- | --- |
 | `auth:set` | Store or replace the key; `--env-var` targets a variable other than the configured one |
-| `auth:status` | Report the variable, the source, the masked key, its fingerprint and the file path, or (_since 1.23_) that the configured platform, such as a subscription or a local model, needs no key |
+| `auth:status` | _Since 1.23_, name the provider, the models and what each call bills: the key's variable, nothing for a local model, or the account a subscription's CLI is logged in to, with a warning when an API key bills in place of the subscription. Then report the variable, the source, the masked key, its fingerprint and the file path, or that the configured platform needs no key |
 | `auth:remove` | Forget the stored key (the key stays valid with your provider, so revoke it there too) |
-| `auth:test` | _Since 1.23._ Send one short test request (billed by a paid API, usually well under a cent) and say whether the provider answers; exits `1` with the provider's reason when it does not. Same check as `doctor --check-connection` |
+| `auth:test` | _Since 1.23._ Name the provider, the models and what each call bills, as `auth:status` does, then send one short test request (billed by a paid API, usually well under a cent) and say whether the provider answers; exits `1` with the provider's reason when it does not. Same check as `doctor --check-connection` |
 
 **Permissions.** The file is written `0600` in a `0700` directory. A file other users can read, or that is not valid JSON, is refused on read with a message telling you to rotate the key; `auth:set` and `auth:remove` still rewrite it. On Windows, which has no POSIX permission bits, the file relies on the ACL of `%APPDATA%`.
 
@@ -654,6 +658,8 @@ The bundle resolves `ai.yaml` through Symfony's own environment handling, so `.e
 
 Running against [Ollama](#supported-platforms) needs no credential. Pair it with [`privacy.offline_only: true`](#privacy-data-egress) to have that enforced rather than assumed.
 
+On Ollama, `audit:run` asks the server which models it pulled before the run starts (in a Symfony application as in the binary) and notes each configured `model`, `attacker_model` or `reviewer_model` it has not pulled. The run still goes ahead; a model the provider does not know stops it with an error naming the model and the setting to change.
+
 ## CLI Reference
 
 The bundle registers the `audit:run` console command, also reachable through the shorter `audit` alias (`bin/console audit`), plus `audit:diff`, `audit:trend` and `audit:baseline` for working with previously generated reports. The standalone CLI exposes the same commands, run as `symfony-security-auditor audit:diff …`; its three report commands need neither a configuration nor an API key.
@@ -675,7 +681,7 @@ bin/console audit [<project-path>] [options]
 | Option | Short | Default | Description |
 | --- | --- | --- | --- |
 | `--format` | `-f` | `console` | Report format: `console`, `executive` (stakeholder summary, no per-finding detail), `json`, `sarif`, `html` (self-contained, with charts), `markdown` (PR comment or `$GITHUB_STEP_SUMMARY`), `junit` (CI test panels), `github` (inline workflow annotations) or `github-comment` (_since 1.19_, a self-updating PR comment). See [Output formats](#output-formats-reference). Defaults to `audit.format` (_since 1.22_). |
-| `--output` | `-o` | none | Write the report to this file, for any format, `--dry-run` included. A path it could never be saved to (a symlink, a directory, a pipe) is refused before the audit runs; `/dev/null` works. Leave it out with `--format=github`, whose annotations must reach the workflow log. Defaults to `audit.output` (_since 1.22_). |
+| `--output` | `-o` | none | Write the report to this file, for any format, `--dry-run` included. A path it could never be saved to (a symlink, a directory, a pipe) is refused before the audit runs; `/dev/null` works. Leave it out with `--format=github`, whose annotations must reach the workflow log. Defaults to `audit.output` (_since 1.22_). Without it, `--format=html` on a terminal saves the report to a file only you can read in the temporary directory and prints a `file://` link to open it in a browser; piped or redirected, it prints the HTML (_since 1.23_). |
 | `--no-output` |  | `false` | _Since 1.22._ Print the report for this run, whatever `audit.output` says. Cannot be combined with `--output`. |
 | `--dry-run` |  | `false` | Estimate tokens and cost without calling the LLM, then exit `0`. The estimate ignores prompt-cache discounts, so real runs usually cost less; an unpriced model shows `$0.00` with a warning. The standalone binary runs it without an API key. A report it writes is marked incomplete (_since 1.21_). |
 | `--path` | `-p` | none | Audit these directories or files instead of `scan.included_paths`, relative to the project root; repeat for several. _Since 1.22_ they replace the configured scope (`--path apps/api` reaches a folder the configuration leaves out) and may be absolute when inside the project. File types, size limit, gitignore and scrubbing still apply. The `security.yaml`, voters and forms of the whole project still tell the model which routes are guarded; in a monorepo, the application's own security configuration is read too. A path outside the project exits `1`. |
@@ -775,13 +781,13 @@ _Since 1.19._ A pull-request comment body, sized for a comment rather than a ful
 Generated by [vinceamstoutz/symfony-security-auditor](https://github.com/vinceamstoutz/symfony-security-auditor).
 ```
 
-_Since 1.23._ With [`audit.fix_synthesis`](#audit-orchestrator-knobs) enabled, a `### Suggested fixes` section follows the table: each listed finding whose fix replaces one run of lines of its own file gets a GitHub ` ```suggestion ` block naming those lines. A fix spanning several hunks or files, or one that only adds lines, gets no suggestion block. The body also ends with a hidden, base64-encoded list of those suggestions, which the GitHub Action's `comment-pr` posts as a pull-request review (see [CI](ci.md#sticky-pr-comment-with-the-audit-summary)).
+_Since 1.23._ With [`audit.fix_synthesis`](#audit-orchestrator-knobs) enabled, a `### Suggested fixes` section follows the table: each listed finding whose fix replaces one run of lines of its own file gets a GitHub ` ```suggestion ` block naming those lines. A fix spanning several hunks or files, one that only adds lines or one whose code holds a hidden marker of the auditor gets no suggestion block. The body also ends with a hidden, base64-encoded list of those suggestions, which the GitHub Action's `comment-pr` posts as a pull-request review (see [CI](ci.md#sticky-pr-comment-with-the-audit-summary)).
 
 #### `html`
 
 A single self-contained file (no external stylesheet, font, image or script) carrying the risk badge and run metadata, a Distribution section of two inline-SVG bar charts (by severity, by vulnerability type) and one card per finding with its location, description, vulnerable code, attack vector, proof of concept and remediation. Colors come from the report's own stylesheet, so it follows the reader's light/dark preference.
 
-![The HTML report: risk badge, run metadata, distribution charts and one card per finding](../assets/html-report.png?raw=true)
+![The HTML report: branded header, risk badge, run metadata, distribution charts and one card per finding](../assets/html-report.png?raw=true)
 
 ### Normalized score and grade
 
@@ -806,7 +812,7 @@ The grade boundaries mirror the `risk_level` thresholds, so the two never disagr
 | Code | Meaning |
 | --- | --- |
 | `0` | The audit completed below the `fail_on` threshold and, if set, at or above `--min-score` |
-| `1` | The risk level reached `fail_on`, the score fell below `--min-score`, the run has no verdict (the scan found no file, or no file could be analyzed and nothing was found, _since 1.21_), or the audit failed or was given an invalid path |
+| `1` | The risk level reached `fail_on`, the score fell below `--min-score`, the run has no verdict (the scan found no file, or no file could be analyzed and nothing was found, _since 1.21_), or the audit failed or was given an invalid path. _Since 1.23_ it also covers an audit on a subscription that refuses to start because the CLI is not logged in or would bill an API key in its place |
 | `2` | The token or cost budget was exceeded (the partial report is still written), or a cost budget could not be enforced on an unpriced model and the run was declined |
 | `3` | _Since 1.21._ `--fail-on-incomplete` (or, _since 1.22_, `audit.fail_on_incomplete`) is set, no gate tripped and some file could not be fully analyzed |
 
@@ -966,18 +972,19 @@ args = ["mcp:serve"]
 The audit runs on the auditor's own configured platform and models and bills that provider as a CLI run would. **The MCP client's model is not used**, so your provider credential is still required.
 
 - An audit needs **no API key** only when the configured platform takes none, such as a local [Ollama](#supported-platforms); nothing then leaves your machine either.
+- On a [Claude](#running-on-a-claude-subscription) or [ChatGPT](#running-on-a-chatgpt-subscription) subscription, the `audit` tool refuses to start, as `audit:run` does, while the CLI is not logged in or would bill an API key in place of the subscription. The client receives the reason.
 - A client started from a desktop app does not inherit your shell's environment variables. With the standalone binary, store the key once with [`auth:set`](#providing-the-api-key) so the server finds it however it is launched; otherwise pass the variable through the client's `env` setting.
 - A full report can be large. Claude Code caps a tool's output at 25,000 tokens by default; raise `MAX_MCP_OUTPUT_TOKENS` if a report is cut off.
 - An audit takes minutes and sends no progress; a client that times out (60 seconds by default in the MCP TypeScript SDK) leaves the server spending on an answer nobody reads. Raise the client's tool timeout (Claude Code: `MCP_TOOL_TIMEOUT`, in milliseconds) or keep MCP audits short with the `fast` profile.
 
 ### `init`: generating the standalone configuration
 
-Standalone only. Writes `config.yaml` and installs the provider bridge with the Composer the binary bundles. _Since 1.23_ it first asks how you access AI models (a Claude or ChatGPT [subscription](#running-on-a-subscription), an API key, a local model such as Ollama, an AI gateway or a cloud account), then lists the matching providers and the newest model of each family with its price per million tokens, defaulting to `claude-opus-5-5` where listed. Type any other provider or model id to skip a list. It can end with one test request, sent only on `yes`. Each option given skips its prompt; under `--no-interaction` a missing option takes its default and a platform that needs a URL is refused rather than written half-configured.
+Standalone only. Writes `config.yaml` and installs the provider bridge with the Composer the binary bundles. _Since 1.23_ it first asks how you access AI models (a Claude or ChatGPT [subscription](#running-on-a-subscription), an API key, a local model such as Ollama, an AI gateway or a cloud account), then lists the matching providers and the newest model of each family with its price per million tokens, defaulting to `claude-opus-5-5` where listed. Type any other provider or model id to skip a list. It can end with one test request, sent only on `yes`. Each option given skips its prompt; under `--no-interaction` a missing option takes its default and a platform that needs a URL is refused rather than written half-configured. A model `init` writes as a placeholder is marked with a comment in `config.yaml`; `doctor` warns about it until it is replaced.
 
 | Option | Default | Description |
 | --- | --- | --- |
 | `--provider` | `anthropic` | _Since 1.23_ also `claudecode` or `codex`, to run on a [Claude](#running-on-a-claude-subscription) or [ChatGPT](#running-on-a-chatgpt-subscription) subscription. Any platform the bundled `symfony/ai-bundle` declares; any other (`meta`, which 0.14 dropped, or a misspelling) is refused with exit code `2` before anything is installed, listing the ones it declares. A platform configured per instance takes it too, e.g. `generic.my_gateway`. |
-| `--model` | `claude-opus-5-5` | Used for every provider, not derived from one: set it for anything other than Anthropic. |
+| `--model` | The model `init` offers first | `claude-opus-5-5` for Anthropic or where the provider lists it, else a mid-priced model it lists, the first model of a subscription or the first model Ollama pulled. Where `init` can list no model (a gateway, an Ollama it cannot reach or with no model pulled, a provider the price catalog does not list), `--no-interaction` writes `claude-opus-5-5` as a placeholder and warns: set `model:` in the written file or pass `--model`. |
 | `--env-var` | `<PLATFORM>_API_KEY` | The environment variable the configuration reads the API key from. A platform you host yourself (`ollama`) defaults to none instead. |
 | `--base-url` | prompted when required | _Since 1.21._ The connection origin, for `albert`, `amazeeai`, `generic.<instance>` and `openresponses.<instance>`. Rejected for any other platform. |
 | `--endpoint` | prompted when required | _Since 1.21._ The connection URL under the name those platforms give it: `deepgram`, `elevenlabs`, `minimax`, `ollama`, `together` and `venice`. For `ollama` and `together` it is the origin; `deepgram`, `elevenlabs`, `minimax` and `venice` take it with the API version path their default carries (`https://api.deepgram.com/v1/`), since the bridge appends only the route. Rejected for any other platform. |
@@ -1045,16 +1052,17 @@ Checks that the [standalone binary](#standalone-configuration) is ready to audit
 symfony-security-auditor doctor
 ```
 
-It runs four checks and prints one line for each:
+It runs four checks and prints one line for each. _Since 1.23_ it adds a `Provider` line once a provider is configured:
 
 | Check | What it verifies |
 | --- | --- |
 | Configuration | `config.yaml` resolves, holds a `platform:` block and sets every `%env(...)%` variable of the selected platform (an unset key is reported as `API key`); a key that resolves is shown masked, with a pointer to `auth:status` (_since 1.23_) for where it comes from |
 | Provider bridge | the bridge `init` installed is there, matches the binary's `symfony/ai-platform` release and boots the audit |
-| Composer | `composer` is on the host, for the `lookup_advisory` tool only; `init` uses its own |
+| Composer | the Composer the binary bundles runs, for the `lookup_advisory` tool; `init` runs it too |
 | Pricing catalog | the `symfony/models-dev` catalog that prices the run is there |
+| Provider | _Since 1.23._ The provider, the models and what each call bills. On a subscription, the account `claude auth status` or `codex login status` reports: a **warning** when an API key the auditor cannot keep from the CLI (an API-key Codex login, a key of managed settings) bills in place of the subscription or the CLI cannot tell, a **failure** while the CLI is not logged in |
 
-A missing `composer` or pricing catalog is a **warning**; a bad configuration or bridge is a **failure**. The command exits `1` on a failure only, so it fits a CI preflight step:
+A Composer that does not run or a missing pricing catalog is a **warning**; a bad configuration or bridge is a **failure**. The command exits `1` on a failure only, so it fits a CI preflight step:
 
 ```bash
 symfony-security-auditor doctor && symfony-security-auditor audit path/to/app
@@ -1064,11 +1072,27 @@ _Since 1.23._ `doctor --check-connection` also sends one short request to the pr
 
 ### Shell completion
 
-The binary completes its commands, options and arguments in bash, zsh and fish. `completion` prints the script for your shell and, _since 1.23_, stays out of the command list. Load it from your shell's startup file:
+The binary completes its commands, options and arguments in bash, zsh and fish. `completion` prints the script for your shell and, _since 1.23_, stays out of the command list. Write it once to the directory your shell loads completions from:
 
 ```bash
-eval "$(symfony-security-auditor completion bash)"
+# bash (needs bash-completion 2.x, which loads it on first use)
+mkdir -p ~/.local/share/bash-completion/completions
+symfony-security-auditor completion bash > ~/.local/share/bash-completion/completions/symfony-security-auditor
+
+# zsh
+mkdir -p ~/.zfunc
+symfony-security-auditor completion zsh > ~/.zfunc/_symfony-security-auditor
+
+# fish
+mkdir -p ~/.config/fish/completions
+symfony-security-auditor completion fish > ~/.config/fish/completions/symfony-security-auditor.fish
 ```
+
+Then open a new shell. bash-completion 1.x, the version Homebrew installs for the bash 3.2 macOS ships, never reads that directory: add `source ~/.local/share/bash-completion/completions/symfony-security-auditor` to `~/.bashrc` instead. For zsh, `~/.zfunc` must be on your `fpath` before `compinit` runs: add `fpath=(~/.zfunc $fpath)` to `~/.zshrc` above `compinit`, or above the `source $ZSH/oh-my-zsh.sh` line with Oh My Zsh. If completion still does not show up, delete zsh's cache with `rm -f ~/.zcompdump*` and open a new shell.
+
+Loading the script from your startup file works too (`eval "$(symfony-security-auditor completion bash)"`), but it starts the binary every time a shell opens.
+
+The script asks the installed binary for its completions on every <kbd>Tab</kbd>, so you do not need to write it again after a `self-update`. It is registered for the command name `symfony-security-auditor`, so a copy of the binary renamed to anything else gets no completion. In a Symfony application, `bin/console completion` sets up the bundle's commands the same way.
 
 ### Update notifications
 

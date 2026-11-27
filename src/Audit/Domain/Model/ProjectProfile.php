@@ -44,13 +44,31 @@ final readonly class ProjectProfile
     }
 
     /**
+     * A lockfile that installs no `symfony/http-kernel` is not the application's, so it reads as no lockfile.
+     *
      * @param array<string, string>|null $installedPackages  package name => locked version, `null` when no lockfile was read
      * @param list<ArchitectureStyle>    $architectureStyles
      * @param list<string>               $boundedContexts    the modules the project splits its domain into
      */
     public static function of(?array $installedPackages, array $architectureStyles, array $boundedContexts = []): self
     {
-        return new self($installedPackages, $architectureStyles, $boundedContexts);
+        return new self(
+            self::installsAKernel($installedPackages) ? $installedPackages : null,
+            $architectureStyles,
+            $boundedContexts,
+        );
+    }
+
+    /**
+     * Tells a Symfony application's lockfile, which always installs `symfony/http-kernel`, from any other.
+     *
+     * @param array<string, string>|null $installedPackages
+     *
+     * @phpstan-assert-if-true array<string, string> $installedPackages
+     */
+    public static function installsAKernel(?array $installedPackages): bool
+    {
+        return null !== $installedPackages && \array_key_exists(self::SYMFONY_KERNEL, $installedPackages);
     }
 
     /**
@@ -104,7 +122,7 @@ final readonly class ProjectProfile
     private function isMet(string $alternative, array $installedPackages): bool
     {
         if (str_starts_with($alternative, self::SYMFONY_MINIMUM)) {
-            $lockedRelease = $this->releaseOf($installedPackages[self::SYMFONY_KERNEL] ?? '0');
+            $lockedRelease = $this->releaseOf($installedPackages[self::SYMFONY_KERNEL]);
 
             return self::UNNAMED_RELEASE === $lockedRelease || version_compare($lockedRelease, substr($alternative, \strlen(self::SYMFONY_MINIMUM)), '>=');
         }

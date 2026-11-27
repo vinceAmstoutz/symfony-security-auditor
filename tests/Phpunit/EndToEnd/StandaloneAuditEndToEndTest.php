@@ -25,6 +25,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\M
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\MissingPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnresolvableConfigPathException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\UnobtainableIdentityTokenException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\AmbiguousPlatformException;
 use VinceAmstoutz\SymfonySecurityAuditor\Standalone\Exception\MissingBundleExtensionException;
@@ -218,6 +219,30 @@ final class StandaloneAuditEndToEndTest extends TestCase
         $this->expectExceptionMessageContaining('through "PROVIDER_API_KEY_FILE"');
 
         $this->runWithCredentialFromFile(\sprintf('%s %s', AuditCommand::NAME, $this->projectDir), $missingCredentialFile);
+    }
+
+    /**
+     * @throws UnresolvableConfigPathException
+     * @throws UnobtainableIdentityTokenException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_workload_identity_federation_stands_in_for_an_unset_anthropic_api_key(): void
+    {
+        $this->filesystem->dumpFile($this->configHome.'/symfony-security-auditor/config.yaml', "platform:\n  anthropic:\n    api_key: '%env(ANTHROPIC_API_KEY)%'\nmodel: 'claude-opus-5-5'\n");
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment([
+            'XDG_CONFIG_HOME' => $this->configHome,
+            'XDG_CACHE_HOME' => $this->cacheHome,
+            'ANTHROPIC_FEDERATION_RULE_ID' => 'fdrl_rule',
+            'ANTHROPIC_ORGANIZATION_ID' => 'org-uuid',
+        ])->create();
+        $standaloneApplication->setAutoExit(false);
+        $standaloneApplication->setCatchExceptions(false);
+
+        $this->expectException(UnobtainableIdentityTokenException::class);
+        $this->expectExceptionMessageContaining('run in a job with the "id-token: write" permission, or set ANTHROPIC_API_KEY.');
+
+        $standaloneApplication->run(new StringInput(\sprintf('%s %s', AuditCommand::NAME, $this->projectDir)), new BufferedOutput());
     }
 
     /**

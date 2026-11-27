@@ -1,0 +1,22 @@
+name: Bot review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+permissions: {}
+
+jobs:
+  review:
+    name: Ask the bot to review the pull request
+    if: (github.event.pull_request.user.login == github.repository_owner || github.event.pull_request.user.login == 'vinceamstoutz-github-ai-bot[bot]') && !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Start the bot's review workflow for this pull request
+        env:
+          GH_TOKEN: ${{ secrets.BOT_DISPATCH_TOKEN }}
+          REPOSITORY: ${{ github.event.repository.name }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: gh workflow run review.yaml -R vinceAmstoutz/vince-bot -f repository="$REPOSITORY" -f number="$NUMBER"

@@ -23,8 +23,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerCacheInterfac
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\AttackerPromptBuilderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\CodeSlicerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\StaticPreScannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistryFactoryInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Scan\MemoizedStaticPreScanner;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
@@ -53,7 +53,7 @@ final readonly class AttackerAgentDefinitionFactory
             ]),
             inline_service(AttackerScanCollaborators::class)->args([
                 service($attackerCacheServiceId),
-                service(StaticPreScannerInterface::class),
+                service(MemoizedStaticPreScanner::class),
                 service(ProgressReporterInterface::class),
                 service(FileChunker::class),
                 service(ToolRegistryFactoryInterface::class),

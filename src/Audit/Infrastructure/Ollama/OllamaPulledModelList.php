@@ -18,12 +18,15 @@ use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
- * Asks an Ollama server which models it pulled, through its `/api/tags`.
+ * Asks an Ollama server which models it pulled, through its `/api/tags`,
+ * giving up after WAIT_SECONDS.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
 final readonly class OllamaPulledModelList implements PulledModelListInterface
 {
+    private const float WAIT_SECONDS = 3.0;
+
     public function __construct(
         private HttpClientInterface $httpClient,
     ) {}
@@ -32,7 +35,7 @@ final readonly class OllamaPulledModelList implements PulledModelListInterface
     public function pulledModels(string $endpoint): array
     {
         try {
-            $tags = $this->httpClient->request('GET', \sprintf('%s/api/tags', rtrim($endpoint, '/')))->toArray();
+            $tags = $this->httpClient->request('GET', \sprintf('%s/api/tags', rtrim($endpoint, '/')), ['timeout' => self::WAIT_SECONDS, 'max_duration' => self::WAIT_SECONDS])->toArray();
         } catch (ExceptionInterface) {
             return [];
         }
