@@ -116,13 +116,27 @@ final class StatusTrackingCoverageRecorder implements CoverageRecorderInterface,
      */
     public function chunkStatus(array $chunk): string
     {
+        return [] === $this->unanalyzedFiles($chunk) ? 'analyzed' : 'errored';
+    }
+
+    /**
+     * Returns the files of the chunk whose last attacker status is neither
+     * analyzed nor cached.
+     *
+     * @param list<ProjectFile> $chunk
+     *
+     * @return list<string>
+     */
+    public function unanalyzedFiles(array $chunk): array
+    {
+        $unanalyzed = [];
         foreach ($chunk as $projectFile) {
             if (!\in_array($this->lastAttackerStatus[$projectFile->relativePath()] ?? null, self::ANALYZED_STATUSES, true)) {
-                return 'errored';
+                $unanalyzed[] = $projectFile->relativePath();
             }
         }
 
-        return 'analyzed';
+        return $unanalyzed;
     }
 
     /**

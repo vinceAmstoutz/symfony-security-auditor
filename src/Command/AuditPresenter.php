@@ -339,8 +339,9 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         }
 
         return \sprintf(
-            'Audit incomplete: %d file(s) could not be fully analyzed, so the absence of findings there proves nothing. Risk: %s | Vulnerabilities: %d.',
+            'Audit incomplete: %d file(s) could not be fully analyzed: %s. The absence of findings there proves nothing. Risk: %s | Vulnerabilities: %d.',
             \count($auditReport->unanalyzedFiles()),
+            NamedFiles::of(array_map($this->sanitizeForWarning(...), $auditReport->unanalyzedFiles())),
             $auditReport->riskLevel(),
             $auditReport->totalVulnerabilities(),
         );

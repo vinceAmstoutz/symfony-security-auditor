@@ -15,6 +15,7 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command;
 
 use InvalidArgumentException;
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
@@ -347,6 +348,68 @@ final class AuditPresenterTest extends TestCase
      * @throws InvalidAuditContextException
      * @throws InvalidProjectFileException
      */
+    public function test_an_incomplete_audit_names_the_files_it_could_not_fully_analyze(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $auditContext = $this->contextWithAFile();
+        $auditContext->recordCoverage('attacker', 'src/Analyzed.php', 'analyzed');
+        $auditContext->recordCoverage('attacker', 'src/Huge.php', 'errored');
+
+        $this->auditPresenter->incompleteRunNotice(new SymfonyStyle(new StringInput(''), $bufferedOutput), AuditReport::fromContext($auditContext), Command::SUCCESS, '--fail-on-incomplete');
+
+        self::assertStringContainsString('1 file(s) could not be fully analyzed: src/Huge.php.', preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '');
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    public function test_an_incomplete_audit_names_a_hostile_file_name_as_inert_text(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $auditContext = $this->contextWithAFile();
+        $auditContext->recordCoverage('attacker', 'src/Analyzed.php', 'analyzed');
+        $auditContext->recordCoverage('attacker', "src/A\x1b[2J\n##[error]forged.php", 'errored');
+
+        $this->auditPresenter->incompleteRunNotice(new SymfonyStyle(new StringInput(''), $bufferedOutput), AuditReport::fromContext($auditContext), Command::SUCCESS, '--fail-on-incomplete');
+
+        $rendered = $bufferedOutput->fetch();
+        self::assertStringNotContainsString("\x1b", $rendered);
+        self::assertStringNotContainsString('##[', $rendered);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('namedUnanalyzedFileCases')]
+    public function test_an_incomplete_audit_names_the_first_five_files_and_counts_the_others(int $erroredFiles, string $named): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $auditContext = $this->contextWithAFile();
+        $auditContext->recordCoverage('attacker', 'src/Analyzed.php', 'analyzed');
+        foreach (range(1, $erroredFiles) as $number) {
+            $auditContext->recordCoverage('attacker', \sprintf('src/F%d.php', $number), 'errored');
+        }
+
+        $this->auditPresenter->incompleteRunNotice(new SymfonyStyle(new StringInput(''), $bufferedOutput), AuditReport::fromContext($auditContext), Command::SUCCESS, '--fail-on-incomplete');
+
+        self::assertStringContainsString($named, preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '');
+    }
+
+    /**
+     * @return iterable<string, array{int, string}>
+     */
+    public static function namedUnanalyzedFileCases(): iterable
+    {
+        yield 'five files, all named' => [5, 'analyzed: src/F1.php, src/F2.php, src/F3.php, src/F4.php, src/F5.php. The absence'];
+        yield 'seven files, two counted' => [7, 'analyzed: src/F1.php, src/F2.php, src/F3.php, src/F4.php, src/F5.php and 2 more. The absence'];
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
     public function test_an_incomplete_audit_failed_by_the_configuration_names_its_key(): void
     {
         $bufferedOutput = new BufferedOutput();
@@ -357,7 +420,7 @@ final class AuditPresenterTest extends TestCase
         $this->auditPresenter->incompleteRunNotice(new SymfonyStyle(new StringInput(''), $bufferedOutput), AuditReport::fromContext($auditContext), 3, 'audit.fail_on_incomplete');
 
         $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
-        self::assertStringContainsString('[ERROR] Audit incomplete: 1 file(s) could not be fully analyzed, so the absence of findings there proves nothing. Risk: SAFE | Vulnerabilities: 0. The run fails because audit.fail_on_incomplete is set.', $flattened);
+        self::assertStringContainsString('[ERROR] Audit incomplete: 1 file(s) could not be fully analyzed: src/A.php. The absence of findings there proves nothing. Risk: SAFE | Vulnerabilities: 0. The run fails because audit.fail_on_incomplete is set.', $flattened);
     }
 
     /**
@@ -436,7 +499,7 @@ final class AuditPresenterTest extends TestCase
         $this->auditPresenter->result(new SymfonyStyle(new StringInput(''), $bufferedOutput), AuditReport::fromContext($auditContext), Command::SUCCESS, '--fail-on-incomplete');
 
         $flattened = preg_replace('/\s+/', ' ', $bufferedOutput->fetch()) ?? '';
-        self::assertStringContainsString('[WARNING] Audit incomplete: 1 file(s) could not be fully analyzed, so the absence of findings there proves nothing. Risk: SAFE | Vulnerabilities: 1.', $flattened);
+        self::assertStringContainsString('[WARNING] Audit incomplete: 1 file(s) could not be fully analyzed: src/A.php. The absence of findings there proves nothing. Risk: SAFE | Vulnerabilities: 1.', $flattened);
         self::assertStringNotContainsString('no verdict', $flattened);
     }
 
