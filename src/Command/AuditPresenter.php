@@ -17,6 +17,7 @@ use InvalidArgumentException;
 use Override;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Formatter\OutputFormatter;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
@@ -45,11 +46,9 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     {
         $this->consoleBanner->render($symfonyStyle);
 
-        $symfonyStyle->text([
-            \sprintf('Project: <info>%s</info>', OutputFormatter::escape($projectPath)),
-            'Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)',
-            '',
-        ]);
+        $symfonyStyle->text(\sprintf('Project: <info>%s</info>', OutputFormatter::escape($projectPath)));
+        $symfonyStyle->writeln(' Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)', OutputInterface::VERBOSITY_VERBOSE);
+        $symfonyStyle->text('');
     }
 
     #[Override]
