@@ -19,7 +19,6 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandDefaults;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandInput;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ConflictingCommandOptionsException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
@@ -687,62 +686,28 @@ final class AuditCommandInputTest extends TestCase
         self::assertTrue($auditCommandInput->noOutput);
     }
 
-    /**
-     * @throws UnsupportedOutputFormatException
-     */
-    public function test_an_output_file_without_extension_is_refused_when_no_format_is_chosen(): void
+    #[DataProvider('outputFilesAndWhetherTheyLackAFormat')]
+    public function test_an_output_file_lacks_a_format_only_when_it_has_no_extension_and_no_format_is_chosen(?string $outputFile, ?OutputFormat $givenFormat, OutputFormat $configuredFormat, ?string $outputFileLackingAFormat): void
     {
         $auditCommandInput = new AuditCommandInput();
-        $auditCommandInput->output = 'csv';
-        $auditCommandInput->applyDefaults(new AuditCommandDefaults());
+        $auditCommandInput->output = $outputFile;
+        $auditCommandInput->givenFormat = $givenFormat;
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(format: $configuredFormat));
 
-        $this->expectException(UnsupportedOutputFormatException::class);
-        $this->expectExceptionMessageContaining('The output file "csv" has no extension to pick the report format from.');
-
-        $auditCommandInput->assertOutputNamesAFormat();
+        self::assertSame($outputFileLackingAFormat, $auditCommandInput->outputFileLackingAFormat());
     }
 
     /**
-     * @throws UnsupportedOutputFormatException
+     * @return iterable<string, array{?string, ?OutputFormat, OutputFormat, ?string}>
      */
-    public function test_an_output_file_without_extension_is_kept_when_a_format_is_chosen(): void
+    public static function outputFilesAndWhetherTheyLackAFormat(): iterable
     {
-        $auditCommandInput = new AuditCommandInput();
-        $auditCommandInput->output = 'csv';
-        $auditCommandInput->givenFormat = OutputFormat::Console;
-        $auditCommandInput->applyDefaults(new AuditCommandDefaults());
-
-        $auditCommandInput->assertOutputNamesAFormat();
-
-        self::assertSame('csv', $auditCommandInput->output);
-    }
-
-    /**
-     * @throws UnsupportedOutputFormatException
-     */
-    public function test_an_output_file_without_extension_is_kept_when_a_format_is_configured(): void
-    {
-        $auditCommandInput = new AuditCommandInput();
-        $auditCommandInput->output = 'csv';
-        $auditCommandInput->applyDefaults(new AuditCommandDefaults(format: OutputFormat::Json));
-
-        $auditCommandInput->assertOutputNamesAFormat();
-
-        self::assertSame(OutputFormat::Json, $auditCommandInput->format);
-    }
-
-    /**
-     * @throws UnsupportedOutputFormatException
-     */
-    public function test_a_character_device_such_as_dev_null_is_kept_as_the_output_file(): void
-    {
-        $auditCommandInput = new AuditCommandInput();
-        $auditCommandInput->output = '/dev/null';
-        $auditCommandInput->applyDefaults(new AuditCommandDefaults());
-
-        $auditCommandInput->assertOutputNamesAFormat();
-
-        self::assertSame('/dev/null', $auditCommandInput->output);
+        yield 'no extension, no format' => ['csv', null, OutputFormat::Console, 'csv'];
+        yield 'no extension, a format on the command line' => ['csv', OutputFormat::Console, OutputFormat::Console, null];
+        yield 'no extension, a configured format' => ['csv', null, OutputFormat::Json, null];
+        yield 'a character device' => ['/dev/null', null, OutputFormat::Console, null];
+        yield 'an extension' => ['report.txt', null, OutputFormat::Console, null];
+        yield 'no output file' => [null, null, OutputFormat::Console, null];
     }
 
     /**

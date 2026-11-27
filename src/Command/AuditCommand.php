@@ -55,6 +55,8 @@ final readonly class AuditCommand
 
     public const string ALIAS = 'audit';
 
+    private const string OUTPUT_FILE_LACKING_A_FORMAT = 'The output file "%s" has no extension to pick the report format from, so it gets the console report. Such a name is deprecated and will be refused in 2.0: give it an extension (.html, .json, .sarif, .md or .xml) or choose the format with --format.';
+
     public const string DESCRIPTION = 'Run AI-powered multi-agent security audit on a Symfony project';
 
     /**
@@ -169,7 +171,7 @@ final readonly class AuditCommand
         try {
             try {
                 $auditCommandInput->assertNoConflictingOptions();
-                $auditCommandInput->assertOutputNamesAFormat();
+                $this->warnOfAnOutputFileLackingAFormat($symfonyStyle, $auditCommandInput);
                 $this->assertOutputsWritable($auditCommandInput, $projectPath);
 
                 if ($auditCommandInput->showScanned) {
@@ -210,6 +212,14 @@ final readonly class AuditCommand
             $this->auditPresenter->error($displayStyle, $throwable);
 
             return ExitCode::Failure->value;
+        }
+    }
+
+    private function warnOfAnOutputFileLackingAFormat(SymfonyStyle $symfonyStyle, AuditCommandInput $auditCommandInput): void
+    {
+        $outputFileLackingAFormat = $auditCommandInput->outputFileLackingAFormat();
+        if (null !== $outputFileLackingAFormat) {
+            $symfonyStyle->getErrorStyle()->warning(\sprintf(self::OUTPUT_FILE_LACKING_A_FORMAT, $outputFileLackingAFormat));
         }
     }
 

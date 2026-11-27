@@ -20,7 +20,6 @@ use Symfony\Component\String\AbstractString;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\PathText;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ConflictingCommandOptionsException;
-use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 
 use function Symfony\Component\String\u;
@@ -45,7 +44,7 @@ final class AuditCommandInput
 
     public OutputFormat $format = OutputFormat::Console;
 
-    #[Option(description: 'Output file path (any format). Without --format or audit.format, its extension (.html, .json, .sarif, .md, .xml) picks the format and a name without one is refused. Overrides the audit.output config key for this run.', shortcut: 'o')]
+    #[Option(description: 'Output file path (any format). Without --format or audit.format, its extension (.html, .json, .sarif, .md, .xml) picks the format; a name without one is deprecated. Overrides the audit.output config key for this run.', shortcut: 'o')]
     public ?string $output = null;
 
     #[Option(description: 'Print the report instead of writing it to a file, whatever audit.output says. Cannot be combined with --output.', name: 'no-output')]
@@ -174,20 +173,17 @@ final class AuditCommandInput
     }
 
     /**
-     * Refuses an output file without extension when no format is chosen, since
-     * the extension then picks the format. A device such as `/dev/null` passes.
-     *
-     * @throws UnsupportedOutputFormatException
+     * Returns the output file when it has no extension to pick the format from
+     * while no format is chosen, null otherwise. A device such as `/dev/null`
+     * never lacks one.
      */
-    public function assertOutputNamesAFormat(): void
+    public function outputFileLackingAFormat(): ?string
     {
         if (null === $this->output || !$this->formatIsLeftToTheOutputFile()) {
-            return;
+            return null;
         }
 
-        if ('' === Path::getExtension($this->output) && !WritableFilePath::isCharacterDevice($this->output)) {
-            throw UnsupportedOutputFormatException::forOutputFileWithoutExtension($this->output);
-        }
+        return '' === Path::getExtension($this->output) && !WritableFilePath::isCharacterDevice($this->output) ? $this->output : null;
     }
 
     private function formatIsLeftToTheOutputFile(): bool

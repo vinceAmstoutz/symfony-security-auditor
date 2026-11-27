@@ -126,17 +126,17 @@ final class AuditCommandEndToEndTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
-    public function test_an_output_file_without_extension_is_refused_before_the_audit_when_no_format_is_chosen(): void
+    public function test_an_output_file_without_extension_gets_the_console_report_with_a_deprecation_warning_when_no_format_is_chosen(): void
     {
         $this->createProjectDir();
         $commandTester = $this->makeCommandTester('[]', '{}');
 
         $commandTester->execute(['project-path' => $this->fixtureDir, '--output' => $this->fixtureDir.'/csv']);
 
-        self::assertSame([Command::FAILURE, false, true], [
+        self::assertSame([Command::SUCCESS, true, true], [
             $commandTester->getStatusCode(),
             file_exists($this->fixtureDir.'/csv'),
-            str_contains((string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()), 'has no extension to pick the report format from'),
+            str_contains((string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()), 'Such a name is deprecated and will be refused in 2.0'),
         ]);
     }
 
