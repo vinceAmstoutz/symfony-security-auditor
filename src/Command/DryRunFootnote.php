@@ -14,9 +14,9 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 /**
- * The one footnote under a dry-run estimate: no call was made, how the
- * reviewer figure is projected, and why a priced run costs less than shown
- * or why a subscription shows no cost.
+ * The one footnote under a dry-run estimate: no call was made and how the
+ * reviewer figure is projected. It also says why a priced run costs less than
+ * shown or why a subscription shows no cost.
  *
  * @internal not part of the BC promise, see docs/versioning.md
  */
