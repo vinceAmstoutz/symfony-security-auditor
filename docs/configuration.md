@@ -83,7 +83,7 @@ Create `config/packages/symfony_security_auditor.yaml`. The bundle exposes the f
 | `attacker_max_output_tokens` | `int` (≥ 1) | `null` | Attacker output token cap; `max_output_tokens` when unset. |
 | `reviewer_max_output_tokens` | `int` (≥ 1) | `null` | Reviewer output token cap; `max_output_tokens` when unset. |
 | `provider_json_mode` | bool | `false` | Ask a gateway serving a Claude model (`openrouter`, `generic`, …) to enforce JSON output with `response_format: {type: json_object}`. Not sent on `anthropic` and `bedrock`; no effect on other models. |
-| `cli_agent.platform` | `string` \| `null` | `null` | _Since 1.23._ Run the audit on a subscription through a CLI installed on the machine: `claudecode` (Claude, through `claude`) or `codex` (ChatGPT, through `codex`). The application's own `symfony/ai` platform is left alone. Needs `symfony/ai-claude-code-platform` or `symfony/ai-codex-platform`; see [Running on a Claude subscription](#running-on-a-claude-subscription). |
+| `cli_agent.platform` | `string` \| `null` | `null` | _Since 1.23._ Run the audit on a subscription through a CLI installed on the machine: `claudecode` (Claude, through `claude`) or `codex` (ChatGPT, through `codex`). The application's own `symfony/ai` platform is left alone. Needs `symfony/ai-claude-code-platform` or `symfony/ai-codex-platform`; see [Running on a subscription](#running-on-a-subscription). |
 | `cli_agent.effort` | `string` \| `null` | `null` | _Since 1.23._ The effort the CLI runs at: `low`, `medium`, `high`, `xhigh` or `max`, passed to Claude Code as `--effort` and to Codex as `model_reasoning_effort`. `null` keeps the CLI's own. |
 | `cli_agent.cli_binary` | `string` \| `null` | `null` | _Since 1.23._ Path to the CLI when it is not on the `PATH`. |
 
@@ -499,9 +499,29 @@ platform:
 model: gpt-5.6
 ```
 
-### Running on a Claude subscription
+### Running on a subscription
 
-_Since 1.23_ the standalone binary can run the audit on a Claude subscription instead of an API key, through the [Claude Code](https://code.claude.com) CLI installed on the machine. `init --provider=claudecode` downloads the bridge and asks for the two models and the effort. It writes:
+_Since 1.23_ the standalone binary can run the audit on your Claude or ChatGPT subscription instead of an API key, through that vendor's CLI installed on the machine.
+
+1. Install the CLI and log in to your subscription.
+2. Run `init` with the provider of your subscription. It downloads what it needs, then asks which models to use and the effort (how hard they think). `--model`, `--reviewer-model` and `--effort` answer without asking.
+
+`init` writes a config you can edit afterwards:
+
+- `model` finds the issues and `reviewer_model` double-checks them.
+- `effort` is `low`, `medium`, `high`, `xhigh` or `max`; `init` suggests `medium`. Higher finds more and uses more of your plan. Without it, the CLI keeps its own default.
+- When the CLI is not on the `PATH`, give its path as `cli_binary:` next to `effort:`.
+
+Good to know:
+
+- Your plan's usage limits apply and its terms decide what automated use it allows.
+- The run has no price: `--dry-run` shows no cost and an `audit.budget` cost cap cannot be enforced.
+- `privacy.offline_only` refuses both platforms.
+- The CLI runs outside the audited project with its own tools off, so the code it reads cannot make it act. It sees only the code the auditor sends: `audit.tools_enabled`, `audit.structured_collection`, `audit.reviewer_tools_enabled` and `audit.reviewer_structured_collection` are always off.
+
+#### Running on a Claude subscription
+
+Install the [Claude Code](https://code.claude.com) CLI (`claude`), then run `init --provider=claudecode`. It writes:
 
 ```yaml
 provider: claudecode
@@ -511,16 +531,14 @@ model: claude-opus-5-5
 reviewer_model: claude-haiku-5-5
 ```
 
-- **Requirements.** The `claude` CLI is installed and logged in to the subscription. On a CI runner, set the `CLAUDE_CODE_OAUTH_TOKEN` that `claude setup-token` prints. When `claude` is not on the `PATH`, name it with `cli_binary:` under `claudecode:`.
-- **Models.** _Since 1.23_ `init` offers Opus 5.5 to find the issues and Haiku 5.5 to review them; `--model` and `--reviewer-model` set them without asking. Afterwards, edit `model` and `reviewer_model`: any Claude model id works, as do Claude Code's aliases `opus`, `sonnet` and `haiku`.
-- **Effort.** _Since 1.23_ `init` asks the effort the CLI runs at, `medium` by default: `low`, `medium`, `high`, `xhigh` or `max`. Higher finds more and uses more of the plan. `--effort` sets it without asking. Afterwards, edit `effort:` under `claudecode:`; without it, the CLI keeps its own default. In a Symfony application, set it as `cli_agent.effort`.
-- **How each call runs.** The auditor starts `claude` with its built-in tools off and the MCP servers of the machine ignored, outside the audited project, so the code it reads cannot make it act. The attacker and the reviewer answer in JSON: `audit.tools_enabled`, `audit.structured_collection`, `audit.reviewer_tools_enabled` and `audit.reviewer_structured_collection` are set to `false`, so the model cannot open other files of the project during a chunk.
-- **In a Symfony application.** Require `symfony/ai-claude-code-platform` and set `cli_agent: { platform: claudecode, effort: medium }` with `model: claude-opus-5-5` and `reviewer_model: claude-haiku-5-5` under `symfony_security_auditor:`. The application's own `symfony/ai` platform is left as it is.
-- **Limits.** The plan's usage limits apply. Its terms decide what automated use it allows. The run is not priced, so `--dry-run` shows no cost and an `audit.budget` cost cap cannot be enforced. A prompt longer than the 128 KiB one command-line argument can carry is split like one the provider refuses as too large. `privacy.offline_only` refuses this platform.
+- Any Claude model id works, as do the aliases `opus`, `sonnet` and `haiku`.
+- On a CI runner, set `CLAUDE_CODE_OAUTH_TOKEN` to the token `claude setup-token` prints.
+- Claude Code ignores the MCP servers of the machine.
+- In a Symfony application, require `symfony/ai-claude-code-platform` and set `cli_agent: { platform: claudecode, effort: medium }` with `model: claude-opus-5-5` and `reviewer_model: claude-haiku-5-5` under `symfony_security_auditor:`. Your application's own `symfony/ai` platform is left as it is.
 
-### Running on a ChatGPT subscription
+#### Running on a ChatGPT subscription
 
-_Since 1.23_ the standalone binary can also run on a ChatGPT subscription, through the [Codex](https://github.com/openai/codex) CLI installed on the machine. `init --provider=codex` downloads the bridge and asks for the two models and the effort. It writes:
+Install the [Codex](https://github.com/openai/codex) CLI (`codex`), then run `init --provider=codex`. It writes:
 
 ```yaml
 provider: codex
@@ -530,12 +548,9 @@ model: gpt-6.2-sol
 reviewer_model: gpt-6-luna
 ```
 
-- **Requirements.** The `codex` CLI is installed and logged in to the subscription. When `codex` is not on the `PATH`, name it with `cli_binary:` under `codex:`.
-- **Models.** _Since 1.23_ `init` offers GPT-6.2 Sol (`gpt-6.2-sol`) to find the issues and GPT-6 Luna (`gpt-6-luna`) to review them, GPT-6.2 Astra (`gpt-6.2-astra`) among the choices for the hardest projects; `--model` and `--reviewer-model` set them without asking. Afterwards, edit `model` and `reviewer_model`: any model id your Codex CLI runs works, not only the ones the bundled bridge lists.
-- **Effort.** _Since 1.23_ `init` asks the reasoning effort, `medium` by default: `low`, `medium`, `high`, `xhigh` or `max`, passed to Codex as `model_reasoning_effort`. `--effort` sets it without asking. Afterwards, edit `effort:` under `codex:`; without it, Codex keeps its own default.
-- **How each call runs.** The auditor runs `codex exec` read-only and outside the audited project, with its shell and web search off, the user's Codex configuration and rules ignored and nothing kept of the session. As with Claude Code, the attacker and the reviewer answer in JSON.
-- **In a Symfony application.** Require `symfony/ai-codex-platform` and set `cli_agent: { platform: codex, effort: medium }` with `model: gpt-6.2-sol` and `reviewer_model: gpt-6-luna` under `symfony_security_auditor:`.
-- **Limits.** The same as for a [Claude subscription](#running-on-a-claude-subscription), except that Codex joins the system and user prompts into one command-line argument, so the 128 KiB limit applies to both together.
+- `init` also offers `gpt-6.2-astra` for the hardest projects. Any model id your Codex CLI runs works.
+- Codex runs read-only with its shell and web search off. It ignores your Codex configuration and rules and keeps nothing of the session.
+- In a Symfony application, require `symfony/ai-codex-platform` and set `cli_agent: { platform: codex, effort: medium }` with `model: gpt-6.2-sol` and `reviewer_model: gpt-6-luna` under `symfony_security_auditor:`. Your application's own `symfony/ai` platform is left as it is.
 
 ## Providing the API key
 
@@ -957,7 +972,7 @@ The audit runs on the auditor's own configured platform and models and bills tha
 
 ### `init`: generating the standalone configuration
 
-Standalone only. Writes `config.yaml` and installs the provider bridge with the Composer the binary bundles. _Since 1.23_ it first asks how you access AI models (a Claude or ChatGPT [subscription](#running-on-a-claude-subscription), an API key, a local model such as Ollama, an AI gateway or a cloud account), then lists the matching providers and the newest model of each family with its price per million tokens, defaulting to `claude-opus-5-5` where listed. Type any other provider or model id to skip a list. It can end with one test request, sent only on `yes`. Each option given skips its prompt; under `--no-interaction` a missing option takes its default and a platform that needs a URL is refused rather than written half-configured.
+Standalone only. Writes `config.yaml` and installs the provider bridge with the Composer the binary bundles. _Since 1.23_ it first asks how you access AI models (a Claude or ChatGPT [subscription](#running-on-a-subscription), an API key, a local model such as Ollama, an AI gateway or a cloud account), then lists the matching providers and the newest model of each family with its price per million tokens, defaulting to `claude-opus-5-5` where listed. Type any other provider or model id to skip a list. It can end with one test request, sent only on `yes`. Each option given skips its prompt; under `--no-interaction` a missing option takes its default and a platform that needs a URL is refused rather than written half-configured.
 
 | Option | Default | Description |
 | --- | --- | --- |
