@@ -22,4 +22,9 @@ final class UnsupportedOutputFormatException extends RuntimeException
     {
         return new self(\sprintf('No report renderer is registered for output format "%s".', $format));
     }
+
+    public static function forOutputFileWithoutExtension(string $outputFile): self
+    {
+        return new self(\sprintf('The output file "%s" has no extension to pick the report format from. Give it one (.html, .json, .sarif, .md or .xml) or choose the format with --format: console, executive, json, sarif, html, markdown, junit, github or github-comment.', $outputFile));
+    }
 }

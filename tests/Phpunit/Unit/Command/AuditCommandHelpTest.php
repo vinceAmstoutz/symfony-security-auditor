@@ -88,7 +88,7 @@ final class AuditCommandHelpTest extends TestCase
 
     public function test_the_output_option_names_the_configuration_key_it_overrides(): void
     {
-        self::assertSame('Output file path (any format). Its extension (.html, .json, .sarif, .md, .xml) picks the format when no other sets it. Overrides the audit.output config key for this run.', $this->auditCommandOption('output')->getDescription());
+        self::assertSame('Output file path (any format). Without --format or audit.format, its extension (.html, .json, .sarif, .md, .xml) picks the format and a name without one is refused. Overrides the audit.output config key for this run.', $this->auditCommandOption('output')->getDescription());
     }
 
     public function test_the_bundle_help_names_the_bundle_configuration_file(): void

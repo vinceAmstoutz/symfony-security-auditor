@@ -126,6 +126,23 @@ final class AuditCommandEndToEndTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_an_output_file_without_extension_is_refused_before_the_audit_when_no_format_is_chosen(): void
+    {
+        $this->createProjectDir();
+        $commandTester = $this->makeCommandTester('[]', '{}');
+
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--output' => $this->fixtureDir.'/csv']);
+
+        self::assertSame([Command::FAILURE, false, true], [
+            $commandTester->getStatusCode(),
+            file_exists($this->fixtureDir.'/csv'),
+            str_contains((string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()), 'has no extension to pick the report format from'),
+        ]);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_output_contains_risk_level(): void
     {
         $this->createProjectDir();

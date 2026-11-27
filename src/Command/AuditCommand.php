@@ -169,6 +169,7 @@ final readonly class AuditCommand
         try {
             try {
                 $auditCommandInput->assertNoConflictingOptions();
+                $auditCommandInput->assertOutputNamesAFormat();
                 $this->assertOutputsWritable($auditCommandInput, $projectPath);
 
                 if ($auditCommandInput->showScanned) {

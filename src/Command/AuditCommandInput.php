@@ -20,6 +20,7 @@ use Symfony\Component\String\AbstractString;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Scan\PathText;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\RiskLevel;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\ConflictingCommandOptionsException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 
 use function Symfony\Component\String\u;
@@ -44,7 +45,7 @@ final class AuditCommandInput
 
     public OutputFormat $format = OutputFormat::Console;
 
-    #[Option(description: 'Output file path (any format). Its extension (.html, .json, .sarif, .md, .xml) picks the format when no other sets it. Overrides the audit.output config key for this run.', shortcut: 'o')]
+    #[Option(description: 'Output file path (any format). Without --format or audit.format, its extension (.html, .json, .sarif, .md, .xml) picks the format and a name without one is refused. Overrides the audit.output config key for this run.', shortcut: 'o')]
     public ?string $output = null;
 
     #[Option(description: 'Print the report instead of writing it to a file, whatever audit.output says. Cannot be combined with --output.', name: 'no-output')]
@@ -170,6 +171,28 @@ final class AuditCommandInput
         }
 
         return '.' === $abstractString->toString() ? u('') : $abstractString;
+    }
+
+    /**
+     * Refuses an output file without extension when no format is chosen, since
+     * the extension then picks the format. A device such as `/dev/null` passes.
+     *
+     * @throws UnsupportedOutputFormatException
+     */
+    public function assertOutputNamesAFormat(): void
+    {
+        if (null === $this->output || !$this->formatIsLeftToTheOutputFile()) {
+            return;
+        }
+
+        if ('' === Path::getExtension($this->output) && !WritableFilePath::isCharacterDevice($this->output)) {
+            throw UnsupportedOutputFormatException::forOutputFileWithoutExtension($this->output);
+        }
+    }
+
+    private function formatIsLeftToTheOutputFile(): bool
+    {
+        return !$this->givenFormat instanceof OutputFormat && OutputFormat::Console === $this->format;
     }
 
     /**
