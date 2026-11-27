@@ -325,6 +325,42 @@ final class ClaudeCodePlatformTest extends TestCase
     }
 
     /**
+     * @return iterable<string, array{string}>
+     */
+    public static function costLabellingFormats(): iterable
+    {
+        yield 'console' => ['console'];
+        yield 'markdown' => ['markdown'];
+        yield 'html' => ['html'];
+    }
+
+    /**
+     * @throws AmbiguousPlatformException
+     * @throws MissingBundleExtensionException
+     * @throws UnknownPlatformProviderException
+     * @throws NonLocalPlatformEndpointException
+     * @throws ProviderBridgeException
+     */
+    #[DataProvider('costLabellingFormats')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_the_report_of_a_run_whose_claude_cli_names_no_account_says_it_is_not_priced_per_call(string $format): void
+    {
+        $project = $this->workingDirectory.'/project';
+        (new Filesystem())->dumpFile($project.'/src/Controller/HomeController.php', "<?php\n\nfinal class HomeController {}\n");
+        $silentCli = $this->workingDirectory.'/silent-claude';
+        (new Filesystem())->dumpFile($silentCli, str_replace('{"loggedIn":true,"subscriptionType":"max"}', 'no account status', (string) file_get_contents($this->fakeCli())));
+        (new Filesystem())->chmod($silentCli, 0o755);
+        $auditCommand = $this->container(['cli_binary' => $silentCli], ['model' => 'claude-opus-5-5'])->get(AuditCommand::class);
+        self::assertInstanceOf(AuditCommand::class, $auditCommand);
+        $commandTester = new CommandTester($auditCommand);
+
+        $commandTester->execute(['project-path' => $project, '--format' => $format], ['interactive' => false]);
+
+        self::assertStringContainsString('not priced per call: billed to your Claude subscription, or to an API key the CLI uses in its place', (string) preg_replace('/[\s!]+/', ' ', $commandTester->getDisplay()));
+    }
+
+    /**
      * @throws AmbiguousPlatformException
      * @throws MissingBundleExtensionException
      * @throws UnknownPlatformProviderException

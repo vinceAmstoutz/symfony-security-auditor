@@ -439,6 +439,25 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
     }
 
     /**
+     * @throws RunRefusedException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_budgeted_cli_agent_run_is_refused_naming_the_budget(): void
+    {
+        $kernel = $this->boot(['model' => 'claude-opus-5-5', 'audit' => ['budget' => ['max_cost_usd' => 5.0]], 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
+        $unpricedModelBudgetGuard = $this->getPrivateService($kernel, UnpricedModelBudgetGuardInterface::class);
+        self::assertInstanceOf(UnpricedModelBudgetGuardInterface::class, $unpricedModelBudgetGuard);
+        $input = new ArrayInput([]);
+        $input->setInteractive(false);
+
+        $bufferedOutput = new BufferedOutput();
+        $permitted = $unpricedModelBudgetGuard->permitsRun($input, new SymfonyStyle($input, $bufferedOutput));
+
+        self::assertSame([false, true], [$permitted, str_contains((string) preg_replace('/[\s!]+/', ' ', $bufferedOutput->fetch()), 'A subscription is not priced per call, so the cost budget cannot hold.')]);
+    }
+
+    /**
      * @throws LLMProviderException
      */
     #[RunInSeparateProcess]
