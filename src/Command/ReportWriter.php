@@ -41,6 +41,7 @@ final readonly class ReportWriter implements ReportWriterInterface
         private Filesystem $filesystem,
         private WorkflowCommandNeutralizerInterface $workflowCommandNeutralizer = new WorkflowCommandNeutralizer(false),
         private ?string $temporaryDirectory = null,
+        private StandardOutputInterface $standardOutput = new StandardOutput(),
     ) {
         $indexed = [];
         foreach ($renderers as $renderer) {
@@ -62,7 +63,7 @@ final readonly class ReportWriter implements ReportWriterInterface
     {
         $content = $this->renderContent($outputFormat, $auditReport, $baselinedFingerprints);
 
-        if (null === $outputFile && OutputFormat::Html === $outputFormat && $symfonyStyle->isDecorated()) {
+        if (null === $outputFile && OutputFormat::Html === $outputFormat && $this->standardOutput->isTerminal()) {
             $this->linkFromATemporaryFile($symfonyStyle, $content);
 
             return;

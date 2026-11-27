@@ -44,6 +44,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsafeReportWriteExce
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\StandardOutputInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\WorkflowCommandNeutralizer;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Command\Fixture\DiscardDevice;
@@ -69,7 +70,7 @@ final class ReportWriterTest extends TestCase
             new HtmlReportRenderer(),
             new MarkdownReportRenderer(),
             new JunitReportRenderer(),
-        ], $this->filesystem);
+        ], $this->filesystem, standardOutput: $this->standardOutput(isTerminal: false));
         $this->tmpDir = sys_get_temp_dir().'/report_writer_test_'.uniqid('', true);
         $this->filesystem->mkdir($this->tmpDir);
     }
@@ -301,7 +302,7 @@ final class ReportWriterTest extends TestCase
         $temporaryDirectory = $this->tmpDir.'/with space';
         $this->filesystem->mkdir($temporaryDirectory);
         $bufferedOutput = new BufferedOutput(decorated: true);
-        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $temporaryDirectory);
+        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $temporaryDirectory, standardOutput: $this->standardOutput(isTerminal: true));
 
         $reportWriter->write($this->makeReport(), OutputFormat::Html, null, new SymfonyStyle(new StringInput(''), $bufferedOutput));
 
@@ -317,7 +318,7 @@ final class ReportWriterTest extends TestCase
     public function test_an_html_report_that_cannot_reach_a_temporary_file_is_printed(): void
     {
         $bufferedOutput = new BufferedOutput(decorated: true);
-        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $this->tmpDir.'/missing');
+        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $this->tmpDir.'/missing', standardOutput: $this->standardOutput(isTerminal: true));
 
         $reportWriter->write($this->makeReport(), OutputFormat::Html, null, new SymfonyStyle(new StringInput(''), $bufferedOutput));
 
@@ -332,7 +333,7 @@ final class ReportWriterTest extends TestCase
      */
     public function test_the_temporary_html_report_is_readable_by_its_owner_only(): void
     {
-        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $this->tmpDir);
+        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $this->tmpDir, standardOutput: $this->standardOutput(isTerminal: true));
 
         $reportWriter->write($this->makeReport(), OutputFormat::Html, null, new SymfonyStyle(new StringInput(''), new BufferedOutput(decorated: true)));
 
@@ -346,10 +347,26 @@ final class ReportWriterTest extends TestCase
      * @throws UnsafeReportWriteException
      * @throws ReportWriteFailedException
      */
+    public function test_an_html_report_for_a_terminal_without_colours_is_still_saved_to_a_temporary_file(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: false);
+        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $this->tmpDir, standardOutput: $this->standardOutput(isTerminal: true));
+
+        $reportWriter->write($this->makeReport(), OutputFormat::Html, null, new SymfonyStyle(new StringInput(''), $bufferedOutput));
+
+        self::assertStringContainsString('file://', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws UnsupportedOutputFormatException
+     * @throws InvalidAuditContextException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
     public function test_an_html_report_for_a_terminal_is_saved_to_a_temporary_file_it_links_to(): void
     {
         $bufferedOutput = new BufferedOutput(decorated: true);
-        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $this->tmpDir);
+        $reportWriter = new ReportWriter([new HtmlReportRenderer()], $this->filesystem, temporaryDirectory: $this->tmpDir, standardOutput: $this->standardOutput(isTerminal: true));
 
         $reportWriter->write($this->makeReport(), OutputFormat::Html, null, new SymfonyStyle(new StringInput(''), $bufferedOutput));
 
@@ -802,5 +819,13 @@ final class ReportWriterTest extends TestCase
         $paths = glob($this->tmpDir.'/*.html');
 
         return false === $paths ? [] : $paths;
+    }
+
+    private function standardOutput(bool $isTerminal): StandardOutputInterface
+    {
+        $standardOutput = self::createStub(StandardOutputInterface::class);
+        $standardOutput->method('isTerminal')->willReturn($isTerminal);
+
+        return $standardOutput;
     }
 }
