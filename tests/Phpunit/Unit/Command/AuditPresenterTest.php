@@ -105,8 +105,31 @@ final class AuditPresenterTest extends TestCase
         $this->auditPresenter->longRunNotice($symfonyStyle);
 
         $display = $bufferedOutput->fetch();
-        self::assertStringContainsString('many LLM calls', $display);
-        self::assertStringContainsString('20+ minutes', $display);
+        self::assertStringContainsString('An audit takes minutes, 20+ on large projects.', $display);
+    }
+
+    public function test_long_run_notice_fits_one_line_of_an_80_column_terminal(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $previousColumns = getenv('COLUMNS');
+        putenv('COLUMNS=80');
+
+        try {
+            $this->auditPresenter->longRunNotice(new SymfonyStyle(new StringInput(''), $bufferedOutput));
+        } finally {
+            putenv(false === $previousColumns ? 'COLUMNS' : 'COLUMNS='.$previousColumns);
+        }
+
+        self::assertSame(1, preg_match_all('/^ \/\/ \S/m', $bufferedOutput->fetch()));
+    }
+
+    public function test_long_run_notice_prints_in_the_terminal_default_colour_rather_than_dimmed(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+
+        $this->auditPresenter->longRunNotice(new SymfonyStyle(new StringInput(''), $bufferedOutput));
+
+        self::assertStringNotContainsString("\e[90m", $bufferedOutput->fetch());
     }
 
     public function test_header_includes_project_path(): void
@@ -600,10 +623,10 @@ final class AuditPresenterTest extends TestCase
         $this->auditPresenter->dryRunResult($symfonyStyle, AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
 
         $display = $bufferedOutput->fetch();
-        $flattened = preg_replace('/[\s!]+/', ' ', $display) ?? '';
+        $flattened = preg_replace('/[\s!]+/', ' ', $this->withoutCommentGutter($display)) ?? '';
         self::assertStringContainsString('Dry run complete', $flattened);
-        self::assertStringContainsString('a real run typically costs less', $flattened);
-        self::assertStringContainsString('no LLM calls', $flattened);
+        self::assertStringContainsString('usually make a real run cheaper', $flattened);
+        self::assertStringContainsString('No LLM call was made', $flattened);
         self::assertStringNotContainsString('Audit complete', $display);
         self::assertStringNotContainsString('RISK LEVEL', $display);
         self::assertStringNotContainsString('vulnerabilities found', $display);
@@ -650,7 +673,7 @@ final class AuditPresenterTest extends TestCase
         $this->auditPresenter->dryRunResult($symfonyStyle, AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
 
         $display = $bufferedOutput->fetch();
-        self::assertStringContainsString('no LLM calls were made', $display);
+        self::assertStringContainsString('No LLM call was made', $display);
         self::assertStringNotContainsString('[NOTE]', $display, 'a caveat does not earn a full-width block with a gutter');
         self::assertStringNotContainsString('!', $display);
     }
@@ -665,10 +688,42 @@ final class AuditPresenterTest extends TestCase
 
         $this->auditPresenter->dryRunResult($symfonyStyle, AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
 
-        self::assertStringEndsWith(
-            "costs less than shown.\n\n  Dry run complete.\n\n",
+        self::assertMatchesRegularExpression(
+            '/cheaper\. *\n\n  Dry run complete\.\n\n$/',
             $bufferedOutput->fetch(),
         );
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_the_dry_run_caveat_wraps_between_words_to_fit_the_terminal(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $previousColumns = getenv('COLUMNS');
+        putenv('COLUMNS=80');
+
+        try {
+            $this->auditPresenter->dryRunResult(new SymfonyStyle(new StringInput(''), $bufferedOutput), AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
+        } finally {
+            putenv(false === $previousColumns ? 'COLUMNS' : 'COLUMNS='.$previousColumns);
+        }
+
+        $display = $bufferedOutput->fetch();
+        self::assertLessThanOrEqual(80, max(array_map(mb_strwidth(...), explode("\n", $display))), $display);
+        self::assertStringContainsString('warm caches usually make a real run cheaper', $this->withoutCommentGutter($display));
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     */
+    public function test_the_dry_run_caveat_prints_in_the_terminal_default_colour_rather_than_dimmed(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+
+        $this->auditPresenter->dryRunResult(new SymfonyStyle(new StringInput(''), $bufferedOutput), AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
+
+        self::assertStringNotContainsString("\e[90m", $bufferedOutput->fetch());
     }
 
     /**
@@ -682,6 +737,70 @@ final class AuditPresenterTest extends TestCase
         $this->auditPresenter->dryRunResult($symfonyStyle, AuditReport::fromContext(AuditContext::forProject($this->tmpDir)));
 
         self::assertStringEndsWith("Dry run complete.\n\n", $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_a_subscription_dry_run_explains_its_figures_in_one_footnote(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+
+        $this->subscriptionPresenter()->dryRunResult(new SymfonyStyle(new StringInput(''), $bufferedOutput), $this->subscriptionEstimate());
+
+        self::assertStringContainsString(
+            'No LLM call was made. Your subscription is not billed per call, so no cost is shown. The reviewer figure assumes ~5% of the attacker input.',
+            (string) preg_replace('/ +/', ' ', $this->withoutCommentGutter($bufferedOutput->fetch())),
+        );
+    }
+
+    public function test_a_subscription_dry_run_estimates_the_audit_size_rather_than_its_cost(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+
+        $this->subscriptionPresenter()->estimatingSection(new SymfonyStyle(new StringInput(''), $bufferedOutput));
+
+        self::assertStringContainsString('Estimating audit size (dry run)...', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_a_subscription_dry_run_prints_no_warning_about_its_missing_price(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+
+        $this->subscriptionPresenter()->unsupportedModelWarnings(new SymfonyStyle(new StringInput(''), $bufferedOutput), $this->subscriptionEstimate());
+
+        self::assertSame('', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_a_subscription_dry_run_shows_each_role_tokens_without_a_price(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+
+        $this->subscriptionPresenter()->dryRunResult(new SymfonyStyle(new StringInput(''), $bufferedOutput), $this->subscriptionEstimate());
+
+        self::assertStringContainsString(' *   attacker (claude-opus-5-5): 4,676,904 in / 701,536 out', $bufferedOutput->fetch());
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    public function test_a_subscription_dry_run_shows_no_cost_line(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+
+        $this->subscriptionPresenter()->dryRunResult(new SymfonyStyle(new StringInput(''), $bufferedOutput), $this->subscriptionEstimate());
+
+        self::assertStringNotContainsString('Cost  :', $bufferedOutput->fetch());
     }
 
     /**
@@ -795,8 +914,7 @@ final class AuditPresenterTest extends TestCase
         $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
 
         $display = $bufferedOutput->fetch();
-        self::assertStringContainsString('~25% of attacker input', $display, 'the ratio (200/800) must be derived from the breakdown, not the hardcoded 20% default');
-        self::assertStringContainsString('actual cost scales with real findings', $display);
+        self::assertStringContainsString('~25% of the attacker input', $this->withoutCommentGutter($display), 'the ratio (200/800) must be derived from the breakdown, not the hardcoded 20% default');
     }
 
     /**
@@ -816,7 +934,7 @@ final class AuditPresenterTest extends TestCase
 
         $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
 
-        self::assertStringContainsString('~10% of attacker input', $bufferedOutput->fetch());
+        self::assertStringContainsString('~10% of the attacker input', $this->withoutCommentGutter($bufferedOutput->fetch()));
     }
 
     /**
@@ -836,7 +954,7 @@ final class AuditPresenterTest extends TestCase
 
         $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
 
-        self::assertStringContainsString('~38% of attacker input', $bufferedOutput->fetch(), '3/8 = 37.5% rounds up to 38%, not down to 37%');
+        self::assertStringContainsString('~38% of the attacker input', $this->withoutCommentGutter($bufferedOutput->fetch()), '3/8 = 37.5% rounds up to 38%, not down to 37%');
     }
 
     /**
@@ -856,7 +974,7 @@ final class AuditPresenterTest extends TestCase
 
         $this->auditPresenter->dryRunResult($symfonyStyle, $auditReport);
 
-        self::assertStringContainsString('~27% of attacker input', $bufferedOutput->fetch(), '3/11 = 27.27% rounds down to 27%, not up to 28%');
+        self::assertStringContainsString('~27% of the attacker input', $this->withoutCommentGutter($bufferedOutput->fetch()), '3/11 = 27.27% rounds down to 27%, not up to 28%');
     }
 
     /**
@@ -1146,6 +1264,15 @@ final class AuditPresenterTest extends TestCase
         self::assertStringContainsString('7 file(s)', $display);
     }
 
+    public function test_scanned_files_hint_prints_in_the_terminal_default_colour_rather_than_dimmed(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+
+        $this->auditPresenter->scannedFilesHint(new SymfonyStyle(new StringInput(''), $bufferedOutput), 7);
+
+        self::assertStringNotContainsString("\e[90m", $bufferedOutput->fetch());
+    }
+
     /**
      * @throws InvalidAuditContextException
      * @throws InvalidAuditCostException
@@ -1430,5 +1557,27 @@ final class AuditPresenterTest extends TestCase
         }
 
         return AuditReport::fromContext($auditContext);
+    }
+
+    private function withoutCommentGutter(string $display): string
+    {
+        return preg_replace('/ *\n \/\/ /', ' ', $display) ?? '';
+    }
+
+    private function subscriptionPresenter(): AuditPresenter
+    {
+        return new AuditPresenter($this->pricingProviderKnowing(), cliAgent: 'claudecode');
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    private function subscriptionEstimate(): AuditReport
+    {
+        return AuditReport::fromContext(AuditContext::forProject($this->tmpDir), AuditCost::of(4_901_975, 735_297, 0.0, 'claude-opus-5-5', [
+            'attacker' => ['model' => 'claude-opus-5-5', 'input_tokens' => 4_676_904, 'output_tokens' => 701_536, 'estimated_cost_usd' => 0.0],
+            'reviewer' => ['model' => 'claude-haiku-5-5', 'input_tokens' => 225_071, 'output_tokens' => 33_761, 'estimated_cost_usd' => 0.0],
+        ]));
     }
 }

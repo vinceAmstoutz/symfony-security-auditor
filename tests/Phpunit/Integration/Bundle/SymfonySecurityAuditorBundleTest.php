@@ -347,7 +347,7 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
         $commandTester->execute(['project-path' => $this->tmpDir.'/project', '--dry-run' => true], ['interactive' => false]);
 
-        self::assertStringContainsString('The audit runs on a subscription through the Codex CLI, which is not priced per call', (string) preg_replace('/[\s!]+/', ' ', $commandTester->getDisplay()));
+        self::assertStringContainsString('Your subscription is not billed per call, so no cost is shown.', (string) preg_replace('/[\s!\/]+/', ' ', $commandTester->getDisplay()));
     }
 
     /**
