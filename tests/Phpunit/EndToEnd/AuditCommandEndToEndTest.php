@@ -114,6 +114,36 @@ final class AuditCommandEndToEndTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
+    public function test_an_output_file_ending_in_html_gets_an_html_report_without_a_format(): void
+    {
+        $this->createProjectDir();
+        $reportFile = $this->fixtureDir.'/report.html';
+
+        $this->makeCommandTester('[]', '{}')->execute(['project-path' => $this->fixtureDir, '--output' => $reportFile]);
+
+        self::assertStringStartsWith('<!doctype html>', (string) file_get_contents($reportFile));
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
+    public function test_an_output_file_without_extension_gets_the_console_report_with_a_deprecation_warning_when_no_format_is_chosen(): void
+    {
+        $this->createProjectDir();
+        $commandTester = $this->makeCommandTester('[]', '{}');
+
+        $commandTester->execute(['project-path' => $this->fixtureDir, '--output' => $this->fixtureDir.'/csv']);
+
+        self::assertSame([Command::SUCCESS, true, true], [
+            $commandTester->getStatusCode(),
+            file_exists($this->fixtureDir.'/csv'),
+            str_contains((string) preg_replace('/\s+/', ' ', $commandTester->getDisplay()), 'Such a name is deprecated and will be refused in 2.0'),
+        ]);
+    }
+
+    /**
+     * @throws InvalidTokenUsageException
+     */
     public function test_command_output_contains_risk_level(): void
     {
         $this->createProjectDir();

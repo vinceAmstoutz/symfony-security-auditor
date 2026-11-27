@@ -39,7 +39,7 @@ final class AuditCommandInput
     #[Argument(description: 'Project to audit (default: the current directory)')]
     public ?string $projectPath = null;
 
-    #[Option(description: 'Report format, listed below (default: audit.format, else console)', name: 'format', shortcut: 'f')]
+    #[Option(description: 'Report format; the list and its default are below', name: 'format', shortcut: 'f')]
     public ?OutputFormat $givenFormat = null;
 
     public OutputFormat $format = OutputFormat::Console;
@@ -95,7 +95,15 @@ final class AuditCommandInput
         $this->failOnIncompleteFromConfiguration = null === $this->failOnIncomplete;
         $this->failOnIncomplete ??= $auditCommandDefaults->failOnIncomplete;
         $this->output ??= $this->noOutput || $this->dryRun || '' === $auditCommandDefaults->output ? null : $auditCommandDefaults->output;
-        $this->format = $this->givenFormat ?? $auditCommandDefaults->format;
+        $this->format = $this->givenFormat ?? $this->formatFor($auditCommandDefaults->format);
+    }
+
+    /**
+     * Takes the format from the output file's extension when the configured one is the default `console`.
+     */
+    private function formatFor(OutputFormat $configuredFormat): OutputFormat
+    {
+        return OutputFormat::Console === $configuredFormat ? OutputFormat::ofOutputFile($this->output) ?? $configuredFormat : $configuredFormat;
     }
 
     public function failsOnIncomplete(): bool
@@ -162,6 +170,25 @@ final class AuditCommandInput
         }
 
         return '.' === $abstractString->toString() ? u('') : $abstractString;
+    }
+
+    /**
+     * Returns the output file when it has no extension to pick the format from
+     * while no format is chosen, null otherwise. A device such as `/dev/null`
+     * never lacks one.
+     */
+    public function outputFileLackingAFormat(): ?string
+    {
+        if (null === $this->output || !$this->formatIsLeftToTheOutputFile()) {
+            return null;
+        }
+
+        return '' === Path::getExtension($this->output) && !WritableFilePath::isCharacterDevice($this->output) ? $this->output : null;
+    }
+
+    private function formatIsLeftToTheOutputFile(): bool
+    {
+        return !$this->givenFormat instanceof OutputFormat && OutputFormat::Console === $this->format;
     }
 
     /**

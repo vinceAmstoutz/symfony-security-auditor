@@ -76,7 +76,12 @@ final class AuditCommandHelpTest extends TestCase
         $inputOption = $this->auditCommandOption('format');
 
         self::assertNull($inputOption->getDefault());
-        self::assertStringEndsWith('(default: audit.format, else console)', $inputOption->getDescription());
+        self::assertSame('Report format; the list and its default are below', $inputOption->getDescription());
+    }
+
+    public function test_the_help_says_the_output_extension_picks_the_format_when_none_is_chosen(): void
+    {
+        self::assertStringContainsString('Without --format, audit.format sets it, else the --output extension: .html, .json, .sarif, .md, .xml (junit), else console. A name without one is deprecated.', $this->flattened());
     }
 
     public function test_the_min_score_option_names_the_configuration_key_it_overrides(): void

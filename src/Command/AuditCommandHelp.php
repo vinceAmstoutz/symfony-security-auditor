@@ -35,6 +35,8 @@ final readonly class AuditCommandHelp
           <info>junit</info>           findings as failed tests, for CI test-report panels
           <info>github</info>          inline annotations on the pull request's changed files
           <info>github-comment</info>  pull-request comment a workflow can keep up to date
+        Without <info>--format</info>, <info>audit.format</info> sets it, else the <info>--output</info> extension:
+        <info>.html</info>, <info>.json</info>, <info>.sarif</info>, <info>.md</info>, <info>.xml</info> (junit), else <info>console</info>. A name without one is deprecated.
 
         Examples:
           <info>%command.full_name% --dry-run</info>                          estimate the cost first

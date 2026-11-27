@@ -428,6 +428,51 @@ final class AuditCommandInputTest extends TestCase
         self::assertSame(OutputFormat::Console, $auditCommandInput->format);
     }
 
+    public function test_an_output_file_ending_in_html_writes_an_html_report_when_no_format_is_chosen(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->output = 'var/report.html';
+
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults());
+
+        self::assertSame(OutputFormat::Html, $auditCommandInput->format);
+    }
+
+    #[DataProvider('outputFilesAndTheFormatTheyName')]
+    public function test_the_extension_of_the_output_file_names_the_format_when_none_is_chosen(string $outputFile, OutputFormat $outputFormat): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->output = $outputFile;
+
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults());
+
+        self::assertSame($outputFormat, $auditCommandInput->format);
+    }
+
+    /**
+     * @return iterable<string, array{string, OutputFormat}>
+     */
+    public static function outputFilesAndTheFormatTheyName(): iterable
+    {
+        yield 'json' => ['report.json', OutputFormat::Json];
+        yield 'sarif' => ['report.sarif', OutputFormat::Sarif];
+        yield 'markdown' => ['report.md', OutputFormat::Markdown];
+        yield 'junit' => ['junit.xml', OutputFormat::Junit];
+        yield 'htm' => ['report.htm', OutputFormat::Html];
+        yield 'upper case' => ['REPORT.HTML', OutputFormat::Html];
+        yield 'text' => ['report.txt', OutputFormat::Console];
+    }
+
+    public function test_a_configured_format_wins_over_the_extension_of_the_output_file(): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->output = 'var/report.html';
+
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(format: OutputFormat::Json));
+
+        self::assertSame(OutputFormat::Json, $auditCommandInput->format);
+    }
+
     public function test_an_unset_fail_on_incomplete_does_not_fail_the_run_when_nothing_configures_it(): void
     {
         $auditCommandInput = new AuditCommandInput();
@@ -639,6 +684,30 @@ final class AuditCommandInputTest extends TestCase
         $auditCommandInput->assertNoConflictingOptions();
 
         self::assertTrue($auditCommandInput->noOutput);
+    }
+
+    #[DataProvider('outputFilesAndWhetherTheyLackAFormat')]
+    public function test_an_output_file_lacks_a_format_only_when_it_has_no_extension_and_no_format_is_chosen(?string $outputFile, ?OutputFormat $givenFormat, OutputFormat $configuredFormat, ?string $outputFileLackingAFormat): void
+    {
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->output = $outputFile;
+        $auditCommandInput->givenFormat = $givenFormat;
+        $auditCommandInput->applyDefaults(new AuditCommandDefaults(format: $configuredFormat));
+
+        self::assertSame($outputFileLackingAFormat, $auditCommandInput->outputFileLackingAFormat());
+    }
+
+    /**
+     * @return iterable<string, array{?string, ?OutputFormat, OutputFormat, ?string}>
+     */
+    public static function outputFilesAndWhetherTheyLackAFormat(): iterable
+    {
+        yield 'no extension, no format' => ['csv', null, OutputFormat::Console, 'csv'];
+        yield 'no extension, a format on the command line' => ['csv', OutputFormat::Console, OutputFormat::Console, null];
+        yield 'no extension, a configured format' => ['csv', null, OutputFormat::Json, null];
+        yield 'a character device' => ['/dev/null', null, OutputFormat::Console, null];
+        yield 'an extension' => ['report.txt', null, OutputFormat::Console, null];
+        yield 'no output file' => [null, null, OutputFormat::Console, null];
     }
 
     /**
