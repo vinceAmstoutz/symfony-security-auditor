@@ -336,11 +336,26 @@ final class ReviewerPromptBuilderTest extends TestCase
         self::assertStringContainsString('messenger.transport.symfony_serializer', $prompt);
     }
 
-    public function test_false_positive_playbook_rejects_a_credential_only_a_test_or_dev_environment_reads(): void
+    public function test_false_positive_playbook_rejects_only_an_application_local_credential_a_test_or_dev_environment_reads(): void
     {
         $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();
 
-        self::assertStringContainsString('A credential only a test or dev environment reads', $prompt);
+        self::assertStringContainsString("- An application-local credential only a test or dev environment reads (under `when@test` or `when@dev`, in `config/packages/test/` or `config/packages/dev/`, in `.env.test` or `.env.dev`, in fixtures): the application's own secret (`APP_SECRET`, a JWT passphrase), a database, cache, queue or mailer DSN whose host is local or a placeholder (`localhost`, `127.0.0.1`, a container name such as `database`), or a user of an in-memory provider or of fixtures. Production never loads it.", $prompt);
+        self::assertStringNotContainsString('- A credential only a test or dev environment reads', $prompt);
+    }
+
+    public function test_false_positive_playbook_keeps_a_third_party_credential_wherever_it_is_committed(): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('a credential a third-party service issued (a cloud provider key, a GitHub, Slack or Stripe token, an SMTP or API password of a remote service) is leaked by the commit whichever environment reads it, so ACCEPT it wherever it is committed', $prompt);
+    }
+
+    public function test_false_positive_playbook_judges_a_redacted_credential_by_its_variable_name_and_redaction_kind(): void
+    {
+        $prompt = $this->reviewerPromptBuilder->buildSystemPrompt();
+
+        self::assertStringContainsString('A value may reach you redacted, as in `GITHUB_TOKEN=***REDACTED:env_assignment***`: judge then by the variable or key name (`AWS_SECRET_ACCESS_KEY`, `GITHUB_TOKEN`, `STRIPE_SECRET_KEY`) and by the redaction kind when it names an issuer (`aws_access_key`, `github_token`, `stripe_key`). ACCEPT the finding too when neither tells who issued the credential, as for a DSN whose host is redacted.', $prompt);
     }
 
     public function test_system_prompt_includes_tool_usage_discipline(): void

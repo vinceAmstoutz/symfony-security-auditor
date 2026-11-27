@@ -33,7 +33,7 @@ final readonly class ReviewerPromptBuilder implements ReviewerPromptBuilderInter
      * Part of the reviewer cache key: bump it when a prompt change should
      * invalidate the cached verdicts.
      */
-    public const int PROMPT_VERSION = 5;
+    public const int PROMPT_VERSION = 6;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = false;
 

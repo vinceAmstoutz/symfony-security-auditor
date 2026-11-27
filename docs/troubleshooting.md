@@ -335,6 +335,8 @@ The file holds a Symfony secrets vault decryption key (`config/secrets/<env>/<en
 3. Raise `audit.max_iterations` to `5`.
 4. Use a stronger attacker model; see [Which LLM model should I use?](faq.md#which-llm-model-should-i-use).
 
+A credential of `.env.dev`, `.env.test`, `when@test` or `when@dev` is left out on purpose when it is the application's own, such as its `APP_SECRET`. A third-party service's key is reported there: see [Why is the `APP_SECRET` of `.env.dev` not reported, while an API key there is?](faq.md#why-is-the-app_secret-of-envdev-not-reported-while-an-api-key-there-is).
+
 ### Report has too many false positives
 
 - Raise `audit.min_confidence` from `0.6` to `0.8`.
