@@ -22,13 +22,11 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 final readonly class UnpricedModelNotice
 {
     /**
-     * @param list<string> $models
+     * @param array<string> $models
      */
-    public static function forEstimate(array $models, ?string $cliAgent): string
+    public static function forEstimate(array $models): string
     {
-        return null === $cliAgent
-            ? \sprintf('No published pricing for the configured model(s): %s. The dry-run cost estimate shows $0.00 for these. If you are running a local or self-hosted model (e.g. Ollama, LM Studio), $0.00 is correct — you can ignore this notice. Otherwise the name is likely a typo or an unlisted model: check it in your symfony_security_auditor configuration against the models supported by your symfony/ai platform.', implode(', ', $models))
-            : \sprintf('The audit runs on a subscription through %s, which is not priced per call: the estimate shows no cost.', ProviderNames::ofPlatform($cliAgent));
+        return \sprintf('No published pricing for the configured model(s): %s. The dry-run cost estimate shows $0.00 for these. If you are running a local or self-hosted model (e.g. Ollama, LM Studio), $0.00 is correct — you can ignore this notice. Otherwise the name is likely a typo or an unlisted model: check it in your symfony_security_auditor configuration against the models supported by your symfony/ai platform.', implode(', ', $models));
     }
 
     /**
