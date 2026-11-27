@@ -52,10 +52,10 @@ enum ModelAccess: string
     public function providerQuestion(): string
     {
         return match ($this) {
-            self::Subscription => 'Which subscription do you have?',
+            self::Subscription => 'Which subscription do you have? Pick a number',
             self::ApiKey => 'Which company is your API key from? Pick a number, or type a provider name',
-            self::Cloud => 'Which cloud do you use?',
-            default => 'Which gateway do you use?',
+            self::Cloud => 'Which cloud do you use? Pick a number, or type a provider name',
+            default => 'Which gateway do you use? Pick a number, or type a provider name',
         };
     }
 
