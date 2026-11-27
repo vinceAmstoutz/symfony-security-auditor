@@ -57,6 +57,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `audit:run` prints its long-run notice in one shorter line and `--dry-run` its caveats and the `--show-scanned` tip, all as `//` lines in the terminal's own colour wrapped between words, instead of dimmed lines the terminal broke mid-word ([#751](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/751))
 - `audit:run --dry-run` ends with one footnote. On a Claude or ChatGPT subscription it shows tokens without a price, under an `Estimating audit size` heading, in place of `$0.0000` costs and a warning that the subscription is not priced per call ([#763](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/763))
 - `init` shows `auditor` and `review the findings` in bold in its model questions, so the two read apart at a glance ([#753](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/753))
+- `auth:set` on a Claude or ChatGPT subscription names the command that signs its CLI in (`claude auth login` or `codex login`) instead of only saying there is no key to store ([#754](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/754))
 
 ### Bugfixes 🐛
 

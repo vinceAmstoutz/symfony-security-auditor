@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command;
 
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -23,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\C
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\FilesystemCredentialStore;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\XdgConfigPathResolver;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionClis;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuthSetCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingCredentialPrompt;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\UnhideableCredentialPrompt;
@@ -146,11 +148,41 @@ final class AuthSetCommandTest extends TestCase
 
     public function test_it_says_the_configured_platform_needs_no_api_key_to_store(): void
     {
-        $this->writeConfig("provider: claudecode\nplatform:\n    claudecode: {}\nmodel: opus\n");
+        $this->writeConfig("platform:\n    ollama:\n        endpoint: 'http://localhost:11434'\nmodel: qwen3\n");
         $commandTester = $this->commandTester();
         $commandTester->execute([], ['interactive' => false]);
 
-        self::assertStringContainsString('The configured platform needs no API key, so there is none to store.', $this->flattened($commandTester));
+        self::assertStringContainsString('The configured platform needs no API key, so there is none to store. Name one explicitly with --env-var to store a key anyway.', $this->flattened($commandTester));
+    }
+
+    #[DataProvider('subscriptionSignInCases')]
+    public function test_it_points_a_subscription_to_the_sign_in_of_its_cli_instead_of_a_key(string $config, string $signIn): void
+    {
+        $this->writeConfig($config);
+        $commandTester = $this->commandTester();
+        $commandTester->execute([], ['interactive' => false]);
+
+        self::assertStringContainsString($signIn, $this->flattened($commandTester));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function subscriptionSignInCases(): iterable
+    {
+        yield 'ChatGPT through the Codex CLI' => ["provider: codex\nplatform:\n    codex: {}\nmodel: gpt-6.2-sol\n", 'Run "codex login" to sign in to your ChatGPT subscription, or name a variable with --env-var to store a key anyway.'];
+        yield 'Claude through the Claude Code CLI' => ["provider: claudecode\nplatform:\n    claudecode: {}\nmodel: opus\n", 'Run "claude auth login" to sign in to your Claude subscription'];
+    }
+
+    public function test_it_names_the_sign_in_only_of_the_subscription_clis_it_is_given(): void
+    {
+        $this->writeConfig("provider: claudecode\nplatform:\n    claudecode: {}\nmodel: opus\n");
+        $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null);
+        $commandTester = new CommandTester(new AuthSetCommand(new FilesystemCredentialStore($xdgConfigPathResolver), new ConfiguredCredentialVariable($xdgConfigPathResolver), subscriptionClis: new SubscriptionClis()));
+
+        $commandTester->execute([], ['interactive' => false]);
+
+        self::assertStringContainsString('The configured platform needs no API key, so there is none to store. Name one explicitly with --env-var to store a key anyway.', $this->flattened($commandTester));
     }
 
     public function test_it_refuses_an_empty_answer_rather_than_storing_nothing(): void
