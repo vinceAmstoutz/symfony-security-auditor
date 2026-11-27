@@ -39,12 +39,12 @@ final class AuditCommandInput
     #[Argument(description: 'Path to the Symfony project to audit. Defaults to the current working directory. A folder that holds no composer.json and no file scan.included_paths reaches audits the Composer project it lies in, narrowed to that folder, and reads a --path relative to it.')]
     public ?string $projectPath = null;
 
-    #[Option(description: 'Output format: console, executive, json, sarif, html, markdown, junit, github or github-comment. Defaults to the audit.format config key, console when it is unset.', name: 'format', shortcut: 'f')]
+    #[Option(description: 'Output format: console, executive, json, sarif, html, markdown, junit, github or github-comment. Defaults to the audit.format config key, else the format the --output extension names, else console.', name: 'format', shortcut: 'f')]
     public ?OutputFormat $givenFormat = null;
 
     public OutputFormat $format = OutputFormat::Console;
 
-    #[Option(description: 'Output file path (any format). Overrides the audit.output config key for this run.', shortcut: 'o')]
+    #[Option(description: 'Output file path (any format). Without --format or audit.format, its extension (.html, .json, .sarif, .md, .xml) picks the format; a name without one is deprecated. Overrides the audit.output config key for this run.', shortcut: 'o')]
     public ?string $output = null;
 
     #[Option(description: 'Print the report instead of writing it to a file, whatever audit.output says. Cannot be combined with --output.', name: 'no-output')]
@@ -95,7 +95,15 @@ final class AuditCommandInput
         $this->failOnIncompleteFromConfiguration = null === $this->failOnIncomplete;
         $this->failOnIncomplete ??= $auditCommandDefaults->failOnIncomplete;
         $this->output ??= $this->noOutput || $this->dryRun || '' === $auditCommandDefaults->output ? null : $auditCommandDefaults->output;
-        $this->format = $this->givenFormat ?? $auditCommandDefaults->format;
+        $this->format = $this->givenFormat ?? $this->formatFor($auditCommandDefaults->format);
+    }
+
+    /**
+     * Takes the format from the output file's extension when the configured one is the default `console`.
+     */
+    private function formatFor(OutputFormat $configuredFormat): OutputFormat
+    {
+        return OutputFormat::Console === $configuredFormat ? OutputFormat::ofOutputFile($this->output) ?? $configuredFormat : $configuredFormat;
     }
 
     public function failsOnIncomplete(): bool
@@ -162,6 +170,25 @@ final class AuditCommandInput
         }
 
         return '.' === $abstractString->toString() ? u('') : $abstractString;
+    }
+
+    /**
+     * Returns the output file when it has no extension to pick the format from
+     * while no format is chosen, null otherwise. A device such as `/dev/null`
+     * never lacks one.
+     */
+    public function outputFileLackingAFormat(): ?string
+    {
+        if (null === $this->output || !$this->formatIsLeftToTheOutputFile()) {
+            return null;
+        }
+
+        return '' === Path::getExtension($this->output) && !WritableFilePath::isCharacterDevice($this->output) ? $this->output : null;
+    }
+
+    private function formatIsLeftToTheOutputFile(): bool
+    {
+        return !$this->givenFormat instanceof OutputFormat && OutputFormat::Console === $this->format;
     }
 
     /**

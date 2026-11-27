@@ -319,4 +319,11 @@ return [
         'reason' => 'The saved report is named on a plain line whose path links to the file, in place of an [OK] block.',
         'changelog' => '#765',
     ],
+    [
+        'scenarios' => ['standalone/help-audit'],
+        'path' => 'runs.*.stdout.lines',
+        'match' => '/^[-+]  -[fo], --(?:format=FORMAT|output=OUTPUT) /',
+        'reason' => 'The --format and --output descriptions say that the extension of the output file picks the format when no other sets it.',
+        'changelog' => '#766',
+    ],
 ];
