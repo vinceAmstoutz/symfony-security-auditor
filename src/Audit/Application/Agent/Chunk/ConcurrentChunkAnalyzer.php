@@ -24,6 +24,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidToolRegistryException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProgressEvent;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
@@ -330,7 +331,7 @@ final readonly class ConcurrentChunkAnalyzer
         return $this->oversizedChunkRecovery->recover(
             $pendingChunk->chunk,
             $pendingChunk->chunkContext,
-            $llmResponse->content(),
+            new LLMRequestTooLargeException($llmResponse->content()),
             $coverageRecorder,
             fn (array $half, CoverageRecorderInterface $halfCoverageRecorder): VulnerabilityHydrationResult => $this->analyzeChunkAlone($half, $chunkAnalysisScope, $halfCoverageRecorder),
         );

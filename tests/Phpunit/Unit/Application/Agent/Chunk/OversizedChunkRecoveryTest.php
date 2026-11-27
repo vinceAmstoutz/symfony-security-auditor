@@ -25,10 +25,12 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\Budg
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidProjectFileException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMFixedPromptTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityHydrationResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Pipeline\CoverageRecorderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\CliAgentPromptTooLongException;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Fixture\RecordingCoverageRecorder;
 
@@ -50,7 +52,7 @@ final class OversizedChunkRecoveryTest extends TestCase
         $vulnerabilityHydrationResult = $this->recovery()->recover(
             [$this->file()],
             new ChunkContext(str_repeat('s', 400), str_repeat('u', 600), '', false, self::FILE_BYTES),
-            'prompt is too long',
+            new LLMRequestTooLargeException('prompt is too long'),
             $recordingCoverageRecorder,
             $this->unreachableAnalysis(),
         );
@@ -75,7 +77,7 @@ final class OversizedChunkRecoveryTest extends TestCase
             $this->recovery()->recover(
                 [$this->file()],
                 new ChunkContext(str_repeat('s', 401), str_repeat('u', 600), '', false, self::FILE_BYTES),
-                'prompt is too long',
+                new LLMRequestTooLargeException('prompt is too long'),
                 $recordingCoverageRecorder,
                 $this->unreachableAnalysis(),
             );
@@ -97,7 +99,7 @@ final class OversizedChunkRecoveryTest extends TestCase
         $this->recovery()->recover(
             [ProjectFile::create('src/A.php', '/app/src/A.php', str_repeat('x', 5000))],
             new ChunkContext(str_repeat('s', 401), str_repeat('u', 600), '', false, self::FILE_BYTES),
-            'prompt is too long',
+            new LLMRequestTooLargeException('prompt is too long'),
             new RecordingCoverageRecorder(),
             $this->unreachableAnalysis(),
         );
@@ -115,7 +117,7 @@ final class OversizedChunkRecoveryTest extends TestCase
         $this->recovery()->recover(
             [ProjectFile::create('config/huge.yaml', '/app/config/huge.yaml', str_repeat('x', 2049))],
             new ChunkContext(str_repeat('s', 400), str_repeat('u', 600), '', false, 2049),
-            'prompt is too long',
+            new LLMRequestTooLargeException('prompt is too long'),
             $recordingCoverageRecorder,
             $this->unreachableAnalysis(),
         );
@@ -135,12 +137,32 @@ final class OversizedChunkRecoveryTest extends TestCase
         $this->recovery()->recover(
             [ProjectFile::create('src/Huge.php', '/app/src/Huge.php', str_repeat('x', 4096))],
             new ChunkContext(str_repeat('s', 400), str_repeat('u', 600), '', false, 4095),
-            'prompt is too long',
+            new LLMRequestTooLargeException('prompt is too long'),
             $recordingCoverageRecorder,
             $this->unreachableAnalysis(),
         );
 
         self::assertSame('the file is too large for the model input limit: use a model with a larger context window or set scan.max_file_size_kb below 4 to skip it', $recordingCoverageRecorder->failureReasons[0]['reason']);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_a_file_the_command_line_of_a_subscription_cli_cannot_carry_is_not_told_to_use_a_larger_context_window(): void
+    {
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $this->recovery()->recover(
+            [ProjectFile::create('src/Huge.php', '/app/src/Huge.php', str_repeat('x', 4096))],
+            new ChunkContext(str_repeat('s', 400), str_repeat('u', 600), '', false, 4096),
+            LLMRequestTooLargeException::fromProviderRejection(CliAgentPromptTooLongException::forOneArgument(131071)),
+            $recordingCoverageRecorder,
+            $this->unreachableAnalysis(),
+        );
+
+        self::assertSame('the file is too large for the command-line limit of the subscription CLI: turn on audit.code_slicing.enabled, set scan.max_file_size_kb below 4 to skip it or run on an API platform', $recordingCoverageRecorder->failureReasons[0]['reason']);
     }
 
     private function recovery(): OversizedChunkRecovery

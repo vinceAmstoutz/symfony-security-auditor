@@ -519,6 +519,7 @@ Good to know:
 - Each call bills the subscription the CLI is logged in to: the auditor starts it without your API keys. The audit header, `auth:status`, `auth:test` and `doctor` name that account. An audit refuses to start while the CLI is not logged in.
 - `privacy.offline_only` refuses both platforms.
 - It does not run on Windows: the auditor's instructions do not fit the command line Windows starts the CLI with, so the run stops at its first call. Use WSL, Linux, macOS or an API platform.
+- A large file may not fit. The prompt travels on the command line that starts the CLI, which carries at most 128 KiB per argument whatever the model's context window, so the ceiling per file is far lower than on an API platform (each CLI's is given below). The run lists such a file as not analyzed and its failed chunk line reads `the file is too large for the command-line limit of the subscription CLI`. Turn on `audit.code_slicing.enabled` for a PHP file, skip the file with `scan.max_file_size_kb` or run on an API platform.
 - The CLI runs outside the audited project with its own tools off, so the code it reads cannot make it act. It sees only the code the auditor sends: `audit.tools_enabled`, `audit.structured_collection`, `audit.reviewer_tools_enabled` and `audit.reviewer_structured_collection` are always off.
 
 #### Running on a Claude subscription
@@ -537,6 +538,7 @@ reviewer_model: claude-haiku-5-5
 - On a CI runner, set `CLAUDE_CODE_OAUTH_TOKEN` to the token `claude setup-token` prints.
 - The auditor ignores `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, the Bedrock, Vertex and Foundry switches and the `apiKeyHelper` of your settings files. You get a warning when an API key still bills in place of your subscription, such as one set by managed settings. When `claude` names no subscription plan, only such a helper, the audit refuses to start.
 - Claude Code ignores the MCP servers of the machine.
+- Claude Code takes the auditor's instructions as one argument and the rest of the prompt as another, so the project mapping and the file share 128 KiB: about 110 KB for a PHP file on a small project, less as the mapping grows.
 - In a Symfony application, require `symfony/ai-claude-code-platform` and set `cli_agent: { platform: claudecode, effort: medium }` with `model: claude-opus-5-5` and `reviewer_model: claude-haiku-5-5` under `symfony_security_auditor:`. Your application's own `symfony/ai` platform is left as it is.
 
 #### Running on a ChatGPT subscription
@@ -554,6 +556,7 @@ reviewer_model: gpt-6-luna
 - `init` also offers `gpt-6.2-astra` for the hardest projects. Any model id your Codex CLI runs works.
 - The auditor ignores `CODEX_API_KEY` and `OPENAI_API_KEY`. When `codex` is logged in with an API key, the audit refuses to start: run `codex logout`, then `codex login` with your ChatGPT account.
 - Codex runs read-only with its shell and web search off. It ignores your Codex configuration and rules and keeps nothing of the session.
+- Codex takes the whole prompt as one argument, so the auditor's instructions, the project mapping and the file share 128 KiB: about 47 KB for a PHP file on a small project, less as the mapping grows.
 - In a Symfony application, require `symfony/ai-codex-platform` and set `cli_agent: { platform: codex, effort: medium }` with `model: gpt-6.2-sol` and `reviewer_model: gpt-6-luna` under `symfony_security_auditor:`. Your application's own `symfony/ai` platform is left as it is.
 
 ## Providing the API key

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 use function Symfony\Component\String\u;
@@ -33,13 +34,17 @@ final readonly class ChunkFailureReason
 
     /**
      * Suggests code slicing only for a PHP file the prompt carried untrimmed.
+     * Suggests a larger context window only when the model refused the
+     * prompt, never when the command line of a subscription CLI did.
      */
-    public static function fileTooLarge(ProjectFile $projectFile, int $promptedFileBytes): string
+    public static function fileTooLarge(ProjectFile $projectFile, int $promptedFileBytes, LLMRequestTooLargeException $llmRequestTooLargeException): string
     {
         $fileBytes = \strlen($projectFile->content());
 
         return \sprintf(
-            'the file is too large for the model input limit: %suse a model with a larger context window or set scan.max_file_size_kb below %d to skip it',
+            $llmRequestTooLargeException->exceedsCommandLine()
+                ? 'the file is too large for the command-line limit of the subscription CLI: %sset scan.max_file_size_kb below %d to skip it or run on an API platform'
+                : 'the file is too large for the model input limit: %suse a model with a larger context window or set scan.max_file_size_kb below %d to skip it',
             $promptedFileBytes >= $fileBytes && u($projectFile->relativePath())->endsWith('.php') ? 'turn on audit.code_slicing.enabled, ' : '',
             intdiv($fileBytes + 1023, 1024),
         );

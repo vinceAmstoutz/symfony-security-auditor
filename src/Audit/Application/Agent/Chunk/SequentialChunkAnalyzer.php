@@ -161,7 +161,7 @@ final readonly class SequentialChunkAnalyzer
             return $this->oversizedChunkRecovery->recover(
                 $chunk,
                 $chunkContext,
-                $llmRequestTooLargeException->getMessage(),
+                $llmRequestTooLargeException,
                 $coverageRecorder,
                 fn (array $half, CoverageRecorderInterface $halfCoverageRecorder): VulnerabilityHydrationResult => $this->analyzeChunk($half, $attackerAnalysisRequest, $halfCoverageRecorder, $toolRegistry, $riskMarkerIndex),
             );
