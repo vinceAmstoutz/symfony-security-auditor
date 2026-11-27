@@ -87,16 +87,19 @@ final readonly class SubscriptionAccountGuard implements UnpricedModelBudgetGuar
     }
 
     /**
-     * Hands the reports the subscription and its plan, never the account that could identify a person.
+     * Hands the reports the subscription and its plan, never the account that
+     * could identify a person, or nothing when this run cannot tell.
      */
     private function recordBilledSubscription(CliAgentAccount $cliAgentAccount): void
     {
-        if (CliAgentBilling::Subscription !== $cliAgentAccount->billing) {
-            return;
-        }
+        $this->billedSubscriptionHolder->set(CliAgentBilling::Subscription === $cliAgentAccount->billing ? $this->billedSubscriptionOf($cliAgentAccount) : null);
+    }
 
+    private function billedSubscriptionOf(CliAgentAccount $cliAgentAccount): string
+    {
         $subscription = $this->subscriptionCli->subscription();
-        $this->billedSubscriptionHolder->set(null === $cliAgentAccount->plan ? $subscription : \sprintf('%s (%s)', $subscription, $cliAgentAccount->plan));
+
+        return null === $cliAgentAccount->plan ? $subscription : \sprintf('%s (%s)', $subscription, $cliAgentAccount->plan);
     }
 
     private function refuses(CliAgentAccount $cliAgentAccount): bool

@@ -27,7 +27,10 @@ final class BilledSubscriptionHolder
 {
     private ?string $billedSubscription = null;
 
-    public function set(string $billedSubscription): void
+    /**
+     * Takes null when the latest run could not tell which subscription it bills.
+     */
+    public function set(?string $billedSubscription): void
     {
         $this->billedSubscription = $billedSubscription;
     }

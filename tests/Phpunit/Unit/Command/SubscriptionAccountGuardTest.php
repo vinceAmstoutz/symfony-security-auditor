@@ -70,9 +70,10 @@ final class SubscriptionAccountGuardTest extends TestCase
      * @throws RunRefusedException
      */
     #[DataProvider('accountsAndTheSubscriptionReportsName')]
-    public function test_it_hands_the_reports_only_the_subscription_it_knows_it_bills(CliAgentAccount $cliAgentAccount, ?string $billedSubscription): void
+    public function test_it_hands_the_reports_only_the_subscription_it_knows_it_bills_whatever_an_earlier_run_billed(CliAgentAccount $cliAgentAccount, ?string $billedSubscription): void
     {
         $billedSubscriptionHolder = new BilledSubscriptionHolder();
+        $billedSubscriptionHolder->set('your Claude subscription (team plan)');
 
         $this->guard($cliAgentAccount, $billedSubscriptionHolder)->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), new BufferedOutput()));
 
