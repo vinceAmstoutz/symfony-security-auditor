@@ -23,13 +23,16 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  */
 final readonly class InitProviderQuestion
 {
-    public static function ask(SymfonyStyle $symfonyStyle): string
+    public static function ask(SymfonyStyle $symfonyStyle, bool $interactive): string
     {
-        $answer = NumberedChoice::ask(
+        if (!$interactive) {
+            return ModelAccess::ApiKey->providers()[0];
+        }
+
+        $answer = NumberedChoice::askWithoutDefault(
             $symfonyStyle,
             'How do you access AI models? Pick a number, or type a provider name',
             array_map(static fn (ModelAccess $modelAccess): string => $modelAccess->label(), ModelAccess::cases()),
-            ModelAccess::ApiKey->value,
             array_map(static fn (ModelAccess $modelAccess): string => $modelAccess->value, ModelAccess::cases()),
         );
 
@@ -46,6 +49,6 @@ final readonly class InitProviderQuestion
             return $providers[0];
         }
 
-        return NumberedChoice::ask($symfonyStyle, $modelAccess->providerQuestion(), array_map(ProviderNames::of(...), $providers), $providers[0], $providers);
+        return NumberedChoice::askWithoutDefault($symfonyStyle, $modelAccess->providerQuestion(), array_map(ProviderNames::of(...), $providers), $providers);
     }
 }
