@@ -21,6 +21,7 @@ use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditContextException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\InvalidAuditCostException;
@@ -143,7 +144,24 @@ final class AuditPresenterTest extends TestCase
         $display = $bufferedOutput->fetch();
         self::assertStringContainsString('Project:', $display);
         self::assertStringContainsString('/path/to/project', $display);
-        self::assertStringContainsString('Pipeline:', $display);
+    }
+
+    public function test_header_names_the_pipeline_stages_when_verbose(): void
+    {
+        $bufferedOutput = new BufferedOutput(OutputInterface::VERBOSITY_VERBOSE);
+
+        $this->auditPresenter->header(new SymfonyStyle(new StringInput(''), $bufferedOutput), '/path/to/project');
+
+        self::assertStringContainsString(" Pipeline: Ingestion -> Mapping -> Audit (Attacker vs Reviewer)\n", $bufferedOutput->fetch());
+    }
+
+    public function test_header_leaves_the_pipeline_line_out_at_normal_verbosity(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+
+        $this->auditPresenter->header(new SymfonyStyle(new StringInput(''), $bufferedOutput), '/path/to/project');
+
+        self::assertStringNotContainsString('Pipeline:', $bufferedOutput->fetch());
     }
 
     public function test_header_neutralizes_console_markup_in_the_project_path(): void
