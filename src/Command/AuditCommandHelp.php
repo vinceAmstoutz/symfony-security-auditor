@@ -44,7 +44,8 @@ final readonly class AuditCommandHelp
         <info>--no-output</info> prints the report when <info>audit.output</info> names a file.
 
         Exit codes:
-          <info>0</info>  risk below <info>--fail-on</info> (default <info>critical</info>) and score at or above <info>--min-score</info>
+          <info>0</info>  risk below <info>--fail-on</info> (default <info>critical</info>) and score at or above <info>--min-score</info>,
+             or <info>--generate-baseline</info> wrote its baseline, whatever the findings
           <info>1</info>  a gate tripped, the audit failed, or no verdict: no file found, or none analyzed and no finding
           <info>2</info>  a token or cost budget stopped the run (partial report), or an unpriced model
              made the cost budget unenforceable and the run never started (no report)

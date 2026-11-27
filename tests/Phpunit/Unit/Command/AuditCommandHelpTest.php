@@ -56,6 +56,11 @@ final class AuditCommandHelpTest extends TestCase
         self::assertStringContainsString('or no verdict: no file found, or none analyzed and no finding', $this->flattened());
     }
 
+    public function test_exit_code_zero_documentation_says_a_generated_baseline_does_not_fail_on_findings(): void
+    {
+        self::assertStringContainsString('or --generate-baseline wrote its baseline, whatever the findings', $this->flattened());
+    }
+
     public function test_exit_code_three_documentation_does_not_claim_a_run_with_no_verdict_passes_without_the_option(): void
     {
         self::assertStringContainsString('3 --fail-on-incomplete and some file could not be fully analyzed; without it, a warning', $this->flattened());
