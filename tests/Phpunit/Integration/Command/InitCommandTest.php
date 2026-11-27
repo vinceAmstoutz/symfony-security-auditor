@@ -94,7 +94,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('Which cloud do you use? [AWS Bedrock]: [1] AWS Bedrock [2] Google Vertex AI [3] Azure OpenAI >', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString('Which cloud do you use? Pick a number, or type a provider name: [1] AWS Bedrock [2] Google Vertex AI [3] Azure OpenAI >', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_lists_gateways_for_an_ai_gateway(): void
@@ -104,7 +104,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('Which gateway do you use? [OpenRouter]: [1] OpenRouter [2] Eden AI [3] Another OpenAI-compatible gateway (you give its URL) >', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString('Which gateway do you use? Pick a number, or type a provider name: [1] OpenRouter [2] Eden AI [3] Another OpenAI-compatible gateway (you give its URL) >', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_lists_neither_cloud_platforms_nor_gateways_for_an_api_key(): void
@@ -124,7 +124,7 @@ final class InitCommandTest extends TestCase
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('Which subscription do you have? [Claude (through the Claude Code CLI)]: [1] Claude (through the Claude Code CLI) [2] ChatGPT (through the Codex CLI) >', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString('Which subscription do you have? Pick a number: [1] Claude (through the Claude Code CLI) [2] ChatGPT (through the Codex CLI) >', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_suggests_opus_5_5_for_a_claude_subscription(): void
@@ -357,24 +357,24 @@ final class InitCommandTest extends TestCase
         );
     }
 
-    public function test_it_configures_an_anthropic_api_key_when_every_answer_is_the_default(): void
+    public function test_it_asks_again_how_you_access_ai_models_after_an_empty_answer(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs(['', '', '', '', '']);
+        $commandTester->setInputs(['', 'anthropic', '', '', '']);
 
         $commandTester->execute([]);
 
         self::assertSame('anthropic', $this->configuredValue('provider'));
     }
 
-    public function test_it_asks_how_you_access_ai_models_in_a_few_words(): void
+    public function test_it_preselects_no_way_of_accessing_ai_models(): void
     {
         $commandTester = $this->commandTester();
         $commandTester->setInputs(['openai', 'gpt-5.4', '', '']);
 
         $commandTester->execute([]);
 
-        self::assertStringStartsWith(' How do you access AI models? Pick a number, or type a provider name [', $this->unwrappedDisplay($commandTester));
+        self::assertStringStartsWith(' How do you access AI models? Pick a number, or type a provider name: [1] ', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_asks_the_model_of_a_chatgpt_subscription_suggesting_gpt_6_2_sol(): void
@@ -400,11 +400,11 @@ final class InitCommandTest extends TestCase
     public function test_it_names_the_companies_an_api_key_comes_from_most_common_first(): void
     {
         $commandTester = $this->commandTester();
-        $commandTester->setInputs([ModelAccess::ApiKey->value, '', '', '', '']);
+        $commandTester->setInputs([ModelAccess::ApiKey->value, '1', '', '', '']);
 
         $commandTester->execute([]);
 
-        self::assertStringContainsString('Which company is your API key from? Pick a number, or type a provider name [Anthropic (Claude)]: [1 ] Anthropic (Claude) [2 ] OpenAI (GPT) [3 ] Google AI Studio (Gemini) [4 ] Mistral AI [5 ] DeepSeek [6 ] Cerebras', $this->unwrappedDisplay($commandTester));
+        self::assertStringContainsString('Which company is your API key from? Pick a number, or type a provider name: [1 ] Anthropic (Claude) [2 ] OpenAI (GPT) [3 ] Google AI Studio (Gemini) [4 ] Mistral AI [5 ] DeepSeek [6 ] Cerebras', $this->unwrappedDisplay($commandTester));
     }
 
     public function test_it_asks_for_a_model_pulled_in_ollama_for_a_local_model(): void
@@ -2506,6 +2506,13 @@ final class InitCommandTest extends TestCase
         $commandTester->execute(['--provider' => 'higgsfield', '--model' => 'our-model', '--env-var' => ' HIGGSFIELD_API_KEY '], ['interactive' => false]);
 
         self::assertSame([['higgsfield', $this->dataHome.'/symfony-security-auditor']], $this->recordingBridgeInstaller->installations);
+    }
+
+    public function test_a_run_that_cannot_ask_configures_anthropic_when_no_provider_is_given(): void
+    {
+        $this->commandTester()->execute([], ['interactive' => false]);
+
+        self::assertSame('anthropic', $this->configuredValue('provider'));
     }
 
     public function test_a_run_that_cannot_ask_leaves_an_existing_configuration_untouched(): void
