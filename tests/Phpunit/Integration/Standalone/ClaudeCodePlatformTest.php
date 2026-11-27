@@ -279,9 +279,9 @@ final class ClaudeCodePlatformTest extends TestCase
 
         $commandTester->execute(['project-path' => $project, '--dry-run' => true], ['interactive' => false]);
 
-        $display = (string) preg_replace('/[\s!]+/', ' ', $commandTester->getDisplay());
+        $display = (string) preg_replace('/[\s!\/]+/', ' ', $commandTester->getDisplay());
 
-        self::assertSame([true, false], [str_contains($display, 'The audit runs on a subscription through the Claude Code CLI, which is not priced per call'), str_contains($display, 'typo')]);
+        self::assertSame([true, false], [str_contains($display, 'Your subscription is not billed per call, so no cost is shown.'), str_contains($display, 'typo')]);
     }
 
     /**
