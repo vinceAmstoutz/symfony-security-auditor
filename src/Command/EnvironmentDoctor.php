@@ -56,6 +56,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
     /**
      * @param ?string                     $bundledAiPlatformVersion   the `symfony/ai-platform` release the binary bundles, which the bridge tree must hold too
      * @param ?WorkloadIdentityFederation $workloadIdentityFederation what an `anthropic` audit signs in with in place of an API key
+     * @param ?string                     $federatedSignInRefusal     why that audit cannot sign in through it here
      */
     public function __construct(
         private StandaloneConfigLoader $standaloneConfigLoader,
@@ -67,6 +68,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
         private ?string $bundledAiPlatformVersion = null,
         private ?ConfiguredModelCheck $configuredModelCheck = null,
         private ?WorkloadIdentityFederation $workloadIdentityFederation = null,
+        private ?string $federatedSignInRefusal = null,
     ) {}
 
     /**
@@ -76,7 +78,7 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
     public function diagnose(): array
     {
         $configuration = $this->loadedConfiguration();
-        $doctorCheckResult = $configuration instanceof DoctorCheckResult ? $configuration : new DoctorCheckResult(self::CONFIGURATION_CHECK, DoctorCheckStatus::Ok, $this->resolvedConfigurationDetail($configuration));
+        $doctorCheckResult = $configuration instanceof DoctorCheckResult ? $configuration : $this->resolvedConfiguration($configuration);
 
         return [
             $doctorCheckResult,
@@ -112,6 +114,17 @@ final readonly class EnvironmentDoctor implements EnvironmentDoctorInterface
         }
 
         return $standaloneConfig;
+    }
+
+    /**
+     * Fails the API key check when an `anthropic` audit signs in through
+     * workload identity federation and cannot here.
+     */
+    private function resolvedConfiguration(StandaloneConfig $standaloneConfig): DoctorCheckResult
+    {
+        return null !== $this->federatedSignInRefusal && $standaloneConfig->platform->runsOn(WorkloadIdentityFederation::PLATFORM)
+            ? new DoctorCheckResult(self::API_KEY_CHECK, DoctorCheckStatus::Failure, $this->federatedSignInRefusal)
+            : new DoctorCheckResult(self::CONFIGURATION_CHECK, DoctorCheckStatus::Ok, $this->resolvedConfigurationDetail($standaloneConfig));
     }
 
     /**
