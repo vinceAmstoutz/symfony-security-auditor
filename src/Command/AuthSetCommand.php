@@ -22,6 +22,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialI
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\CredentialStoreInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\CredentialStoreWriteException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Config\Exception\UnreadableCredentialStoreException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionCliInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionClis;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\HiddenInputUnavailableException;
 
 /** @internal not part of the BC promise: the command *name* (`auth:set`) is public, but the PHP class itself is for internal use only. */
@@ -32,11 +34,16 @@ final readonly class AuthSetCommand
 
     public const string DESCRIPTION = 'Store the provider API key on this machine, in a file only you can read';
 
+    private SubscriptionClis $subscriptionClis;
+
     public function __construct(
         private CredentialStoreInterface $credentialStore,
         private ConfiguredCredentialVariable $configuredCredentialVariable,
         private CredentialPromptInterface $credentialPrompt = new HiddenCredentialPrompt(),
-    ) {}
+        ?SubscriptionClis $subscriptionClis = null,
+    ) {
+        $this->subscriptionClis = $subscriptionClis ?? SubscriptionClis::bundled();
+    }
 
     public function __invoke(
         SymfonyStyle $symfonyStyle,
@@ -105,8 +112,14 @@ final readonly class AuthSetCommand
 
     private function noVariableReason(): string
     {
-        return $this->configuredCredentialVariable->platformNeedsNoApiKey()
-            ? 'The configured platform needs no API key, so there is none to store. Name one explicitly with --env-var to store a key anyway.'
-            : 'No API-key variable is configured yet. Run "init" first, or name one explicitly with --env-var.';
+        if (!$this->configuredCredentialVariable->platformNeedsNoApiKey()) {
+            return 'No API-key variable is configured yet. Run "init" first, or name one explicitly with --env-var.';
+        }
+
+        $subscriptionCli = $this->subscriptionClis->of($this->configuredCredentialVariable->provider()->name ?? '');
+
+        return $subscriptionCli instanceof SubscriptionCliInterface
+            ? \sprintf('The configured platform needs no API key, so there is none to store. Run "%s" to sign in to %s, or name a variable with --env-var to store a key anyway.', $subscriptionCli->loginCommand(), $subscriptionCli->subscription())
+            : 'The configured platform needs no API key, so there is none to store. Name one explicitly with --env-var to store a key anyway.';
     }
 }
