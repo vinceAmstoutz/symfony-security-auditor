@@ -19,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Validator\Validation;
@@ -1077,12 +1078,12 @@ final class AuditCommandEndToEndTest extends TestCase
     /**
      * @throws InvalidTokenUsageException
      */
-    public function test_command_displays_title_and_pipeline_header(): void
+    public function test_command_displays_title_and_pipeline_header_when_verbose(): void
     {
         $this->createProjectDir();
 
         $commandTester = $this->makeCommandTester('[]', '{}');
-        $commandTester->execute(['project-path' => $this->fixtureDir]);
+        $commandTester->execute(['project-path' => $this->fixtureDir], ['verbosity' => OutputInterface::VERBOSITY_VERBOSE]);
 
         $output = $commandTester->getDisplay();
         self::assertStringContainsString('SECURITY AUDITOR', $output);
