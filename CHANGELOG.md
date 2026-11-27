@@ -65,6 +65,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `audit:run` on a Claude or ChatGPT subscription says on its `Billing:` line that the run is not priced per call, in place of a separate warning block, unless the CLI cannot tell which account it bills. With `audit.budget.max_cost_usd` set, or an API key billing instead, the warnings stay ([#761](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/761))
 - `audit:run` says where it saved the report on a plain line whose path links to the file, in place of a green `[OK]` block stacked on the verdict, so a failed run no longer reads as a success. The temporary HTML report gets one line with its `file://` link ([#765](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/765))
 - `audit:run --output report.html` writes an HTML report without `--format`: when neither `--format` nor `audit.format` names one, the extension of the output file picks the format (`.html` or `.htm`, `.json`, `.sarif`, `.md` for Markdown, `.xml` for JUnit) ([#766](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/766))
+- `audit:run --help` describes each argument and option in one short line. Its help text fits a 100-column terminal ([#755](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/755))
 
 ### Deprecations 💀
 

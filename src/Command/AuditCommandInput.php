@@ -36,51 +36,51 @@ final class AuditCommandInput
 
     private const int HIGHEST_MIN_SCORE = 100;
 
-    #[Argument(description: 'Path to the Symfony project to audit. Defaults to the current working directory. A folder that holds no composer.json and no file scan.included_paths reaches audits the Composer project it lies in, narrowed to that folder, and reads a --path relative to it.')]
+    #[Argument(description: 'Project to audit (default: the current directory)')]
     public ?string $projectPath = null;
 
-    #[Option(description: 'Output format: console, executive, json, sarif, html, markdown, junit, github or github-comment. Defaults to the audit.format config key, else the format the --output extension names, else console.', name: 'format', shortcut: 'f')]
+    #[Option(description: 'Report format; the list and its default are below', name: 'format', shortcut: 'f')]
     public ?OutputFormat $givenFormat = null;
 
     public OutputFormat $format = OutputFormat::Console;
 
-    #[Option(description: 'Output file path (any format). Without --format or audit.format, its extension (.html, .json, .sarif, .md, .xml) picks the format; a name without one is deprecated. Overrides the audit.output config key for this run.', shortcut: 'o')]
+    #[Option(description: 'Write the report to this file (overrides audit.output)', shortcut: 'o')]
     public ?string $output = null;
 
-    #[Option(description: 'Print the report instead of writing it to a file, whatever audit.output says. Cannot be combined with --output.', name: 'no-output')]
+    #[Option(description: 'Print the report even when audit.output names a file', name: 'no-output')]
     public bool $noOutput = false;
 
-    #[Option(description: 'Estimate token usage and cost without invoking the LLM; emits a report with zero vulnerabilities and an estimated cost block.')]
+    #[Option(description: 'Estimate tokens and cost without calling the LLM')]
     public bool $dryRun = false;
 
-    #[Option(description: 'List the files that would be audited (those of the configured included_paths, or of the --path values in their place) and exit, without invoking the LLM. Use it to confirm your scan scope. Combine with --dry-run to also print the cost estimate.', name: 'show-scanned')]
+    #[Option(description: 'List the files in scope and exit; add --dry-run for the cost', name: 'show-scanned')]
     public bool $showScanned = false;
 
-    #[Option(description: 'Bypass the attacker and reviewer caches for this run: skip cache reads so every chunk and verdict hits the LLM, and skip cache writes so existing entries stay untouched. Useful after upgrading the auditor or when you need to force a fresh analysis.', name: 'no-cache')]
+    #[Option(description: 'Neither read nor write the attacker and reviewer caches', name: 'no-cache')]
     public bool $noCache = false;
 
     /**
      * @var list<string>
      */
-    #[Option(description: 'Scan these directories or files of the project (relative to the project root) in place of scan.included_paths for this run; the project root itself keeps the configured scope. Repeat the option to give several. Useful for monorepos where only one app should be audited. By default the configured scope is scanned.', name: 'path', shortcut: 'p')]
+    #[Option(description: 'Scan only this file or folder of the project (repeatable)', name: 'path', shortcut: 'p')]
     public array $paths = [];
 
-    #[Option(description: 'Diff mode: audit only files changed against the given git ref (e.g. main, origin/main, abc1234). Honors both committed changes (ref...HEAD) and uncommitted working-tree changes. Designed for CI on pull requests; the cache stays warm for unchanged files.', name: 'since')]
+    #[Option(description: 'Audit only the files changed since this git ref, uncommitted ones too', name: 'since')]
     public ?string $since = null;
 
-    #[Option(description: 'Baseline file of accepted-finding fingerprints. Findings whose fingerprint is listed are suppressed from the report and excluded from the exit code. Overrides the audit.baseline config key. A missing file suppresses nothing.', name: 'baseline')]
+    #[Option(description: 'Hide the findings this baseline file lists (overrides audit.baseline)', name: 'baseline')]
     public ?string $baseline = null;
 
-    #[Option(description: 'Run the audit, then write every current finding fingerprint to the given file as a baseline and exit 0 without failing on findings (3 under --fail-on-incomplete when some file could not be fully analyzed; a run with no verdict writes no baseline and exits 1). Use this to accept the current findings so future runs only report new ones.', name: 'generate-baseline')]
+    #[Option(description: 'Run the audit and save its findings to this file as a baseline', name: 'generate-baseline')]
     public ?string $generateBaseline = null;
 
-    #[Option(description: 'Minimum aggregate risk level (safe|low|medium|high|critical) that makes the command exit 1. Overrides the audit.fail_on config key for this run. Defaults to the configured value (critical) when omitted.', name: 'fail-on')]
+    #[Option(description: 'Exit 1 from this risk level up (default: audit.fail_on, critical)', name: 'fail-on')]
     public ?RiskLevel $failOn = null;
 
-    #[Option(description: 'Minimum normalized score (0-100) below which the command exits 1. Independent of --fail-on: the audit fails when either gate trips. Overrides the audit.min_score config key for this run; with neither, the risk level alone gates.', name: 'min-score')]
+    #[Option(description: 'Exit 1 below this score, 0-100 (overrides audit.min_score)', name: 'min-score')]
     public ?int $minScore = null;
 
-    #[Option(description: 'Exit 3 when some file could not be fully analyzed (a scan or LLM call failed), so a partial report cannot pass CI. A tripped --fail-on or --min-score gate still exits 1. Without it, such a run only prints a warning unless audit.fail_on_incomplete is set; --no-fail-on-incomplete turns that off for this run.', name: 'fail-on-incomplete')]
+    #[Option(description: 'Exit 3 when some file could not be fully analyzed', name: 'fail-on-incomplete')]
     public ?bool $failOnIncomplete = null;
 
     private bool $failOnIncompleteFromConfiguration = false;
