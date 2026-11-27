@@ -53,6 +53,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `doctor` warns about that placeholder or a model the Ollama server has not pulled; `audit:run` on Ollama notes a configured model the server has not pulled, in the binary and the bundle; an error from a provider that does not know the model names it and the setting that fixes it ([#733](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/733))
 - An interactive `init` preselects no answer to how you access AI models and which provider or subscription you use: an empty answer asks again. `init --no-interaction` still configures `anthropic` ([#752](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/752))
 - `audit:run` prints its long-run notice in one shorter line and `--dry-run` its caveats and the `--show-scanned` tip, all as `//` lines in the terminal's own colour wrapped between words, instead of dimmed lines the terminal broke mid-word ([#751](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/751))
+- `audit:run --dry-run` ends with one footnote. On a Claude or ChatGPT subscription it shows tokens without a price, under an `Estimating audit size` heading, in place of `$0.0000` costs and a warning that the subscription is not priced per call ([#PRNUM](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/PRNUM))
 
 ### Bugfixes 🐛
 

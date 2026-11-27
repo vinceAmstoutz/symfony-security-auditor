@@ -19,7 +19,6 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
-use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AgentRole;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditCost;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\AuditReport;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
@@ -92,11 +91,11 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     {
         $unsupportedModels = $this->unsupportedModels($auditReport->cost());
 
-        if ([] === $unsupportedModels) {
+        if ([] === $unsupportedModels || null !== $this->cliAgent) {
             return;
         }
 
-        $symfonyStyle->getErrorStyle()->warning(UnpricedModelNotice::forEstimate(array_values($unsupportedModels), $this->cliAgent));
+        $symfonyStyle->getErrorStyle()->warning(UnpricedModelNotice::forEstimate(array_values($unsupportedModels)));
     }
 
     #[Override]
@@ -146,62 +145,14 @@ final readonly class AuditPresenter implements AuditPresenterInterface
     #[Override]
     public function estimatingSection(SymfonyStyle $symfonyStyle): void
     {
-        $symfonyStyle->section('Estimating audit cost (dry run)...');
+        $symfonyStyle->section(null === $this->cliAgent ? 'Estimating audit cost (dry run)...' : 'Estimating audit size (dry run)...');
     }
 
     #[Override]
     public function dryRunResult(SymfonyStyle $symfonyStyle, AuditReport $auditReport): void
     {
-        $cost = $auditReport->cost();
-
-        if ('' !== $cost->primaryModel()) {
-            $lines = [];
-            $lines[] = \sprintf('Model : %s', OutputFormatter::escape($cost->primaryModel()));
-            $lines[] = \sprintf(
-                'Tokens: %s in / %s out (total: %s)',
-                number_format($cost->inputTokens()),
-                number_format($cost->outputTokens()),
-                number_format($cost->totalTokens()),
-            );
-            $lines[] = \sprintf('Cost  : $%s (estimate)', number_format($cost->estimatedCostUsd(), 4, '.', ''));
-
-            foreach ($cost->byRole() as $role => $entry) {
-                $lines[] = \sprintf(
-                    '  %-8s (%s): $%s — %s in / %s out',
-                    $role,
-                    OutputFormatter::escape($entry['model']),
-                    number_format($entry['estimated_cost_usd'], 4, '.', ''),
-                    number_format($entry['input_tokens']),
-                    number_format($entry['output_tokens']),
-                );
-            }
-
-            $symfonyStyle->listing($lines);
-
-            $reviewerRatioPercent = $this->reviewerRatioPercent($cost);
-            if (null !== $reviewerRatioPercent) {
-                $this->caveat($symfonyStyle, \sprintf(
-                    'Reviewer input is projected at ~%d%% of attacker input in this estimate — a flat pre-run heuristic, not a measurement; actual cost scales with real findings.',
-                    $reviewerRatioPercent,
-                ));
-            }
-        }
-
-        $this->caveat($symfonyStyle, 'Dry run — no LLM calls were made. This is a cost estimate only. It excludes provider prompt-cache discounts and warm attacker/reviewer caches, so a real run typically costs less than shown.');
+        (new DryRunEstimate(null !== $this->cliAgent))->render($symfonyStyle, $auditReport->cost());
         $this->lightConfirmation($symfonyStyle, 'Dry run complete.');
-    }
-
-    private function reviewerRatioPercent(AuditCost $auditCost): ?int
-    {
-        $byRole = $auditCost->byRole();
-        $attackerInputTokens = $byRole[AgentRole::Attacker->value]['input_tokens'] ?? 0;
-        $reviewerInputTokens = $byRole[AgentRole::Reviewer->value]['input_tokens'] ?? null;
-
-        if (null === $reviewerInputTokens || 0 === $attackerInputTokens) {
-            return null;
-        }
-
-        return (int) round($reviewerInputTokens / $attackerInputTokens * 100);
     }
 
     #[Override]
@@ -233,11 +184,6 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         }
 
         $this->lightConfirmation($symfonyStyle, \sprintf('%d file(s) in scope.', \count($projectFiles)));
-    }
-
-    private function caveat(SymfonyStyle $symfonyStyle, string $message): void
-    {
-        $symfonyStyle->comment($message);
     }
 
     private function lightConfirmation(SymfonyStyle $symfonyStyle, string $message): void
