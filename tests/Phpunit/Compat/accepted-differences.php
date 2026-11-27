@@ -43,21 +43,21 @@ return [
         'scenarios' => ['cache/written-by-release', 'cache/written-by-release-batch', 'standalone/cache-written-by-release'],
         'path' => 'runs.*.stdout.json.coverage.*.status',
         'match' => '/^"cached" -> "analyzed"$/',
-        'reason' => 'The attacker prompt version went from 19 to 23 for new hunts and for the rule that leaves out test-only credentials, so a run no longer serves the attacker answers 1.22.1 cached and analyzes those chunks again.',
+        'reason' => 'The attacker prompt version went from 19 to 24 for new hunts and for the rule that leaves out test-only credentials, so a run no longer serves the attacker answers 1.22.1 cached and analyzes those chunks again.',
         'changelog' => '#693',
     ],
     [
         'scenarios' => ['cache/written-by-release', 'cache/written-by-release-batch', 'standalone/cache-written-by-release'],
         'path' => 'runs.*.stdout.json.cost.*',
         'match' => '/^(?:0|0\\.0|\\[\\]) -> /',
-        'reason' => 'The attacker prompt version went from 19 to 23 for new hunts and for the rule that leaves out test-only credentials, so a run no longer serves the attacker answers 1.22.1 cached and analyzes those chunks again.',
+        'reason' => 'The attacker prompt version went from 19 to 24 for new hunts and for the rule that leaves out test-only credentials, so a run no longer serves the attacker answers 1.22.1 cached and analyzes those chunks again.',
         'changelog' => '#693',
     ],
     [
         'scenarios' => ['cache/written-by-release', 'cache/written-by-release-batch', 'standalone/cache-written-by-release'],
         'path' => 'llm.lines',
         'match' => '/^\\+(?:attacker|attacker-json|tool-results) model=/',
-        'reason' => 'The attacker prompt version went from 19 to 23 for new hunts and for the rule that leaves out test-only credentials, so a run no longer serves the attacker answers 1.22.1 cached and analyzes those chunks again.',
+        'reason' => 'The attacker prompt version went from 19 to 24 for new hunts and for the rule that leaves out test-only credentials, so a run no longer serves the attacker answers 1.22.1 cached and analyzes those chunks again.',
         'internal' => true,
     ],
     [
@@ -290,5 +290,12 @@ return [
         'match' => '#^\\+ // (?:No LLM call was made\\. The reviewer figure assumes ~\\d+% of the attacker input\\. Prompt-cache discounts or warm caches|usually make a real run cheaper\\.)$#',
         'reason' => 'A dry run ends with one footnote in place of its two caveats.',
         'changelog' => '#763',
+    ],
+    [
+        'scenarios' => ['format/github-incomplete-run', 'format/sarif-incomplete-run', 'gate/incomplete-run', 'gate/incomplete-run-config-fail-on-incomplete', 'gate/incomplete-run-fail-on-incomplete', 'run/reviewer-accepted-spellings', 'run/reviewer-accepted-spellings-batch', 'run/reviewer-accepted-spellings-fail-on-incomplete', 'run/sloppy-findings-fail-on-incomplete', 'run/sloppy-findings-json', 'run/sloppy-findings-structured'],
+        'path' => 'runs.0.stderr.lines',
+        'match' => '#^[-+] (?:\\[(?:WARNING|ERROR)\\] Audit incomplete: \\d+ file\\(s\\) could not be fully analyzed| +(?:src/Controller/|findings there proves nothing|there proves nothing|Risk: |(?:SAFE|LOW|MEDIUM|HIGH|CRITICAL) \\| Vulnerabilities: |when this happens\\.|is set\\.|set\\.))#',
+        'reason' => 'The incomplete-audit warning names the files it could not fully analyze, the first five and then a count, which rewraps it.',
+        'changelog' => '#756',
     ],
 ];

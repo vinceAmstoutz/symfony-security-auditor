@@ -47,6 +47,7 @@ final readonly class TemplateAttackerSkill implements AttackerSkillInterface
             - {requires symfony>=8.2} `|normalize` (Symfony ≥ 8.2) on an entity with no `groups`, printed into the page or a `<script>` block — every readable property (password hash, tokens, other users' data) ships to the browser.
             - Twig Components (`<twig:Component …/>`) passing user input through `data-*` attributes without escaping (`<twig:UserCard name="{{ name|raw }}"/>`).
             - Live Components emitting `data-live-action-param` / `data-live-prop` with untrusted values — bound back to the server unchecked.
+            - {requires symfony>=8.2} `|trans_html` (Symfony ≥ 8.2) given a tag whose `attr` holds a user value in `href`, `src` or `action`, or a parameter marked `|raw`: attribute values are escaped but their scheme is not checked, so a `javascript:` URL runs (XSS).
             Do NOT flag:
             - Default `{{ value }}` interpolation — Twig auto-escapes for the active context.
             - `|raw` on values originating from a `Markdown` / `Sanitize` (HtmlSanitizer) transformation upstream — trust the sanitizer unless evidence shows otherwise.

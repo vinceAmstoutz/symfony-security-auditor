@@ -103,6 +103,46 @@ final class OversizedChunkRecoveryTest extends TestCase
         );
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_a_file_code_slicing_cannot_trim_is_not_told_to_turn_it_on(): void
+    {
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $this->recovery()->recover(
+            [ProjectFile::create('config/huge.yaml', '/app/config/huge.yaml', str_repeat('x', 2049))],
+            new ChunkContext(str_repeat('s', 400), str_repeat('u', 600), '', false, 2049),
+            'prompt is too long',
+            $recordingCoverageRecorder,
+            $this->unreachableAnalysis(),
+        );
+
+        self::assertSame('the file is too large for the model input limit: use a model with a larger context window or set scan.max_file_size_kb below 3 to skip it', $recordingCoverageRecorder->failureReasons[0]['reason']);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_a_file_code_slicing_already_trimmed_is_not_told_to_turn_it_on(): void
+    {
+        $recordingCoverageRecorder = new RecordingCoverageRecorder();
+
+        $this->recovery()->recover(
+            [ProjectFile::create('src/Huge.php', '/app/src/Huge.php', str_repeat('x', 4096))],
+            new ChunkContext(str_repeat('s', 400), str_repeat('u', 600), '', false, 4095),
+            'prompt is too long',
+            $recordingCoverageRecorder,
+            $this->unreachableAnalysis(),
+        );
+
+        self::assertSame('the file is too large for the model input limit: use a model with a larger context window or set scan.max_file_size_kb below 4 to skip it', $recordingCoverageRecorder->failureReasons[0]['reason']);
+    }
+
     private function recovery(): OversizedChunkRecovery
     {
         $vulnerabilityFactory = new VulnerabilityFactory(new NullLogger(), Validation::createValidator());
