@@ -326,4 +326,11 @@ return [
         'reason' => 'The --format and --output descriptions say that the extension of the output file picks the format when no other sets it.',
         'changelog' => '#766',
     ],
+    [
+        'scenarios' => ['standalone/help-audit'],
+        'path' => 'runs.0.stdout.lines',
+        'match' => '/^[-+](?: |$)/',
+        'reason' => 'audit:run --help describes each argument and option in one short line and rewrites its help text to fit 100 columns.',
+        'changelog' => '#755',
+    ],
 ];
