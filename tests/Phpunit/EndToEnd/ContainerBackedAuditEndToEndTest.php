@@ -63,6 +63,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ExploringAuditPl
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\FileReadingAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\MalformedResponseAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\NoticeIgnoringAuditPlatform;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\OneFileTooLargeAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\ScriptedAuditPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\EndToEnd\Fixture\UnauthorizedAuditPlatform;
 
@@ -362,6 +363,27 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         yield 'sequential json attacker' => [['audit' => ['structured_collection' => false]]];
         yield 'concurrent structured attacker' => [['profile' => 'fast']];
         yield 'concurrent json attacker' => [['profile' => 'fast', 'audit' => ['structured_collection' => false]]];
+    }
+
+    #[DataProvider('fileTheModelCannotFitCases')]
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_an_incomplete_run_names_the_file_the_model_could_not_fit_and_how_to_avoid_it(string $expected): void
+    {
+        (new Filesystem())->dumpFile($this->fixtureDir.'/src/Service/HugeImporter.php', \sprintf("<?php\nnamespace App\\Service;\nclass HugeImporter\n{\n    // %s\n%s}\n", OneFileTooLargeAuditPlatform::TOO_LARGE_MARKER, str_repeat("    public const string ROW = 'a generated mapping row that fills the file';\n", 3000)));
+
+        $display = $this->runAudit(['model' => 'gpt-4o'], 'console', OneFileTooLargeAuditPlatform::class);
+
+        self::assertStringContainsString($expected, (string) preg_replace('/\s+/', ' ', $display));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function fileTheModelCannotFitCases(): iterable
+    {
+        yield 'the incomplete-audit warning' => ['could not be fully analyzed: src/Service/HugeImporter.php. The absence of findings there proves nothing.'];
+        yield 'the failed chunk line' => ['src/Service/HugeImporter.php: the file is too large for the model input limit: turn on audit.code_slicing.enabled'];
     }
 
     #[RunInSeparateProcess]

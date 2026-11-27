@@ -184,9 +184,9 @@ A chunk exceeds the model's input window, `audit.rate_limit.input_tokens_per_min
 
 A single file that still does not fit is recorded as errored (`Attacker chunk exceeds the model input limit as a single file; …`), as is a lone finding the reviewer cannot fit. To get it analyzed:
 
-- Turn on `audit.code_slicing.enabled` (the `fast` profile does).
+- Turn on `audit.code_slicing.enabled` for a PHP file (the `fast` profile does).
 - Use an attacker model with a larger context window (`attacker_model`).
-- Leave generated or vendored trees out of `scan.included_paths`.
+- Leave generated or vendored trees out of `scan.included_paths`, or skip the file with `scan.max_file_size_kb` set below the size the failed chunk line names.
 
 When even a small file is refused, the run stops: the system prompt and project mapping fill the window.
 
@@ -296,7 +296,7 @@ The chunk's files are recorded as errored, left out of the cache and counted und
 | `the model returned no content` | Retry; switch model if every chunk fails. |
 | `the answer was not valid JSON` | See [`Failed to parse …`](#failed-to-parse-attacker-agent-json-response--failed-to-parse-reviewer-response). |
 | `a finding the record tool refused was never recorded again` | The model never repeated a refused `record_vulnerability` call, so that finding is lost. Retry; switch model if every chunk fails. |
-| `the file is too large for the model input limit` | See [`prompt is too long`](#prompt-is-too-long--context_length_exceeded--http-413). |
+| `the file is too large for the model input limit: …` | The rest of the line names the fix: `turn on audit.code_slicing.enabled` (only for a PHP file the run did not slice), `use a model with a larger context window` and `set scan.max_file_size_kb below N to skip it`, where `N` is the size of the file in KB. See [`prompt is too long`](#prompt-is-too-long--context_length_exceeded--http-413). |
 | any other message | An unexpected failure; the run went on. Read the message (also in the Symfony log). |
 
 ### `Audit incomplete: N file(s) could not be fully analyzed`

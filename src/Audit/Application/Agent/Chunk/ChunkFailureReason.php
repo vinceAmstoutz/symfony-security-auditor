@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\Chunk;
 
 use Throwable;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 
 use function Symfony\Component\String\u;
 
@@ -26,11 +27,23 @@ final readonly class ChunkFailureReason
 {
     public const string NOT_JSON = 'the answer was not valid JSON';
 
-    public const string FILE_TOO_LARGE = 'the file is too large for the model input limit';
-
     public const string RECORDING_REFUSED = 'a finding the record tool refused was never recorded again';
 
     private const int MAX_MESSAGE_LENGTH = 120;
+
+    /**
+     * Suggests code slicing only for a PHP file the prompt carried untrimmed.
+     */
+    public static function fileTooLarge(ProjectFile $projectFile, int $promptedFileBytes): string
+    {
+        $fileBytes = \strlen($projectFile->content());
+
+        return \sprintf(
+            'the file is too large for the model input limit: %suse a model with a larger context window or set scan.max_file_size_kb below %d to skip it',
+            $promptedFileBytes >= $fileBytes && u($projectFile->relativePath())->endsWith('.php') ? 'turn on audit.code_slicing.enabled, ' : '',
+            intdiv($fileBytes + 1023, 1024),
+        );
+    }
 
     public static function fromStopReason(string $stopReason): string
     {
