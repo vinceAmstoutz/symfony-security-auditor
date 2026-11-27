@@ -1,0 +1,19 @@
+name: Bot conflicts
+
+on:
+  push:
+    branches: ["*.x"]
+
+permissions: {}
+
+jobs:
+  conflicts:
+    name: Ask the bot to merge the base branch into the conflicting pull requests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Start the bot's conflicts workflow
+        env:
+          GH_TOKEN: ${{ secrets.BOT_DISPATCH_TOKEN }}
+        run: gh workflow run conflicts.yaml -R vinceAmstoutz/vince-bot
