@@ -53,7 +53,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `doctor` warns about that placeholder or a model the Ollama server has not pulled; `audit:run` on Ollama notes a configured model the server has not pulled, in the binary and the bundle; an error from a provider that does not know the model names it and the setting that fixes it ([#733](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/733))
 - An interactive `init` preselects no answer to how you access AI models and which provider or subscription you use: an empty answer asks again. `init --no-interaction` still configures `anthropic` ([#752](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/752))
 - `audit:run --format=html` without `--output` on a terminal saves the report to a file only you can read in the temporary directory and prints a `file://` link to open it in a browser, instead of printing the HTML; piped or redirected, it still prints the HTML ([#757](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/757))
-- `audit:run` says where it saved the report on a plain line whose path links to the file, in place of a green `[OK]` block stacked on the verdict, so a failed run no longer reads as a success. The temporary HTML report gets one line with its `file://` link
+- `audit:run` says where it saved the report on a plain line whose path links to the file, in place of a green `[OK]` block stacked on the verdict, so a failed run no longer reads as a success. The temporary HTML report gets one line with its `file://` link ([#765](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/765))
 
 ### Bugfixes 🐛
 

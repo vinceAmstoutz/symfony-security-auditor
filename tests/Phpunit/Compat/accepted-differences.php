@@ -275,6 +275,6 @@ return [
         'path' => 'runs.*.stdout.lines',
         'match' => '/^(?:- \\[OK\\] Report saved to .+|\\+ Report saved to .+|-)$/',
         'reason' => 'The saved report is named on a plain line whose path links to the file, in place of an [OK] block.',
-        'changelog' => '#999999',
+        'changelog' => '#765',
     ],
 ];
