@@ -37,7 +37,7 @@ final readonly class UnpricedModelBudgetGuard implements UnpricedModelBudgetGuar
     public function permitsRun(InputInterface $input, SymfonyStyle $symfonyStyle): bool
     {
         $unpricedModels = $this->unpricedModels();
-        if ([] === $unpricedModels) {
+        if ([] === $unpricedModels || $this->subscriptionWithoutBudget()) {
             return true;
         }
 
@@ -60,6 +60,11 @@ final readonly class UnpricedModelBudgetGuard implements UnpricedModelBudgetGuar
         $errorStyle->error(UnpricedModelNotice::forBudgetRefusal($this->cliAgent));
 
         return false;
+    }
+
+    private function subscriptionWithoutBudget(): bool
+    {
+        return null !== $this->cliAgent && null === $this->maxCostUsd;
     }
 
     /**
