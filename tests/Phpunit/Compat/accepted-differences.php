@@ -271,6 +271,27 @@ return [
         'changelog' => '#758',
     ],
     [
+        'scenarios' => ['option/dry-run', 'option/show-scanned-dry-run', 'standalone/dry-run'],
+        'path' => 'runs.*.stdout.lines',
+        'match' => '#^(?:[-+] (?:// )?(?:Reviewer input is projected at |actual cost scales with real findings\\.|Dry run \\xE2\\x80\\x94 no LLM calls were made\\.|attacker/reviewer caches, so a real run|Tip: run with --show-scanned )|\\+$)#',
+        'reason' => 'A dry run prints its caveats and the --show-scanned tip as // comment lines wrapped between words, in place of dimmed lines that ran past the terminal width.',
+        'changelog' => '#751',
+    ],
+    [
+        'scenarios' => ['baseline/generated-by-release-console', 'format/console', 'format/console-no-finding', 'format/console-to-file', 'format/executive-to-file', 'format/github-comment-to-file', 'format/github-to-file', 'format/html-to-file', 'format/json-to-file', 'format/junit-to-file', 'format/markdown-to-file', 'format/sarif-to-file', 'option/generate-baseline-console', 'option/project-path-omitted', 'option/project-path-only', 'output/config-key', 'output/dev-null', 'output/existing-file', 'output/missing-directory', 'output/relative-path', 'output/short-option', 'run/empty-project-console', 'run/scan-layout-formats', 'standalone/format-console', 'standalone/output-dev-null', 'standalone/output-file'],
+        'path' => 'runs.*.stdout.lines',
+        'match' => '/^(?:\\+ \\/\\/ An audit takes minutes, 20\\+ on large projects\\. Progress streams below\\.|- Live progress and findings stream below as they happen\\.)$/',
+        'reason' => 'The long-run notice is one shorter // line in the terminal colour, in place of two dimmed lines.',
+        'changelog' => '#751',
+    ],
+    [
+        'scenarios' => ['option/dry-run', 'option/show-scanned-dry-run', 'standalone/dry-run'],
+        'path' => 'runs.*.stdout.lines',
+        'match' => '#^\\+ // (?:No LLM call was made\\. The reviewer figure assumes ~\\d+% of the attacker input\\. Prompt-cache discounts or warm caches|usually make a real run cheaper\\.)$#',
+        'reason' => 'A dry run ends with one footnote in place of its two caveats.',
+        'changelog' => '#763',
+    ],
+    [
         'scenarios' => ['baseline/generated-by-release-console', 'format/console', 'format/console-no-finding', 'format/console-to-file', 'format/executive-to-file', 'format/github-comment-to-file', 'format/github-to-file', 'format/html-to-file', 'format/json-to-file', 'format/junit-to-file', 'format/markdown-to-file', 'format/sarif-to-file', 'option/dry-run', 'option/generate-baseline-console', 'option/project-path-omitted', 'option/project-path-only', 'option/show-scanned', 'option/show-scanned-dry-run', 'output/config-key', 'output/dev-null', 'output/directory', 'output/existing-file', 'output/missing-directory', 'output/relative-path', 'output/short-option', 'run/empty-project-console', 'run/scan-layout-formats', 'standalone/dry-run', 'standalone/format-console', 'standalone/output-dev-null', 'standalone/output-file', 'standalone/show-scanned', 'standalone/stack-working-directory-scan-paths'],
         'path' => 'runs.*.stdout.lines',
         'match' => '/^- Pipeline: Ingestion -> Mapping -> Audit \\(Attacker vs Reviewer\\)$/',

@@ -1695,8 +1695,7 @@ final class AuditCommandEndToEndTest extends TestCase
             '--dry-run' => true,
         ]);
 
-        self::assertStringContainsString('Reviewer input is projected at ~', $commandTester->getDisplay());
-        self::assertStringContainsString('% of attacker input', $commandTester->getDisplay());
+        self::assertMatchesRegularExpression('/The reviewer figure assumes ~\\d+% of the attacker input\\./', (string) preg_replace('/[\\s\\/]+/', ' ', $commandTester->getDisplay()));
     }
 
     /**
@@ -1921,7 +1920,7 @@ final class AuditCommandEndToEndTest extends TestCase
         $commandTester = $this->makeCommandTester('[]', '{}');
         $commandTester->execute(['project-path' => $this->fixtureDir]);
 
-        self::assertStringContainsString('20+ minutes', $commandTester->getDisplay());
+        self::assertStringContainsString('20+ on large projects', $commandTester->getDisplay());
     }
 
     /**
