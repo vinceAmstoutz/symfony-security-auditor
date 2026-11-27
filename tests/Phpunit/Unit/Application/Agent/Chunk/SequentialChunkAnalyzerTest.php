@@ -196,7 +196,7 @@ final class SequentialChunkAnalyzerTest extends TestCase
 
         $this->analyzer($llmClient, $attackerCache, false, progressReporter: $recordingProgressReporter)->analyze([[$this->makeFileOfSize('src/A.php', 16384)]], $this->request(), new RecordingCoverageRecorder(), null, new RiskMarkerIndex([]));
 
-        self::assertSame('the file is too large for the model input limit: turn on audit.code_slicing.enabled, skip it with a lower scan.max_file_size_kb or use a model with a larger context window', $recordingProgressReporter->eventsNamed('attacker.chunk.completed')[0]['reason']);
+        self::assertSame('the file is too large for the model input limit: turn on audit.code_slicing.enabled, use a model with a larger context window or set scan.max_file_size_kb below 16 to skip it', $recordingProgressReporter->eventsNamed('attacker.chunk.completed')[0]['reason']);
     }
 
     private function vulnerabilityFactory(): VulnerabilityFactory

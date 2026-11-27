@@ -184,9 +184,9 @@ A chunk exceeds the model's input window, `audit.rate_limit.input_tokens_per_min
 
 A single file that still does not fit is recorded as errored (`Attacker chunk exceeds the model input limit as a single file; …`), as is a lone finding the reviewer cannot fit. To get it analyzed:
 
-- Turn on `audit.code_slicing.enabled` (the `fast` profile does).
+- Turn on `audit.code_slicing.enabled` for a PHP file (the `fast` profile does).
 - Use an attacker model with a larger context window (`attacker_model`).
-- Leave generated or vendored trees out of `scan.included_paths`.
+- Leave generated or vendored trees out of `scan.included_paths`, or skip the file with `scan.max_file_size_kb` set below the size the failed chunk line names.
 
 When even a small file is refused, the run stops: the system prompt and project mapping fill the window.
 
