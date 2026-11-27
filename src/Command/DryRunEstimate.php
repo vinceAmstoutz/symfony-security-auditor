@@ -36,7 +36,7 @@ final readonly class DryRunEstimate
             $symfonyStyle->listing($this->lines($auditCost));
         }
 
-        $symfonyStyle->comment(DryRunFootnote::of(self::reviewerRatioPercent($auditCost), $this->onSubscription));
+        $symfonyStyle->comment(DryRunFootnote::of($this->reviewerRatioPercent($auditCost), $this->onSubscription));
     }
 
     /**
@@ -72,7 +72,7 @@ final readonly class DryRunEstimate
             : \sprintf('  %-8s (%s): $%s — %s', $role, OutputFormatter::escape($entry['model']), number_format($entry['estimated_cost_usd'], 4, '.', ''), $tokens);
     }
 
-    private static function reviewerRatioPercent(AuditCost $auditCost): ?int
+    private function reviewerRatioPercent(AuditCost $auditCost): ?int
     {
         $byRole = $auditCost->byRole();
         $attackerInputTokens = $byRole[AgentRole::Attacker->value]['input_tokens'] ?? 0;
