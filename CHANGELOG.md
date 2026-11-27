@@ -62,6 +62,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `audit:run` names the files it could not fully analyze in its incomplete-audit warning (the first five, then a count). Each failed chunk line names its files too. A file too large for the model says to use a model with a larger context window or to set `scan.max_file_size_kb` below its size. It suggests turning on `audit.code_slicing.enabled` only when that can still trim the file ([#756](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/756))
 - The `attacker.chunk.completed` progress event of a failed chunk lists the files it left unanalyzed under `files` ([#756](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/756))
 - `audit:run` no longer prints the fixed `Pipeline:` line under the project path; `-v` still shows it ([#760](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/760))
+- `audit:run` on a Claude or ChatGPT subscription says on its `Billing:` line that the run is not priced per call, in place of a separate warning block, unless the CLI cannot tell which account it bills. With `audit.budget.max_cost_usd` set, or an API key billing instead, the warnings stay ([#761](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/761))
 - `audit:run --help` describes each argument and option in one short line. Its help text fits a 100-column terminal ([#755](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/755))
 
 ### Bugfixes 🐛
