@@ -41,6 +41,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilitySeverit
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityType;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\PricingProviderInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\ExitCode;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\WorkflowCommandNeutralizer;
 
 final class AuditPresenterTest extends TestCase
@@ -376,6 +377,37 @@ final class AuditPresenterTest extends TestCase
         $rendered = $bufferedOutput->fetch();
         self::assertStringNotContainsString("\x1b", $rendered);
         self::assertStringNotContainsString('##[', $rendered);
+    }
+
+    /**
+     * @throws InvalidAuditContextException
+     * @throws InvalidProjectFileException
+     */
+    #[DataProvider('incompleteAuditBlocks')]
+    public function test_an_incomplete_audit_on_a_github_actions_runner_defuses_a_workflow_command_in_a_file_name(int $exitCode, string $block): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $auditPresenter = new AuditPresenter($this->pricingProviderKnowing(), workflowCommandNeutralizer: new WorkflowCommandNeutralizer(true));
+        $auditContext = $this->contextWithAFile();
+        $auditContext->recordCoverage('attacker', 'src/Analyzed.php', 'analyzed');
+        $auditContext->recordCoverage('attacker', 'src/a ::stop-commands::x.php', 'errored');
+
+        $auditPresenter->incompleteRunNotice(new SymfonyStyle(new StringInput(''), $bufferedOutput), AuditReport::fromContext($auditContext), $exitCode, '--fail-on-incomplete');
+
+        $rendered = $bufferedOutput->fetch();
+        self::assertStringContainsString($block, $rendered);
+        self::assertStringContainsString(':\\:stop-commands:\\:x.php', $rendered);
+        self::assertStringNotContainsString('::', $rendered);
+    }
+
+    /**
+     * @return iterable<string, array{int, string}>
+     */
+    public static function incompleteAuditBlocks(): iterable
+    {
+        yield 'the warning of a run that passes' => [Command::SUCCESS, '[WARNING]'];
+        yield 'the warning of a run a gate fails' => [Command::FAILURE, '[WARNING]'];
+        yield 'the error of a run that fails on incomplete' => [ExitCode::Incomplete->value, '[ERROR]'];
     }
 
     /**
