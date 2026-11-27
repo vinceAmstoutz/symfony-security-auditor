@@ -45,6 +45,12 @@ final readonly class CodexSubscriptionCli implements SubscriptionCliInterface
     }
 
     #[Override]
+    public function suggestedReviewerModel(): string
+    {
+        return 'gpt-6-luna';
+    }
+
+    #[Override]
     public function loginCommand(): string
     {
         return 'codex login';

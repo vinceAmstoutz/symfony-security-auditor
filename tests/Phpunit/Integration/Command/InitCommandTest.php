@@ -377,6 +377,26 @@ final class InitCommandTest extends TestCase
         self::assertStringStartsWith(' How do you access AI models? Pick a number, or type a provider name: [1] ', $this->unwrappedDisplay($commandTester));
     }
 
+    public function test_it_emphasizes_that_the_first_model_question_is_about_the_auditor(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'codex', '', '', '']);
+
+        $commandTester->execute([], ['decorated' => true]);
+
+        self::assertStringContainsString("\e[1mauditor\e[22m\e[32m use?", $commandTester->getDisplay());
+    }
+
+    public function test_it_emphasizes_that_the_second_model_question_is_about_reviewing_the_findings(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([(string) (1 + (int) array_search(ModelAccess::Subscription, ModelAccess::cases(), true)), 'codex', '', '', '']);
+
+        $commandTester->execute([], ['decorated' => true]);
+
+        self::assertStringContainsString("\e[1mreview the findings\e[22m\e[32m?", $commandTester->getDisplay());
+    }
+
     public function test_it_asks_the_model_of_a_chatgpt_subscription_suggesting_gpt_6_2_sol(): void
     {
         $commandTester = $this->commandTester();
