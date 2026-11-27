@@ -52,7 +52,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `init --no-interaction` without `--model` picks the first model Ollama pulled and warns when it writes `claude-opus-5-5` as a placeholder for a provider it cannot list models for, marking that line of `config.yaml` with a comment ([#733](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/733))
 - `doctor` warns about that placeholder or a model the Ollama server has not pulled; `audit:run` on Ollama notes a configured model the server has not pulled, in the binary and the bundle; an error from a provider that does not know the model names it and the setting that fixes it ([#733](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/733))
 - An interactive `init` preselects no answer to how you access AI models and which provider or subscription you use: an empty answer asks again. `init --no-interaction` still configures `anthropic` ([#752](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/752))
-- `audit:run` on a Claude or ChatGPT subscription says on its `Billing:` line that the run is not priced per call, in place of a separate warning block. With `audit.budget.max_cost_usd` set, or an API key billing instead, the warnings stay ([#761](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/761))
+- `audit:run` on a Claude or ChatGPT subscription says on its `Billing:` line that the run is not priced per call, in place of a separate warning block, unless the CLI cannot tell which account it bills. With `audit.budget.max_cost_usd` set, or an API key billing instead, the warnings stay ([#761](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/761))
 
 ### Bugfixes 🐛
 

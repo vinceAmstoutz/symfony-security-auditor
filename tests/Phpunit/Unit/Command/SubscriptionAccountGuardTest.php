@@ -142,13 +142,13 @@ final class SubscriptionAccountGuardTest extends TestCase
     /**
      * @throws RunRefusedException
      */
-    public function test_it_says_the_subscription_is_not_priced_per_call_when_the_cli_cannot_tell_which_account_it_bills(): void
+    public function test_it_does_not_say_the_run_is_not_priced_per_call_when_the_cli_cannot_tell_which_account_it_bills(): void
     {
         $bufferedOutput = new BufferedOutput();
 
         $this->guard(CliAgentAccount::unknown('"claude auth status" failed'))->permitsRun(new ArrayInput([]), new SymfonyStyle(new ArrayInput([]), $bufferedOutput));
 
-        self::assertStringContainsString(', not priced per call', $bufferedOutput->fetch());
+        self::assertStringNotContainsString(', not priced per call', $bufferedOutput->fetch());
     }
 
     /**
