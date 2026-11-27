@@ -61,6 +61,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - `auth:set` on a Claude or ChatGPT subscription names the command that signs its CLI in (`claude auth login` or `codex login`) instead of only saying there is no key to store ([#754](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/754))
 - `audit:run` names the files it could not fully analyze in its incomplete-audit warning (the first five, then a count). Each failed chunk line names its files too. A file too large for the model says to use a model with a larger context window or to set `scan.max_file_size_kb` below its size. It suggests turning on `audit.code_slicing.enabled` only when that can still trim the file ([#756](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/756))
 - The `attacker.chunk.completed` progress event of a failed chunk lists the files it left unanalyzed under `files` ([#756](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/756))
+- `audit:run` no longer prints the fixed `Pipeline:` line under the project path; `-v` still shows it ([#760](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/760))
 - The console, HTML and Markdown reports of a run on a Claude or ChatGPT subscription show the subscription and plan the run checked it bills, such as `billed to your Claude subscription (team plan)`, in place of a `$0.0000` cost with a note about API keys. The account email stays out of the report ([#767](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/767))
 
 ### Bugfixes 🐛
