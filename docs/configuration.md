@@ -436,7 +436,7 @@ SYMFONY_SECURITY_AUDITOR_HOME=/app/var/ssa symfony-security-auditor init
 # → /app/var/ssa/.config/symfony-security-auditor/config.yaml
 ```
 
-Run [`init`](#init-generating-the-standalone-configuration) to write the file and install the provider bridge, pinned to the binary's PHP and `symfony/ai-platform` release. When an upgrade changes that release, `audit`, `mcp:serve` and `doctor` report the bridge as stale: rebuild it with `init --provider=<your provider> --force`.
+Run [`init`](#init-generating-the-standalone-configuration) to write the file and install the provider bridge, pinned to the binary's PHP and `symfony/ai-platform` release. Where nobody answers its questions, as in the image build above, it continues as `init --no-interaction` does and configures `anthropic`: pass `--provider` and `--model` for another provider. When an upgrade changes that release, `audit`, `mcp:serve` and `doctor` report the bridge as stale: rebuild it with `init --provider=<your provider> --force`.
 
 The file is **rootless**: it takes the same keys as the bundle configuration above, without the `symfony_security_auditor:` wrapper, plus three standalone-only top-level keys:
 
@@ -979,7 +979,7 @@ The audit runs on the auditor's own configured platform and models and bills tha
 
 ### `init`: generating the standalone configuration
 
-Standalone only. Writes `config.yaml` and installs the provider bridge with the Composer the binary bundles. _Since 1.23_ it first asks how you access AI models (a Claude or ChatGPT [subscription](#running-on-a-subscription), an API key, a local model such as Ollama, an AI gateway or a cloud account), then lists the matching providers and the newest model of each family with its price per million tokens, defaulting to `claude-opus-5-5` where listed. Type any other provider or model id to skip a list. It can end with one test request, sent only on `yes`. Each option given skips its prompt; under `--no-interaction` a missing option takes its default and a platform that needs a URL is refused rather than written half-configured. A model `init` writes as a placeholder is marked with a comment in `config.yaml`; `doctor` warns about it until it is replaced.
+Standalone only. Writes `config.yaml` and installs the provider bridge with the Composer the binary bundles. _Since 1.23_ it first asks how you access AI models (a Claude or ChatGPT [subscription](#running-on-a-subscription), an API key, a local model such as Ollama, an AI gateway or a cloud account), then lists the matching providers and the newest model of each family with its price per million tokens, defaulting to `claude-opus-5-5` where listed. Type any other provider or model id to skip a list. It can end with one test request, sent only on `yes`. Each option given skips its prompt; under `--no-interaction` a missing option takes its default and a platform that needs a URL is refused rather than written half-configured. At a terminal an empty answer to the access or provider question asks again. When the input ends before that answer (a Dockerfile `RUN`, a CI step, `init </dev/null`), or gives three empty answers away from a terminal, `init` says so and continues as with `--no-interaction`. A model `init` writes as a placeholder is marked with a comment in `config.yaml`; `doctor` warns about it until it is replaced.
 
 | Option | Default | Description |
 | --- | --- | --- |

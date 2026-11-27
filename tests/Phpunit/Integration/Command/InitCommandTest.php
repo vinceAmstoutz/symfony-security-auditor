@@ -34,6 +34,8 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\ModelsDevP
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Pricing\PricedModelListInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\InitCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ModelAccess;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\StandardInput;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\StandardInputInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\FailingBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingBridgeInstaller;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\RecordingConnectionTestRunner;
@@ -2535,6 +2537,110 @@ final class InitCommandTest extends TestCase
         self::assertSame('anthropic', $this->configuredValue('provider'));
     }
 
+    public function test_it_configures_anthropic_when_the_input_ends_before_any_answer(): void
+    {
+        $exitCode = $this->commandTester()->execute([]);
+
+        self::assertSame([Command::SUCCESS, 'anthropic'], [$exitCode, $this->configuredValue('provider')]);
+    }
+
+    public function test_it_says_that_it_continues_without_interaction_when_the_input_ends_before_any_answer(): void
+    {
+        $commandTester = $this->commandTester();
+
+        $commandTester->execute([]);
+
+        self::assertStringContainsString('> No answer was given: init continues as with --no-interaction. Installing support for Anthropic', $this->unwrappedDisplay($commandTester));
+    }
+
+    /**
+     * @param list<string> $answers
+     */
+    #[DataProvider('answersThatNameNoProvider')]
+    public function test_once_the_input_ended_it_prints_what_a_run_that_cannot_ask_prints(array $answers): void
+    {
+        $unasked = $this->commandTester(recordingConnectionTestRunner: new RecordingConnectionTestRunner());
+        $unasked->execute([], ['interactive' => false]);
+        (new Filesystem())->remove($this->configFile());
+        $ended = $this->commandTester(recordingConnectionTestRunner: new RecordingConnectionTestRunner());
+        $ended->setInputs($answers);
+
+        $ended->execute([]);
+
+        self::assertStringEndsWith('init continues as with --no-interaction.'.$this->unwrappedDisplay($unasked), $this->unwrappedDisplay($ended));
+    }
+
+    /**
+     * @return iterable<string, array{list<string>}>
+     */
+    public static function answersThatNameNoProvider(): iterable
+    {
+        yield 'no answer' => [[]];
+        yield 'an empty answer' => [['']];
+    }
+
+    public function test_it_configures_anthropic_when_the_input_ends_after_an_empty_answer(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['']);
+
+        $exitCode = $commandTester->execute([]);
+
+        self::assertSame([Command::SUCCESS, 'anthropic'], [$exitCode, $this->configuredValue('provider')]);
+    }
+
+    public function test_it_stops_asking_an_input_that_keeps_answering_nothing(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['', '', '', 'openai', 'gpt-5.4', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('anthropic', $this->configuredValue('provider'));
+    }
+
+    public function test_away_from_a_terminal_it_still_takes_the_third_answer(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs(['', '', 'openai', 'gpt-5.4', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('openai', $this->configuredValue('provider'));
+    }
+
+    public function test_it_stops_asking_which_provider_an_input_that_keeps_answering_nothing(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Cloud->value, '', '', '', 'vertexai', 'gemini-3-pro', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('anthropic', $this->configuredValue('provider'));
+    }
+
+    public function test_it_configures_anthropic_when_the_input_ends_before_the_provider_is_named(): void
+    {
+        $commandTester = $this->commandTester();
+        $commandTester->setInputs([ModelAccess::Subscription->value]);
+
+        $exitCode = $commandTester->execute([]);
+
+        self::assertSame([Command::SUCCESS, 'anthropic'], [$exitCode, $this->configuredValue('provider')]);
+    }
+
+    public function test_at_a_terminal_it_asks_again_for_as_long_as_the_answer_is_empty(): void
+    {
+        $standardInput = self::createStub(StandardInputInterface::class);
+        $standardInput->method('isTerminal')->willReturn(true);
+        $commandTester = $this->commandTester(standardInput: $standardInput);
+        $commandTester->setInputs(['', '', '', 'openai', 'gpt-5.4', '']);
+
+        $commandTester->execute([]);
+
+        self::assertSame('openai', $this->configuredValue('provider'));
+    }
+
     public function test_a_run_that_cannot_ask_leaves_an_existing_configuration_untouched(): void
     {
         (new Filesystem())->dumpFile($this->configFile(), "model: keep-me\n");
@@ -2551,7 +2657,7 @@ final class InitCommandTest extends TestCase
     /**
      * @param list<string> $pulledModels
      */
-    private function commandTester(?PricedModelListInterface $pricedModelList = null, ?RecordingConnectionTestRunner $recordingConnectionTestRunner = null, array $pulledModels = []): CommandTester
+    private function commandTester(?PricedModelListInterface $pricedModelList = null, ?RecordingConnectionTestRunner $recordingConnectionTestRunner = null, array $pulledModels = [], StandardInputInterface $standardInput = new StandardInput()): CommandTester
     {
         $pulledModelList = self::createStub(PulledModelListInterface::class);
         $pulledModelList->method('pulledModels')->willReturn($pulledModels);
@@ -2565,6 +2671,7 @@ final class InitCommandTest extends TestCase
             pricedModelList: $pricedModelList,
             connectionTestRunner: $recordingConnectionTestRunner,
             pulledModelList: $pulledModelList,
+            standardInput: $standardInput,
         );
 
         return new CommandTester($initCommand);
