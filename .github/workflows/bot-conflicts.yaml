@@ -9,6 +9,7 @@ permissions: {}
 jobs:
   conflicts:
     name: Ask the bot to merge the base branch into the conflicting pull requests
+    if: github.repository == 'vinceAmstoutz/symfony-security-auditor'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
