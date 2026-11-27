@@ -399,6 +399,28 @@ final class SymfonySecurityAuditorBundleTest extends TestCase
 
     /**
      * @throws RunRefusedException
+     * @throws InvalidAuditContextException
+     * @throws InvalidAuditCostException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(4000)]
+    public function test_a_cli_agent_report_names_the_plan_the_run_checked_it_bills(): void
+    {
+        $kernel = $this->boot(['model' => 'claude-opus-5-5', 'cli_agent' => ['platform' => 'claudecode', 'cli_binary' => $this->fakeClaudeCli()]], registerPlatform: false);
+        $unpricedModelBudgetGuard = $this->getPrivateService($kernel, UnpricedModelBudgetGuardInterface::class);
+        self::assertInstanceOf(UnpricedModelBudgetGuardInterface::class, $unpricedModelBudgetGuard);
+        $htmlReportRenderer = $this->getPrivateService($kernel, HtmlReportRenderer::class);
+        self::assertInstanceOf(HtmlReportRenderer::class, $htmlReportRenderer);
+        $input = new ArrayInput([]);
+        $input->setInteractive(false);
+
+        $unpricedModelBudgetGuard->permitsRun($input, new SymfonyStyle($input, new BufferedOutput()));
+
+        self::assertStringContainsString('<dd>billed to your Claude subscription (pro plan)</dd>', $htmlReportRenderer->render(AuditReport::fromContext(AuditContext::forProject($this->tmpDir), AuditCost::of(100, 50, 0.0, 'claude-opus-5-5'))));
+    }
+
+    /**
+     * @throws RunRefusedException
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(4000)]

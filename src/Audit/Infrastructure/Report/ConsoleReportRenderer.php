@@ -26,6 +26,7 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
     public function __construct(
         private TemplateLoader $templateLoader = new TemplateLoader(),
         private ?string $subscription = null,
+        private BilledSubscriptionHolder $billedSubscriptionHolder = new BilledSubscriptionHolder(),
     ) {}
 
     #[Override]
@@ -49,8 +50,7 @@ final readonly class ConsoleReportRenderer implements ReportRendererInterface
             '{{filesScanned}}' => $auditReport->filesScanned(),
             '{{tokens}}' => \sprintf('%s in / %s out', number_format($cost->inputTokens()), number_format($cost->outputTokens())),
             '{{primaryModel}}' => '' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel(),
-            '{{cost}}' => number_format($cost->estimatedCostUsd(), 4, '.', ''),
-            '{{costRateLabel}}' => CostRateLabel::of($cost, $this->subscription),
+            '{{costLine}}' => CostLine::of($cost, $this->subscription, $this->billedSubscriptionHolder->billedSubscription()),
             '{{riskLevel}}' => RiskHeadline::riskLevel($auditReport),
             '{{riskDetail}}' => RiskHeadline::scoreDetail($auditReport, 'Score:'),
             '{{body}}' => $this->body($auditReport),

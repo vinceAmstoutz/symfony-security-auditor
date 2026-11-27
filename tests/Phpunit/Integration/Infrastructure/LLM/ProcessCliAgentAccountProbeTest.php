@@ -49,7 +49,7 @@ final class ProcessCliAgentAccountProbeTest extends TestCase
     {
         $cli = $this->fakeCli(self::CLAUDE_ARGUMENTS, '{"loggedIn":true,"authMethod":"claude.ai","apiProvider":"firstParty","email":"dev@example.com","subscriptionType":"max"}');
 
-        self::assertEquals(CliAgentAccount::subscription('max plan, dev@example.com'), (new ProcessCliAgentAccountProbe())->probe('claudecode', $cli));
+        self::assertEquals(CliAgentAccount::subscription('max plan, dev@example.com', 'max plan'), (new ProcessCliAgentAccountProbe())->probe('claudecode', $cli));
     }
 
     public function test_it_reports_the_api_key_claude_bills_in_place_of_the_subscription(): void
@@ -65,7 +65,7 @@ final class ProcessCliAgentAccountProbeTest extends TestCase
         $this->filesystem->dumpFile($cli, "#!/bin/sh\n[ \"\$*\" = 'auth status --json' ] || exit 64\nif [ -f \"\$CLAUDE_CONFIG_DIR/settings.json\" ] || [ -z \"\$CLAUDE_CONFIG_DIR\" ]; then echo '{\"loggedIn\":true,\"subscriptionType\":\"max\",\"apiKeySource\":\"apiKeyHelper\"}'; else echo '{\"loggedIn\":true}'; fi\n");
         $this->filesystem->chmod($cli, 0o755);
 
-        self::assertEquals(CliAgentAccount::subscription('max plan'), (new ProcessCliAgentAccountProbe())->probe('claudecode', $cli));
+        self::assertEquals(CliAgentAccount::subscription('max plan', 'max plan'), (new ProcessCliAgentAccountProbe())->probe('claudecode', $cli));
     }
 
     public function test_it_cannot_tell_the_account_of_a_login_that_names_no_plan_besides_an_api_key_helper_the_audit_ignores(): void

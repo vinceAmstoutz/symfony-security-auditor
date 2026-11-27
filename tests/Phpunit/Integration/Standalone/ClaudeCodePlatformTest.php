@@ -311,7 +311,7 @@ final class ClaudeCodePlatformTest extends TestCase
      */
     #[RunInSeparateProcess]
     #[MaximumDuration(8000)]
-    public function test_the_report_of_a_run_on_a_claude_subscription_says_it_is_not_priced_per_call(): void
+    public function test_the_report_of_a_run_on_a_claude_subscription_names_the_plan_it_billed(): void
     {
         $project = $this->workingDirectory.'/project';
         (new Filesystem())->dumpFile($project.'/src/Controller/HomeController.php', "<?php\n\nfinal class HomeController {}\n");
@@ -321,7 +321,7 @@ final class ClaudeCodePlatformTest extends TestCase
 
         $commandTester->execute(['project-path' => $project], ['interactive' => false]);
 
-        self::assertStringContainsString('not priced per call: billed to your Claude subscription, or to an API key the CLI uses in its place', (string) preg_replace('/[\s!]+/', ' ', $commandTester->getDisplay()));
+        self::assertStringContainsString('Cost : billed to your Claude subscription (max plan)', (string) preg_replace('/[\s!]+/', ' ', $commandTester->getDisplay()));
     }
 
     /**

@@ -26,6 +26,7 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
      */
     public function __construct(
         private ?string $subscription = null,
+        private BilledSubscriptionHolder $billedSubscriptionHolder = new BilledSubscriptionHolder(),
     ) {}
 
     #[Override]
@@ -50,12 +51,11 @@ final readonly class MarkdownReportRenderer implements ReportRendererInterface
                 number_format($auditReport->durationSeconds(), 1, '.', ''),
             ),
             \sprintf(
-                '**Tokens:** %s in / %s out · **Model:** %s · **Cost:** $%s (%s)',
+                '**Tokens:** %s in / %s out · **Model:** %s · **Cost:** %s',
                 number_format($cost->inputTokens()),
                 number_format($cost->outputTokens()),
                 '' === $cost->primaryModel() ? 'unknown model' : MarkdownTextEscaper::fences($cost->primaryModel()),
-                number_format($cost->estimatedCostUsd(), 4, '.', ''),
-                CostRateLabel::of($cost, $this->subscription),
+                MarkdownTextEscaper::fences(CostLine::of($cost, $this->subscription, $this->billedSubscriptionHolder->billedSubscription())),
             ),
             '',
             \sprintf(

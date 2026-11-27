@@ -22,16 +22,18 @@ final readonly class CliAgentAccount
 {
     /**
      * @param ?string $detail the plan and account of a subscription, what holds the API key that bills instead, or why the CLI could not tell
+     * @param ?string $plan   the plan of a subscription alone, without the account that could identify a person
      */
     private function __construct(
         public CliAgentBilling $billing,
         public ?string $detail,
         public ?string $remedy = null,
+        public ?string $plan = null,
     ) {}
 
-    public static function subscription(?string $account): self
+    public static function subscription(?string $account, ?string $plan = null): self
     {
-        return new self(CliAgentBilling::Subscription, $account);
+        return new self(CliAgentBilling::Subscription, $account, plan: $plan);
     }
 
     /**

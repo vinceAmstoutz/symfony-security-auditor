@@ -156,6 +156,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\TwigE
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\UseCaseAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\VoterAttackerSkill;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\WebhookConsumerAttackerSkill;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\BilledSubscriptionHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ConsoleReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\ExecutiveSummaryReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\GithubAnnotationsReportRenderer;
@@ -398,6 +399,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $defaultsConfigurator->set(ReportPathPrefix::class)
         ->args([param('symfony_security_auditor.audit.report_path_prefix')]);
 
+    $defaultsConfigurator->set(BilledSubscriptionHolder::class);
     $defaultsConfigurator->set(ConsoleReportRenderer::class);
     $defaultsConfigurator->set(JsonReportRenderer::class);
     $defaultsConfigurator->set(SarifReportRenderer::class);

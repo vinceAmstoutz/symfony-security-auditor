@@ -21,6 +21,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentAccoun
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentAccountProbeInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentBilling;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\SubscriptionCliInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\BilledSubscriptionHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\RunRefusedException;
 
 /**
@@ -37,6 +38,7 @@ final readonly class SubscriptionAccountGuard implements UnpricedModelBudgetGuar
         private SubscriptionCliInterface $subscriptionCli,
         private ?string $cliBinary,
         private CliAgentAccountProbeInterface $cliAgentAccountProbe,
+        private BilledSubscriptionHolder $billedSubscriptionHolder = new BilledSubscriptionHolder(),
     ) {}
 
     #[Override]
@@ -47,6 +49,7 @@ final readonly class SubscriptionAccountGuard implements UnpricedModelBudgetGuar
         }
 
         $cliAgentAccount = $this->cliAgentAccountProbe->probe($this->subscriptionCli->platform(), $this->cliBinary);
+        $this->recordBilledSubscription($cliAgentAccount);
         $errorStyle = $symfonyStyle->getErrorStyle();
         $warning = ProviderSetupLines::warningFor($this->subscriptionCli, $cliAgentAccount);
         $errorStyle->writeln(\sprintf(null === $warning ? ' Billing: %s, not priced per call' : ' Billing: %s', ProviderSetupLines::subscriptionBilling($this->subscriptionCli, $cliAgentAccount)));
@@ -70,6 +73,7 @@ final readonly class SubscriptionAccountGuard implements UnpricedModelBudgetGuar
         $this->unpricedModelBudgetGuard->assertUnattendedRunPermitted($logger);
 
         $cliAgentAccount = $this->cliAgentAccountProbe->probe($this->subscriptionCli->platform(), $this->cliBinary);
+        $this->recordBilledSubscription($cliAgentAccount);
         $warning = ProviderSetupLines::warningFor($this->subscriptionCli, $cliAgentAccount);
         if (null === $warning) {
             return;
@@ -80,6 +84,22 @@ final readonly class SubscriptionAccountGuard implements UnpricedModelBudgetGuar
         }
 
         $logger->warning($warning);
+    }
+
+    /**
+     * Hands the reports the subscription and its plan, never the account that
+     * could identify a person, or nothing when this run cannot tell.
+     */
+    private function recordBilledSubscription(CliAgentAccount $cliAgentAccount): void
+    {
+        $this->billedSubscriptionHolder->set(CliAgentBilling::Subscription === $cliAgentAccount->billing ? $this->billedSubscriptionOf($cliAgentAccount) : null);
+    }
+
+    private function billedSubscriptionOf(CliAgentAccount $cliAgentAccount): string
+    {
+        $subscription = $this->subscriptionCli->subscription();
+
+        return null === $cliAgentAccount->plan ? $subscription : \sprintf('%s (%s)', $subscription, $cliAgentAccount->plan);
     }
 
     private function refuses(CliAgentAccount $cliAgentAccount): bool

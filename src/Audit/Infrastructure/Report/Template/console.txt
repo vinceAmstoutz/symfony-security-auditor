@@ -10,7 +10,7 @@
   Duration: {{duration}}
   Files   : {{filesScanned}} scanned
   Tokens  : {{tokens}} ({{primaryModel}})
-  Cost    : ${{cost}} ({{costRateLabel}})
+  Cost    : {{costLine}}
 
 ──────────────────────────────────────────────────────────────────────
   RISK LEVEL: {{riskLevel}}  ({{riskDetail}})

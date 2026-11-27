@@ -28,6 +28,7 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
         private TemplateLoader $templateLoader = new TemplateLoader(),
         private DistributionBarChart $distributionBarChart = new DistributionBarChart(),
         private ?string $subscription = null,
+        private BilledSubscriptionHolder $billedSubscriptionHolder = new BilledSubscriptionHolder(),
     ) {}
 
     #[Override]
@@ -52,8 +53,7 @@ final readonly class HtmlReportRenderer implements ReportRendererInterface
             '{{filesScanned}}' => $auditReport->filesScanned(),
             '{{tokens}}' => $this->escape(\sprintf('%s in / %s out', number_format($cost->inputTokens()), number_format($cost->outputTokens()))),
             '{{primaryModel}}' => $this->escape('' === $cost->primaryModel() ? 'unknown model' : $cost->primaryModel()),
-            '{{cost}}' => $this->escape(number_format($cost->estimatedCostUsd(), 4, '.', '')),
-            '{{costRateLabel}}' => $this->escape(CostRateLabel::of($cost, $this->subscription)),
+            '{{costLine}}' => $this->escape(CostLine::of($cost, $this->subscription, $this->billedSubscriptionHolder->billedSubscription())),
             '{{riskLevel}}' => $this->escape($riskLevel),
             '{{riskLevelClass}}' => $this->escape(strtolower($riskLevel)),
             '{{riskDetail}}' => $this->escape(RiskHeadline::scoreDetail($auditReport, 'score')),
