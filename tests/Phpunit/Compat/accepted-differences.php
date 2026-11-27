@@ -275,6 +275,6 @@ return [
         'path' => 'runs.*.stdout.lines',
         'match' => '/^[-+]  -[fo], --(?:format=FORMAT|output=OUTPUT) /',
         'reason' => 'The --format and --output descriptions say that the extension of the output file picks the format when no other sets it.',
-        'changelog' => '#PRNUM',
+        'changelog' => '#766',
     ],
 ];
