@@ -1920,7 +1920,7 @@ final class AuditCommandEndToEndTest extends TestCase
         $commandTester = $this->makeCommandTester('[]', '{}');
         $commandTester->execute(['project-path' => $this->fixtureDir]);
 
-        self::assertStringContainsString('20+ minutes', $commandTester->getDisplay());
+        self::assertStringContainsString('20+ on large projects', $commandTester->getDisplay());
     }
 
     /**

@@ -105,8 +105,31 @@ final class AuditPresenterTest extends TestCase
         $this->auditPresenter->longRunNotice($symfonyStyle);
 
         $display = $bufferedOutput->fetch();
-        self::assertStringContainsString('many LLM calls', $display);
-        self::assertStringContainsString('20+ minutes', $display);
+        self::assertStringContainsString('An audit takes minutes, 20+ on large projects.', $display);
+    }
+
+    public function test_long_run_notice_fits_one_line_of_an_80_column_terminal(): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $previousColumns = getenv('COLUMNS');
+        putenv('COLUMNS=80');
+
+        try {
+            $this->auditPresenter->longRunNotice(new SymfonyStyle(new StringInput(''), $bufferedOutput));
+        } finally {
+            putenv(false === $previousColumns ? 'COLUMNS' : 'COLUMNS='.$previousColumns);
+        }
+
+        self::assertSame(1, preg_match_all('/^ \/\/ \S/m', $bufferedOutput->fetch()));
+    }
+
+    public function test_long_run_notice_prints_in_the_terminal_default_colour_rather_than_dimmed(): void
+    {
+        $bufferedOutput = new BufferedOutput(decorated: true);
+
+        $this->auditPresenter->longRunNotice(new SymfonyStyle(new StringInput(''), $bufferedOutput));
+
+        self::assertStringNotContainsString("\e[90m", $bufferedOutput->fetch());
     }
 
     public function test_header_includes_project_path(): void
