@@ -78,7 +78,7 @@ final class AuditCommandHelpTest extends TestCase
         $inputOption = $this->auditCommandOption('format');
 
         self::assertNull($inputOption->getDefault());
-        self::assertStringEndsWith('Defaults to the audit.format config key, console when it is unset.', $inputOption->getDescription());
+        self::assertStringEndsWith('Defaults to the audit.format config key, else the format the --output extension names, else console.', $inputOption->getDescription());
     }
 
     public function test_the_min_score_option_names_the_configuration_key_it_overrides(): void
@@ -88,7 +88,7 @@ final class AuditCommandHelpTest extends TestCase
 
     public function test_the_output_option_names_the_configuration_key_it_overrides(): void
     {
-        self::assertSame('Output file path (any format). Overrides the audit.output config key for this run.', $this->auditCommandOption('output')->getDescription());
+        self::assertSame('Output file path (any format). Without --format or audit.format, its extension (.html, .json, .sarif, .md, .xml) picks the format; a name without one is deprecated. Overrides the audit.output config key for this run.', $this->auditCommandOption('output')->getDescription());
     }
 
     public function test_the_bundle_help_names_the_bundle_configuration_file(): void
