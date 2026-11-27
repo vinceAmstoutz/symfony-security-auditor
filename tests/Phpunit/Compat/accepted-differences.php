@@ -270,4 +270,11 @@ return [
         'reason' => 'The long-run notice is one shorter // line in the terminal colour, in place of two dimmed lines.',
         'changelog' => '#751',
     ],
+    [
+        'scenarios' => ['option/dry-run', 'option/show-scanned-dry-run', 'standalone/dry-run'],
+        'path' => 'runs.*.stdout.lines',
+        'match' => '#^\\+ // (?:No LLM call was made\\. The reviewer figure assumes ~\\d+% of the attacker input\\. Prompt-cache discounts or warm caches|usually make a real run cheaper\\.)$#',
+        'reason' => 'A dry run ends with one footnote in place of its two caveats.',
+        'changelog' => '#763',
+    ],
 ];
