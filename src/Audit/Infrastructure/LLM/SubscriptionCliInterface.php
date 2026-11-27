@@ -31,6 +31,12 @@ interface SubscriptionCliInterface
     public function subscription(): string;
 
     /**
+     * The model `init` suggests to review the findings, the lightest one the
+     * subscription runs.
+     */
+    public function suggestedReviewerModel(): string;
+
+    /**
      * The command that logs the CLI in to the subscription.
      */
     public function loginCommand(): string;
