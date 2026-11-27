@@ -93,7 +93,7 @@ final readonly class InitCommand
     {
         $configFile = $this->xdgConfigPathResolver->configFile();
 
-        $provider = b($initCommandInput->provider ?? InitProviderQuestion::ask($symfonyStyle))->trim()->toString();
+        $provider = b($initCommandInput->provider ?? InitProviderQuestion::ask($symfonyStyle, $interactive))->trim()->toString();
 
         if ($this->refused($symfonyStyle, InitRefusal::forProviderText($provider))) {
             return Command::INVALID;
