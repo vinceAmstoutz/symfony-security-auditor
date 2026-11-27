@@ -258,7 +258,7 @@ final readonly class AuditConfigurationDefinition
                         ->enumNode('format')
                             ->values(['console', 'executive', 'json', 'sarif', 'html', 'markdown', 'junit', 'github', 'github-comment'])
                             ->defaultValue('console')
-                            ->info('Default report format when --format is not given. The --format CLI option overrides this per run, even when it names the default.')
+                            ->info('Default report format when --format is not given. The --format CLI option overrides this per run, even when it names the default. Written or left at `console`, it yields to the extension of the output file, which picks the format: `--format console` keeps the console report.')
                         ->end()
                         ->append((new TextNodeDefinition('output'))
                             ->defaultNull()

@@ -239,7 +239,7 @@
                 "github",
                 "github-comment"
               ],
-              "description": "Default report format when --format is not given. The --format CLI option overrides this, even when it names the default. Default: console."
+              "description": "Default report format when --format is not given. The --format CLI option overrides this, even when it names the default. Default: console. Written or left at console, it yields to the extension of the output file, which picks the format (.html, .htm, .json, .sarif, .sarif.json, .md, .xml): --format console keeps the console report."
             },
             "output": {
               "type": ["string", "null"],

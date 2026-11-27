@@ -2,10 +2,10 @@
     "release": "1.22.1",
     "php": "8.3.6",
     "packages": {
-        "symfony/console": "v7.4.22",
-        "symfony/config": "v7.4.22",
-        "symfony/dependency-injection": "v7.4.22",
-        "symfony/yaml": "v7.4.21",
+        "symfony/console": "v7.4.23",
+        "symfony/config": "v7.4.23",
+        "symfony/dependency-injection": "v7.4.23",
+        "symfony/yaml": "v7.4.23",
         "symfony/ai-platform": "v0.15.0",
         "symfony/ai-bundle": "v0.15.0",
         "mcp/sdk": "v0.10.0"
@@ -490,6 +490,10 @@
         {
             "scenario": "output/existing-file",
             "sha256": "cb5cc332494f9f0e3297bee9e00b1a7a12d1bc22291f7e04390f1b48986ca943"
+        },
+        {
+            "scenario": "output/extension-without-format",
+            "sha256": "53e91b57317500c468a37ce3cb3d0b793572f1df155b0f4c2a21e04675c96fa4"
         },
         {
             "scenario": "output/missing-directory",
@@ -1173,5 +1177,5 @@
         }
     ],
     "unrecorded": [],
-    "seal": "db21c854d916a4e1680bfbfdb6021181d9eb164469b7e47c6ff3b2341ecc4ed8"
+    "seal": "46ac53d9848285d7786eac6ab8adbb27e6551b313fc873383e9f88bd24b4e81a"
 }

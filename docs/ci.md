@@ -578,4 +578,6 @@ php bin/console audit:run /path/to/project --format sarif --output report.sarif
 php bin/console audit:run /path/to/project --format html --output report.html
 ```
 
+_Since 1.23_, without `--format`, while `audit.format` is written or left at `console`, the extension of the `--output` file picks the format (`.html` or `.htm`, `.json`, `.sarif` or `.sarif.json`, `.md`, `.xml` for JUnit). 1.22 wrote the console report to such a file: `--format console` keeps it. Keep `--format` in a pipeline, so the report never depends on a file name.
+
 Every format, its options and sample output live in the [Output Formats Reference](configuration.md#output-formats-reference).

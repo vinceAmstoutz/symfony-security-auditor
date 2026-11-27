@@ -194,7 +194,7 @@ bin/console audit:run
 bin/console audit:run /path/to/your/symfony/project
 ```
 
-Want JSON, SARIF, HTML, or Markdown instead? Add `--format json --output report.json`, `--format sarif --output report.sarif`, `--format html --output report.html`, or `--format markdown --output report.md`. See [CLI reference](docs/configuration.md#cli-reference).
+Want JSON, SARIF, HTML, or Markdown instead? Add `--format json --output report.json`, `--format sarif --output report.sarif`, `--format html --output report.html`, or `--format markdown --output report.md`. Since 1.23 `--output` alone is enough: without `--format`, while `audit.format` is written or left at `console`, the extension of the file picks the format. 1.22 wrote the console report to such a file: `--format console` keeps it. See [CLI reference](docs/configuration.md#cli-reference).
 
 Estimate cost before running:
 

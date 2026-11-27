@@ -39,12 +39,12 @@ final class AuditCommandInput
     #[Argument(description: 'Project to audit (default: the current directory)')]
     public ?string $projectPath = null;
 
-    #[Option(description: 'Report format; the list and its default are below', name: 'format', shortcut: 'f')]
+    #[Option(description: 'Report format; without it the --output extension can pick it (below)', name: 'format', shortcut: 'f')]
     public ?OutputFormat $givenFormat = null;
 
     public OutputFormat $format = OutputFormat::Console;
 
-    #[Option(description: 'Write the report to this file (overrides audit.output)', shortcut: 'o')]
+    #[Option(description: 'Report file (overrides audit.output); its extension can set the format', shortcut: 'o')]
     public ?string $output = null;
 
     #[Option(description: 'Print the report even when audit.output names a file', name: 'no-output')]

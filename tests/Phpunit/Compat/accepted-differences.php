@@ -215,7 +215,7 @@ return [
         'changelog' => '#702',
     ],
     [
-        'scenarios' => ['baseline/generated-by-release-console', 'format/console', 'format/console-no-finding', 'format/console-to-file', 'format/executive-to-file', 'format/github-comment-to-file', 'format/github-to-file', 'format/html-to-file', 'format/json-to-file', 'format/junit-to-file', 'format/markdown-to-file', 'format/sarif-to-file', 'option/generate-baseline-console', 'option/project-path-omitted', 'option/project-path-only', 'output/config-key', 'output/dev-null', 'output/existing-file', 'output/missing-directory', 'output/relative-path', 'output/short-option', 'run/empty-project-console', 'run/scan-layout-formats', 'standalone/format-console', 'standalone/output-dev-null', 'standalone/output-file'],
+        'scenarios' => ['baseline/generated-by-release-console', 'format/console', 'format/console-no-finding', 'format/console-to-file', 'format/executive-to-file', 'format/github-comment-to-file', 'format/github-to-file', 'format/html-to-file', 'format/json-to-file', 'format/junit-to-file', 'format/markdown-to-file', 'format/sarif-to-file', 'option/generate-baseline-console', 'option/project-path-omitted', 'option/project-path-only', 'output/config-key', 'output/dev-null', 'output/existing-file', 'output/extension-without-format', 'output/missing-directory', 'output/relative-path', 'output/short-option', 'run/empty-project-console', 'run/scan-layout-formats', 'standalone/format-console', 'standalone/output-dev-null', 'standalone/output-file'],
         'path' => 'runs.*.stdout.lines',
         'match' => '/^(?:- The audit makes many LLM calls \\xE2\\x80\\x94 typically several minutes, 20\\+ minutes on large projects\\.$|\\+ The audit makes many LLM calls: typically several minutes, 20\\+ minutes on large projects\\.$)/',
         'reason' => 'The long-run notice is written with a colon in place of a dash.',
@@ -278,7 +278,7 @@ return [
         'changelog' => '#751',
     ],
     [
-        'scenarios' => ['baseline/generated-by-release-console', 'format/console', 'format/console-no-finding', 'format/console-to-file', 'format/executive-to-file', 'format/github-comment-to-file', 'format/github-to-file', 'format/html-to-file', 'format/json-to-file', 'format/junit-to-file', 'format/markdown-to-file', 'format/sarif-to-file', 'option/generate-baseline-console', 'option/project-path-omitted', 'option/project-path-only', 'output/config-key', 'output/dev-null', 'output/existing-file', 'output/missing-directory', 'output/relative-path', 'output/short-option', 'run/empty-project-console', 'run/scan-layout-formats', 'standalone/format-console', 'standalone/output-dev-null', 'standalone/output-file'],
+        'scenarios' => ['baseline/generated-by-release-console', 'format/console', 'format/console-no-finding', 'format/console-to-file', 'format/executive-to-file', 'format/github-comment-to-file', 'format/github-to-file', 'format/html-to-file', 'format/json-to-file', 'format/junit-to-file', 'format/markdown-to-file', 'format/sarif-to-file', 'option/generate-baseline-console', 'option/project-path-omitted', 'option/project-path-only', 'output/config-key', 'output/dev-null', 'output/existing-file', 'output/extension-without-format', 'output/missing-directory', 'output/relative-path', 'output/short-option', 'run/empty-project-console', 'run/scan-layout-formats', 'standalone/format-console', 'standalone/output-dev-null', 'standalone/output-file'],
         'path' => 'runs.*.stdout.lines',
         'match' => '/^(?:\\+ \\/\\/ An audit takes minutes, 20\\+ on large projects\\. Progress streams below\\.|- Live progress and findings stream below as they happen\\.)$/',
         'reason' => 'The long-run notice is one shorter // line in the terminal colour, in place of two dimmed lines.',
@@ -299,7 +299,7 @@ return [
         'changelog' => '#756',
     ],
     [
-        'scenarios' => ['baseline/generated-by-release-console', 'format/console', 'format/console-no-finding', 'format/console-to-file', 'format/executive-to-file', 'format/github-comment-to-file', 'format/github-to-file', 'format/html-to-file', 'format/json-to-file', 'format/junit-to-file', 'format/markdown-to-file', 'format/sarif-to-file', 'option/dry-run', 'option/generate-baseline-console', 'option/project-path-omitted', 'option/project-path-only', 'option/show-scanned', 'option/show-scanned-dry-run', 'output/config-key', 'output/dev-null', 'output/directory', 'output/existing-file', 'output/missing-directory', 'output/relative-path', 'output/short-option', 'run/empty-project-console', 'run/scan-layout-formats', 'standalone/dry-run', 'standalone/format-console', 'standalone/output-dev-null', 'standalone/output-file', 'standalone/show-scanned', 'standalone/stack-working-directory-scan-paths'],
+        'scenarios' => ['baseline/generated-by-release-console', 'format/console', 'format/console-no-finding', 'format/console-to-file', 'format/executive-to-file', 'format/github-comment-to-file', 'format/github-to-file', 'format/html-to-file', 'format/json-to-file', 'format/junit-to-file', 'format/markdown-to-file', 'format/sarif-to-file', 'option/dry-run', 'option/generate-baseline-console', 'option/project-path-omitted', 'option/project-path-only', 'option/show-scanned', 'option/show-scanned-dry-run', 'output/config-key', 'output/dev-null', 'output/directory', 'output/existing-file', 'output/extension-without-format', 'output/missing-directory', 'output/relative-path', 'output/short-option', 'run/empty-project-console', 'run/scan-layout-formats', 'standalone/dry-run', 'standalone/format-console', 'standalone/output-dev-null', 'standalone/output-file', 'standalone/show-scanned', 'standalone/stack-working-directory-scan-paths'],
         'path' => 'runs.*.stdout.lines',
         'match' => '/^- Pipeline: Ingestion -> Mapping -> Audit \\(Attacker vs Reviewer\\)$/',
         'reason' => 'The audit header prints the fixed pipeline line only with -v.',
@@ -313,11 +313,25 @@ return [
         'changelog' => '#760',
     ],
     [
-        'scenarios' => ['format/console-to-file', 'format/executive-to-file', 'format/github-comment-to-file', 'format/github-to-file', 'format/html-to-file', 'format/json-to-file', 'format/junit-to-file', 'format/markdown-to-file', 'format/sarif-to-file', 'output/config-key', 'output/dev-null', 'output/existing-file', 'output/missing-directory', 'output/relative-path', 'output/short-option', 'standalone/output-dev-null', 'standalone/output-file'],
+        'scenarios' => ['format/console-to-file', 'format/executive-to-file', 'format/github-comment-to-file', 'format/github-to-file', 'format/html-to-file', 'format/json-to-file', 'format/junit-to-file', 'format/markdown-to-file', 'format/sarif-to-file', 'output/config-key', 'output/dev-null', 'output/existing-file', 'output/extension-without-format', 'output/missing-directory', 'output/relative-path', 'output/short-option', 'standalone/output-dev-null', 'standalone/output-file'],
         'path' => 'runs.*.stdout.lines',
         'match' => '/^(?:- \\[OK\\] Report saved to .+|\\+ Report saved to .+|-)$/',
         'reason' => 'The saved report is named on a plain line whose path links to the file, in place of an [OK] block.',
         'changelog' => '#765',
+    ],
+    [
+        'scenarios' => ['output/extension-without-format'],
+        'path' => 'files.out/report.json.lines',
+        'match' => '/ -> <absent>$/',
+        'reason' => 'An output file ending in .json no longer gets the console report when no format is chosen: --format console keeps it.',
+        'changelog' => '#766',
+    ],
+    [
+        'scenarios' => ['output/extension-without-format'],
+        'path' => 'files.out/report.json.json',
+        'match' => '/^<absent> -> \\{"audit_id":/',
+        'reason' => 'An output file ending in .json gets the JSON report when no format is chosen.',
+        'changelog' => '#766',
     ],
     [
         'scenarios' => ['standalone/help-audit'],

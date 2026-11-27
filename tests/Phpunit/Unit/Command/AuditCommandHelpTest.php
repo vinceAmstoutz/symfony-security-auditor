@@ -81,12 +81,12 @@ final class AuditCommandHelpTest extends TestCase
         $inputOption = $this->auditCommandOption('format');
 
         self::assertNull($inputOption->getDefault());
-        self::assertSame('Report format; the list and its default are below', $inputOption->getDescription());
+        self::assertSame('Report format; without it the --output extension can pick it (below)', $inputOption->getDescription());
     }
 
     public function test_the_help_says_the_output_extension_picks_the_format_when_none_is_chosen(): void
     {
-        self::assertStringContainsString('Without --format, audit.format sets it, else the --output extension: .html, .json, .sarif, .md, .xml (junit), else console. A name without one is deprecated.', $this->flattened());
+        self::assertStringContainsString('Without --format, audit.format sets the format. Written or left at console, it yields to the --output extension: .html, .json, .sarif, .sarif.json, .md, .xml (junit), else console. 1.22 wrote the console report to such a file: --format console keeps it. A name without extension is deprecated.', $this->flattened());
     }
 
     public function test_the_min_score_option_names_the_configuration_key_it_overrides(): void
@@ -96,7 +96,7 @@ final class AuditCommandHelpTest extends TestCase
 
     public function test_the_output_option_names_the_configuration_key_it_overrides(): void
     {
-        self::assertSame('Write the report to this file (overrides audit.output)', $this->auditCommandOption('output')->getDescription());
+        self::assertSame('Report file (overrides audit.output); its extension can set the format', $this->auditCommandOption('output')->getDescription());
     }
 
     public function test_the_bundle_help_names_the_bundle_configuration_file(): void

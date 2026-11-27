@@ -456,6 +456,9 @@ final class AuditCommandInputTest extends TestCase
     {
         yield 'json' => ['report.json', OutputFormat::Json];
         yield 'sarif' => ['report.sarif', OutputFormat::Sarif];
+        yield 'sarif named as the json it is' => ['results.sarif.json', OutputFormat::Sarif];
+        yield 'sarif named as json in upper case' => ['RESULTS.SARIF.JSON', OutputFormat::Sarif];
+        yield 'json whose name only ends in sarif' => ['notsarif.json', OutputFormat::Json];
         yield 'markdown' => ['report.md', OutputFormat::Markdown];
         yield 'junit' => ['junit.xml', OutputFormat::Junit];
         yield 'htm' => ['report.htm', OutputFormat::Html];
