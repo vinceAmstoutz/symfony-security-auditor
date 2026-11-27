@@ -73,4 +73,27 @@ final class ProgressContextTest extends TestCase
         yield 'an event that counts no failure' => [['accepted' => 2, 'rejected' => 1], '2 validated, 1 rejected'];
         yield 'some reviews failed' => [['accepted' => 1, 'rejected' => 1, 'failed' => 2], '1 validated, 1 rejected, 2 failed'];
     }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    #[DataProvider('failureSuffixes')]
+    public function test_the_failure_suffix_names_the_unanalyzed_files_before_the_reason(array $context, string $expected): void
+    {
+        self::assertSame($expected, ProgressContext::failureReasonSuffix($context));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, string}>
+     */
+    public static function failureSuffixes(): iterable
+    {
+        yield 'files and a reason' => [['files' => ['src/A.php', 'src/B.php'], 'reason' => 'too large'], ' — src/A.php, src/B.php: too large'];
+        yield 'files only' => [['files' => ['src/A.php']], ' — src/A.php'];
+        yield 'a reason only' => [['reason' => 'too large'], ' — too large'];
+        yield 'neither' => [[], ''];
+        yield 'files that are not a list' => [['files' => 'src/A.php', 'reason' => 'too large'], ' — too large'];
+        yield 'an entry that is not a path' => [['files' => [42, 'src/A.php']], ' — src/A.php'];
+        yield 'a path that spans lines' => [['files' => ["src/A\n.php"]], ' — src/A .php'];
+    }
 }
