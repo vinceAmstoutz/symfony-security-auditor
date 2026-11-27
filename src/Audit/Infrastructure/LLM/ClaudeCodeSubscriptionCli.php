@@ -44,6 +44,12 @@ final readonly class ClaudeCodeSubscriptionCli implements SubscriptionCliInterfa
     }
 
     #[Override]
+    public function suggestedReviewerModel(): string
+    {
+        return 'claude-haiku-5-5';
+    }
+
+    #[Override]
     public function loginCommand(): string
     {
         return 'claude auth login';
