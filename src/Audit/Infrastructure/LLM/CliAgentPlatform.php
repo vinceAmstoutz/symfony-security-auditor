@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM;
 
 use Override;
-use Symfony\AI\Platform\Exception\ExceedContextSizeException;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\Message\MessageInterface;
 use Symfony\AI\Platform\Message\SystemMessage;
@@ -24,6 +23,7 @@ use Symfony\AI\Platform\ModelCatalog\ModelCatalogInterface;
 use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\CliAgentCommandLineTooLongException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\CliAgentPromptTooLongException;
 
 /**
  * Runs a coding agent's CLI on the user's subscription as a plain model, its
@@ -60,6 +60,7 @@ final readonly class CliAgentPlatform implements PlatformInterface
 
     /**
      * @throws CliAgentCommandLineTooLongException when the request cannot start the CLI however it is split
+     * @throws CliAgentPromptTooLongException      when a smaller request may fit
      */
     #[Override]
     public function invoke(string|Model $model, array|string|object $input, array $options = []): DeferredResult
@@ -79,7 +80,7 @@ final readonly class CliAgentPlatform implements PlatformInterface
 
     /**
      * @throws CliAgentCommandLineTooLongException when no split can make the request fit
-     * @throws ExceedContextSizeException          when a smaller request may fit
+     * @throws CliAgentPromptTooLongException      when a smaller request may fit
      */
     private function assertFitsTheCommandLine(MessageBag $messageBag): void
     {
@@ -88,13 +89,13 @@ final readonly class CliAgentPlatform implements PlatformInterface
         }
 
         if ($this->outgrowsOneArgument($messageBag)) {
-            throw new ExceedContextSizeException(\sprintf('The prompt is longer than the %d bytes one command-line argument of the CLI can carry.', self::LONGEST_COMMAND_LINE_ARGUMENT));
+            throw CliAgentPromptTooLongException::forOneArgument(self::LONGEST_COMMAND_LINE_ARGUMENT);
         }
     }
 
     /**
      * @throws CliAgentCommandLineTooLongException
-     * @throws ExceedContextSizeException
+     * @throws CliAgentPromptTooLongException
      */
     private function assertFitsTheWindowsCommandLine(MessageBag $messageBag): void
     {
@@ -104,7 +105,7 @@ final readonly class CliAgentPlatform implements PlatformInterface
         }
 
         if (array_sum($this->promptLengths($messageBag)) > self::WINDOWS_PROMPT_ROOM) {
-            throw new ExceedContextSizeException(\sprintf('The prompt is longer than the %d bytes the Windows command line of the CLI leaves it.', self::WINDOWS_PROMPT_ROOM));
+            throw CliAgentPromptTooLongException::forTheWindowsCommandLine(self::WINDOWS_PROMPT_ROOM);
         }
     }
 

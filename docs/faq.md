@@ -117,6 +117,22 @@ Tune `audit.min_confidence` (default `0.6`) to trade precision for recall. CI ga
 
 A finding the Attacker generates that turns out not to be exploitable. The Reviewer rejects most of them. If you still see false positives in the final report, raise `min_confidence`, or [file an issue](https://github.com/vinceamstoutz/symfony-security-auditor/issues) with a reproducer.
 
+### Why is the `APP_SECRET` of `.env.dev` not reported, while an API key there is?
+
+Both agents are told to leave out a credential that is the application's own and that only a test or dev environment reads: under `when@test` or `when@dev`, in `config/packages/test/` or `config/packages/dev/`, in `.env.test` or `.env.dev`. Production never loads it, so reporting it as a hardcoded secret on every application is noise. That covers:
+
+- the application's own secret, such as the throwaway `APP_SECRET` Symfony Flex writes to `.env.dev` and `.env.test`, or a JWT passphrase;
+- a database, cache, queue or mailer DSN whose host is local or a placeholder (`localhost`, `127.0.0.1`, a container name);
+- a user of an in-memory provider. The Reviewer also leaves out a user that fixtures create.
+
+The same value is reported when production reads it too, as from a committed `.env`.
+
+The location alone excuses nothing. A credential a third-party service issued (a cloud provider key, a GitHub, Slack or Stripe token, the SMTP or API password of a remote service) is reported wherever it is committed, since the commit leaks it whichever environment reads it. The Reviewer may lower its severity.
+
+With `scan.secret_scrubbing.enabled` (the default) the models never see the value, only its line, such as `GITHUB_TOKEN=***REDACTED:env_assignment***`. They tell the two cases apart by the variable or key name and by the kind in the placeholder when it names an issuer (`aws_access_key`, `github_token`, `stripe_key`). A credential neither identifies is reported too: a generic `API_KEY`, or a `MAILER_DSN` whose host is redacted with its password. The candidates of `audit.report_static_findings` go through the same review. Accept a finding you have checked with a [baseline](configuration.md#auditbaseline-maintaining-the-accepted-finding-baseline).
+
+These are instructions to the models, not a filter in code, so a model can still decide otherwise.
+
 ### What if I see a false negative (missed vulnerability)?
 
 That's a harder problem: LLMs miss things. Options:

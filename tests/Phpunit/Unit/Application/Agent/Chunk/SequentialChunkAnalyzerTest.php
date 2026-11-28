@@ -47,6 +47,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\NullProgressReporter;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\ProgressReporterInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Port\Tool\ToolRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Cache\NullAttackerCache;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\CliAgentPromptTooLongException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\AttackerPromptBuilder;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chunk\Fixture\ChunkAnalysisInputs;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Unit\Application\Agent\Chunk\Fixture\SequentialChunkAnalyzerHarness;
@@ -197,6 +198,25 @@ final class SequentialChunkAnalyzerTest extends TestCase
         $this->analyzer($llmClient, $attackerCache, false, progressReporter: $recordingProgressReporter)->analyze([[$this->makeFileOfSize('src/A.php', 16384)]], $this->request(), new RecordingCoverageRecorder(), null, new RiskMarkerIndex([]));
 
         self::assertSame('the file is too large for the model input limit: turn on audit.code_slicing.enabled, use a model with a larger context window or set scan.max_file_size_kb below 16 to skip it', $recordingProgressReporter->eventsNamed('attacker.chunk.completed')[0]['reason']);
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     * @throws InvalidToolRegistryException
+     */
+    public function test_a_single_file_the_command_line_of_a_subscription_cli_cannot_carry_reports_that_as_the_reason_its_chunk_failed(): void
+    {
+        $llmClient = self::createStub(LLMClientInterface::class);
+        $llmClient->method('complete')->willThrowException(LLMRequestTooLargeException::fromProviderRejection(CliAgentPromptTooLongException::forOneArgument(131071)));
+        $attackerCache = self::createStub(AttackerCacheInterface::class);
+        $attackerCache->method('get')->willReturn(null);
+        $recordingProgressReporter = new RecordingProgressReporter();
+
+        $this->analyzer($llmClient, $attackerCache, false, progressReporter: $recordingProgressReporter)->analyze([[$this->makeFileOfSize('src/A.php', 16384)]], $this->request(), new RecordingCoverageRecorder(), null, new RiskMarkerIndex([]));
+
+        self::assertSame('the file is too large for the command-line limit of the subscription CLI: turn on audit.code_slicing.enabled, set scan.max_file_size_kb below 16 to skip it or run on an API platform', $recordingProgressReporter->eventsNamed('attacker.chunk.completed')[0]['reason']);
     }
 
     private function vulnerabilityFactory(): VulnerabilityFactory

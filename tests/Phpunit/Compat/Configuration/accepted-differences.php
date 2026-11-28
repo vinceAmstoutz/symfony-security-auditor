@@ -14,12 +14,12 @@ declare(strict_types=1);
 return [
     [
         'parameters' => ['symfony_security_auditor.cache.reviewer_key_salt'],
-        'reason' => 'The reviewer prompt version went from 4 to 5 for the rule that rejects test-only credentials, so the reviewer cache keys no longer match what 1.22.1 cached.',
+        'reason' => 'The reviewer prompt version went from 4 to 6 for the rule that rejects application-local test-only credentials, so the reviewer cache keys no longer match what 1.22.1 cached.',
         'changelog' => '#758',
     ],
     [
         'parameters' => ['symfony_security_auditor.cache.key_salt', 'symfony_security_auditor.cache.cheap_attacker_key_salt'],
-        'reason' => 'The attacker prompt version went from 19 to 24 for the Symfony 8.2, advisory and layered-architecture hunts, for links the router builds from the Host header and for the rule that leaves out test-only credentials, so the attacker cache keys no longer match what 1.22.1 cached.',
+        'reason' => 'The attacker prompt version went from 19 to 25 for the Symfony 8.2, advisory and layered-architecture hunts, for links the router builds from the Host header and for the rule that leaves out application-local test-only credentials, so the attacker cache keys no longer match what 1.22.1 cached.',
         'changelog' => '#693',
     ],
     [

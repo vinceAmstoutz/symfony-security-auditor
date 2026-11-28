@@ -23,18 +23,24 @@ use Symfony\AI\Platform\PlatformInterface;
 use Symfony\AI\Platform\Result\DeferredResult;
 use Symfony\AI\Platform\Result\InMemoryRawResult;
 use Symfony\AI\Platform\Result\TextResult;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\CommandLineLimitExceptionInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentPlatform;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\CliAgentWorkingDirectory;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\CliAgentCommandLineTooLongException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\LLM\Exception\CliAgentPromptTooLongException;
+use VinceAmstoutz\SymfonySecurityAuditor\Tests\Fixture\ExpectsExceptionMessageTrait;
 
 final class CliAgentPlatformTest extends TestCase
 {
+    use ExpectsExceptionMessageTrait;
+
     private const int LONGEST_COMMAND_LINE_ARGUMENT = 131071;
 
     private const int WINDOWS_PROMPT_ROOM = 7000;
 
     /**
      * @throws CliAgentCommandLineTooLongException
+     * @throws CliAgentPromptTooLongException
      */
     public function test_a_prompt_longer_than_one_command_line_argument_can_carry_is_refused_as_too_large(): void
     {
@@ -48,6 +54,19 @@ final class CliAgentPlatformTest extends TestCase
 
     /**
      * @throws CliAgentCommandLineTooLongException
+     * @throws CliAgentPromptTooLongException
+     */
+    public function test_a_prompt_longer_than_one_command_line_argument_can_carry_is_refused_by_the_command_line(): void
+    {
+        $this->expectException(CommandLineLimitExceptionInterface::class);
+        $this->expectExceptionMessageContaining('The prompt is longer than the 131071 bytes one command-line argument of the CLI can carry.');
+
+        (new CliAgentPlatform(self::createStub(PlatformInterface::class), new CliAgentWorkingDirectory(), ['tools' => [], 'strict_mcp_config' => true]))->invoke('opus', new MessageBag(Message::ofUser(str_repeat('a', self::LONGEST_COMMAND_LINE_ARGUMENT + 1))));
+    }
+
+    /**
+     * @throws CliAgentCommandLineTooLongException
+     * @throws CliAgentPromptTooLongException
      */
     public function test_a_system_prompt_longer_than_one_command_line_argument_can_carry_is_refused_as_too_large(): void
     {
@@ -61,6 +80,7 @@ final class CliAgentPlatformTest extends TestCase
 
     /**
      * @throws CliAgentCommandLineTooLongException
+     * @throws CliAgentPromptTooLongException
      */
     public function test_a_prompt_as_long_as_one_command_line_argument_can_carry_reaches_the_cli_alone_with_its_isolating_options_in_its_working_directory(): void
     {
@@ -75,6 +95,7 @@ final class CliAgentPlatformTest extends TestCase
 
     /**
      * @throws CliAgentCommandLineTooLongException
+     * @throws CliAgentPromptTooLongException
      */
     public function test_a_prompt_given_as_text_reaches_the_cli_unmeasured(): void
     {
@@ -96,6 +117,7 @@ final class CliAgentPlatformTest extends TestCase
 
     /**
      * @throws CliAgentCommandLineTooLongException
+     * @throws CliAgentPromptTooLongException
      */
     public function test_prompts_that_share_one_command_line_argument_are_refused_as_too_large_together(): void
     {
@@ -109,6 +131,7 @@ final class CliAgentPlatformTest extends TestCase
 
     /**
      * @throws CliAgentCommandLineTooLongException
+     * @throws CliAgentPromptTooLongException
      */
     public function test_prompts_that_fill_their_shared_command_line_argument_exactly_reach_the_cli(): void
     {
@@ -121,6 +144,9 @@ final class CliAgentPlatformTest extends TestCase
         self::assertSame($deferredResult, (new CliAgentPlatform($platform, $cliAgentWorkingDirectory, ['sandbox' => 'read-only'], promptsShareOneArgument: true))->invoke('gpt-6.2-astra', $messageBag));
     }
 
+    /**
+     * @throws CliAgentPromptTooLongException
+     */
     public function test_on_windows_instructions_longer_than_the_command_line_leaves_the_prompts_stop_the_run_instead_of_splitting_it(): void
     {
         $platform = $this->createMock(PlatformInterface::class);
@@ -136,6 +162,7 @@ final class CliAgentPlatformTest extends TestCase
 
     /**
      * @throws CliAgentCommandLineTooLongException
+     * @throws CliAgentPromptTooLongException
      */
     public function test_on_windows_prompts_longer_than_the_command_line_leaves_them_are_refused_as_too_large(): void
     {
@@ -149,6 +176,19 @@ final class CliAgentPlatformTest extends TestCase
 
     /**
      * @throws CliAgentCommandLineTooLongException
+     * @throws CliAgentPromptTooLongException
+     */
+    public function test_on_windows_prompts_longer_than_the_command_line_leaves_them_are_refused_by_the_command_line(): void
+    {
+        $this->expectException(CommandLineLimitExceptionInterface::class);
+        $this->expectExceptionMessageContaining('The prompt is longer than the 7000 bytes the Windows command line of the CLI leaves it.');
+
+        (new CliAgentPlatform(self::createStub(PlatformInterface::class), new CliAgentWorkingDirectory(), ['tools' => []], onWindows: true))->invoke('opus', new MessageBag(Message::forSystem(str_repeat('a', self::WINDOWS_PROMPT_ROOM)), Message::ofUser('b')));
+    }
+
+    /**
+     * @throws CliAgentCommandLineTooLongException
+     * @throws CliAgentPromptTooLongException
      */
     public function test_on_windows_prompts_that_fill_the_room_the_command_line_leaves_them_reach_the_cli(): void
     {

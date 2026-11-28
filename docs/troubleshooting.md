@@ -188,11 +188,15 @@ A single file that still does not fit is recorded as errored (`Attacker chunk ex
 - Use an attacker model with a larger context window (`attacker_model`).
 - Leave generated or vendored trees out of `scan.included_paths`, or skip the file with `scan.max_file_size_kb` set below the size the failed chunk line names.
 
+On a Claude or ChatGPT subscription the command line of the CLI refuses the prompt long before the model would (`The prompt is longer than the 131071 bytes one command-line argument of the CLI can carry.`): about 47 KB of PHP in one file on Codex, about 110 KB on Claude Code. A larger context window changes nothing there. Turn on `audit.code_slicing.enabled`, skip the file or run on an API platform, as [Running on a subscription](configuration.md#running-on-a-subscription) explains.
+
 When even a small file is refused, the run stops: the system prompt and project mapping fill the window.
 
 ```text
 The audit prompt was refused even with only the 512-byte file "src/Kernel.php" in it (…): the system prompt and the project mapping around it take up the rest, so no file can fit. Use a model with a larger context window for the attacker, raise audit.rate_limit.input_tokens_per_minute when that limit refused it, or narrow scan.included_paths.
 ```
+
+On a Claude or ChatGPT subscription the same stop names the command line instead, since a larger context window would not help: `… take up the rest of the command line that starts the subscription CLI, so no file can fit. Narrow scan.included_paths or run on an API platform.`
 
 A tool conversation that outgrows the window after tool results (`Tool-using conversation outgrew the model input limit after tool results were appended; …`) keeps what it recorded and its chunk is errored. Lower `audit.max_tool_iterations`.
 
@@ -297,6 +301,7 @@ The chunk's files are recorded as errored, left out of the cache and counted und
 | `the answer was not valid JSON` | See [`Failed to parse …`](#failed-to-parse-attacker-agent-json-response--failed-to-parse-reviewer-response). |
 | `a finding the record tool refused was never recorded again` | The model never repeated a refused `record_vulnerability` call, so that finding is lost. Retry; switch model if every chunk fails. |
 | `the file is too large for the model input limit: …` | The rest of the line names the fix: `turn on audit.code_slicing.enabled` (only for a PHP file the run did not slice), `use a model with a larger context window` and `set scan.max_file_size_kb below N to skip it`, where `N` is the size of the file in KB. See [`prompt is too long`](#prompt-is-too-long--context_length_exceeded--http-413). |
+| `the file is too large for the command-line limit of the subscription CLI: …` | On a Claude or ChatGPT subscription the prompt travels on the command line of the CLI, at most 128 KiB per argument, so a model with a larger context window would not help. The rest of the line names the fix: `turn on audit.code_slicing.enabled` (only for a PHP file the run did not slice), `set scan.max_file_size_kb below N to skip it` and `run on an API platform`. See [Running on a subscription](configuration.md#running-on-a-subscription). |
 | any other message | An unexpected failure; the run went on. Read the message (also in the Symfony log). |
 
 ### `Audit incomplete: N file(s) could not be fully analyzed`
@@ -334,6 +339,8 @@ The file holds a Symfony secrets vault decryption key (`config/secrets/<env>/<en
 2. Lower `audit.min_confidence` from `0.6` to `0.3`.
 3. Raise `audit.max_iterations` to `5`.
 4. Use a stronger attacker model; see [Which LLM model should I use?](faq.md#which-llm-model-should-i-use).
+
+A credential of `.env.dev`, `.env.test`, `when@test` or `when@dev` is left out on purpose when it is the application's own, such as its `APP_SECRET`. A third-party service's key is reported there: see [Why is the `APP_SECRET` of `.env.dev` not reported, while an API key there is?](faq.md#why-is-the-app_secret-of-envdev-not-reported-while-an-api-key-there-is).
 
 ### Report has too many false positives
 

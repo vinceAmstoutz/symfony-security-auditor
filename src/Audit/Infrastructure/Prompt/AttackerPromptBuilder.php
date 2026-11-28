@@ -30,7 +30,7 @@ final readonly class AttackerPromptBuilder implements ProfileAwareAttackerPrompt
      * Part of the attacker cache key: bump it when a prompt change should
      * invalidate the cached answers.
      */
-    public const int PROMPT_VERSION = 24;
+    public const int PROMPT_VERSION = 25;
 
     public const bool DEFAULT_STRUCTURED_COLLECTION = true;
 

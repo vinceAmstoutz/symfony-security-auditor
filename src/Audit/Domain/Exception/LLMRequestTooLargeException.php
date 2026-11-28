@@ -29,4 +29,24 @@ class LLMRequestTooLargeException extends LLMProviderException
     {
         return new self(\sprintf('The model cannot fit the request: %s', ProviderMessageRedactor::redact($throwable->getMessage())), previous: $throwable);
     }
+
+    /**
+     * Whether the command line of a CLI refused the prompt, which a model
+     * with a larger context window would not change.
+     *
+     * @internal not part of the BC promise, see docs/versioning.md
+     */
+    public function exceedsCommandLine(): bool
+    {
+        $cause = $this->getPrevious();
+        while ($cause instanceof Throwable) {
+            if ($cause instanceof CommandLineLimitExceptionInterface) {
+                return true;
+            }
+
+            $cause = $cause->getPrevious();
+        }
+
+        return false;
+    }
 }

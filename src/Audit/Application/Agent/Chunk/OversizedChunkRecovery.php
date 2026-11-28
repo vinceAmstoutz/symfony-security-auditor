@@ -20,6 +20,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Agent\VulnerabilityFa
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Application\Budget\Exception\BudgetExceededException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMFixedPromptTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMProviderException;
+use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception\LLMRequestTooLargeException;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\ProjectFile;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\Vulnerability;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Model\VulnerabilityHydrationResult;
@@ -56,15 +57,15 @@ final readonly class OversizedChunkRecovery
      * @throws BudgetExceededException
      * @throws LLMProviderException
      */
-    public function recover(array $chunk, ChunkContext $chunkContext, string $reason, CoverageRecorderInterface $coverageRecorder, Closure $analyzeChunk): VulnerabilityHydrationResult
+    public function recover(array $chunk, ChunkContext $chunkContext, LLMRequestTooLargeException $llmRequestTooLargeException, CoverageRecorderInterface $coverageRecorder, Closure $analyzeChunk): VulnerabilityHydrationResult
     {
         if (1 === \count($chunk)) {
-            return $this->failSingleFile($chunk[0], $chunkContext, $reason, $coverageRecorder);
+            return $this->failSingleFile($chunk[0], $chunkContext, $llmRequestTooLargeException, $coverageRecorder);
         }
 
         $this->logger->warning('Attacker chunk exceeds the model input limit; it is split in two and each half analyzed on its own', [
             'files' => array_map(static fn (ProjectFile $projectFile): string => $projectFile->relativePath(), $chunk),
-            'error' => $reason,
+            'error' => $llmRequestTooLargeException->getMessage(),
         ]);
 
         $firstHalfSize = intdiv(\count($chunk) + 1, 2);
@@ -105,19 +106,19 @@ final readonly class OversizedChunkRecovery
     /**
      * @throws LLMFixedPromptTooLargeException
      */
-    private function failSingleFile(ProjectFile $projectFile, ChunkContext $chunkContext, string $reason, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
+    private function failSingleFile(ProjectFile $projectFile, ChunkContext $chunkContext, LLMRequestTooLargeException $llmRequestTooLargeException, CoverageRecorderInterface $coverageRecorder): VulnerabilityHydrationResult
     {
-        ChunkCoverageRecorder::recordErrored([$projectFile], ChunkFailureReason::fileTooLarge($projectFile, $chunkContext->promptedFileBytes), $coverageRecorder);
+        ChunkCoverageRecorder::recordErrored([$projectFile], ChunkFailureReason::fileTooLarge($projectFile, $chunkContext->promptedFileBytes, $llmRequestTooLargeException), $coverageRecorder);
 
         $bytes = $chunkContext->promptedFileBytes;
         $promptBytes = \strlen($chunkContext->systemPrompt) + \strlen($chunkContext->userMessage);
         if ($bytes * 100 < self::FIXED_PROMPT_BLAMED_BELOW_FILE_PERCENT * $promptBytes) {
-            throw LLMFixedPromptTooLargeException::forFile($projectFile->relativePath(), $bytes, $reason);
+            throw LLMFixedPromptTooLargeException::forRefusal($projectFile->relativePath(), $bytes, $llmRequestTooLargeException);
         }
 
         $this->logger->warning('Attacker chunk exceeds the model input limit as a single file; it is recorded as errored and left out of the cache', [
             'files' => [$projectFile->relativePath()],
-            'error' => $reason,
+            'error' => $llmRequestTooLargeException->getMessage(),
         ]);
 
         return VulnerabilityHydrationResult::empty();
