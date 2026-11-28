@@ -97,6 +97,7 @@ This project adheres to [Semantic Versioning 2.0.0](https://semver.org). See [`d
 - Cached attacker answers refresh once after upgrading and again whenever a `composer.lock` change adds or drops a hunt gated on a Symfony release or package, or the project's layout changes. The longer hunting instructions raise the attacker's input tokens, by about a third on a small project where they outweigh the code ([#693](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/693), [#694](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/694))
 - An answer a platform hands back in a form the auditor cannot read, with no finish reason, counts as no verdict: its files are reported errored and it is never cached ([#731](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/731))
 - The test suite also runs on PHP 8.6 ([#692](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/692), [#704](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/704))
+- On a GitHub Actions runner, the project and `--path` values `audit:run` names when no file matches can no longer start a workflow command in the job log ([#774](https://github.com/vinceAmstoutz/symfony-security-auditor/pull/774))
 
 ## [1.22.1] — 2026-10-29 — Waypoint
 

@@ -1365,6 +1365,31 @@ final class AuditPresenterTest extends TestCase
         self::assertStringNotContainsString('##[', $rendered);
     }
 
+    /**
+     * @return iterable<string, array{string, list<string>}>
+     */
+    public static function unmatchedScopesHoldingAWorkflowCommand(): iterable
+    {
+        yield 'in a --path value' => ['/work/demo', ['src/a ::stop-commands::x']];
+        yield 'in the project path' => ['/work/a ::stop-commands::x', []];
+    }
+
+    /**
+     * @param list<string> $scanPaths
+     */
+    #[DataProvider('unmatchedScopesHoldingAWorkflowCommand')]
+    public function test_no_files_matched_on_a_github_actions_runner_defuses_a_workflow_command_in_the_paths_it_names(string $projectPath, array $scanPaths): void
+    {
+        $bufferedOutput = new BufferedOutput();
+        $auditPresenter = new AuditPresenter($this->pricingProviderKnowing(), workflowCommandNeutralizer: new WorkflowCommandNeutralizer(true));
+
+        $auditPresenter->noFilesMatched(new SymfonyStyle(new StringInput(''), $bufferedOutput), $projectPath, $scanPaths);
+
+        $rendered = $bufferedOutput->fetch();
+        self::assertStringContainsString(':\\:stop-commands:\\:x', $rendered);
+        self::assertStringNotContainsString('::', $rendered);
+    }
+
     public function test_scanned_files_hint_points_to_the_flag_with_the_file_count(): void
     {
         $bufferedOutput = new BufferedOutput();

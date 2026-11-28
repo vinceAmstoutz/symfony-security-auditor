@@ -160,16 +160,16 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         $project = $this->sanitizeForWarning($projectPath);
 
         if ([] === $scanPaths) {
-            $symfonyStyle->warning(\sprintf('No files matched under "%s". Check your included_paths configuration.', $project));
+            $symfonyStyle->warning($this->workflowCommandNeutralizer->message(\sprintf('No files matched under "%s". Check your included_paths configuration.', $project)));
 
             return;
         }
 
-        $symfonyStyle->warning(\sprintf(
+        $symfonyStyle->warning($this->workflowCommandNeutralizer->message(\sprintf(
             'No files matched under "%s" for --path %s. Check that each --path exists in the project, relative to its root, and holds PHP, Twig, YAML or XML files.',
             $project,
             implode(', ', array_map($this->sanitizeForWarning(...), $scanPaths)),
-        ));
+        )));
     }
 
     #[Override]
