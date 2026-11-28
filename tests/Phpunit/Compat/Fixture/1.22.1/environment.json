@@ -2,10 +2,10 @@
     "release": "1.22.1",
     "php": "8.3.6",
     "packages": {
-        "symfony/console": "v7.4.23",
-        "symfony/config": "v7.4.23",
-        "symfony/dependency-injection": "v7.4.23",
-        "symfony/yaml": "v7.4.23",
+        "symfony/console": "v7.4.22",
+        "symfony/config": "v7.4.22",
+        "symfony/dependency-injection": "v7.4.22",
+        "symfony/yaml": "v7.4.21",
         "symfony/ai-platform": "v0.15.0",
         "symfony/ai-bundle": "v0.15.0",
         "mcp/sdk": "v0.10.0"
@@ -1177,5 +1177,5 @@
         }
     ],
     "unrecorded": [],
-    "seal": "46ac53d9848285d7786eac6ab8adbb27e6551b313fc873383e9f88bd24b4e81a"
+    "seal": "d6f61cbcc617a8ff2a61f341a623b45590026812779d2eed7b4a365810cf1dba"
 }
