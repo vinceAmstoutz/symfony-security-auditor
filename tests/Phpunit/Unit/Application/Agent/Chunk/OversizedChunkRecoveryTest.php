@@ -173,7 +173,7 @@ final class OversizedChunkRecoveryTest extends TestCase
     public function test_a_small_file_the_model_refuses_stops_the_run_advising_a_larger_context_window(): void
     {
         $this->expectException(LLMFixedPromptTooLargeException::class);
-        $this->expectExceptionMessage('so no file can fit. Use a model with a larger context window for the attacker, raise audit.rate_limit.input_tokens_per_minute when that limit refused it, or narrow scan.included_paths.');
+        $this->expectExceptionMessageContaining('so no file can fit. Use a model with a larger context window for the attacker, raise audit.rate_limit.input_tokens_per_minute when that limit refused it, or narrow scan.included_paths.');
 
         $this->recovery()->recover(
             [$this->file()],
@@ -192,7 +192,7 @@ final class OversizedChunkRecoveryTest extends TestCase
     public function test_a_small_file_the_command_line_of_a_subscription_cli_refuses_stops_the_run_naming_that_limit(): void
     {
         $this->expectException(LLMFixedPromptTooLargeException::class);
-        $this->expectExceptionMessage('The audit prompt was refused even with only the 100-byte file "src/A.php" in it (The model cannot fit the request: The prompt is longer than the 131071 bytes one command-line argument of the CLI can carry.): the system prompt and the project mapping around it take up the rest of the command line that starts the subscription CLI, so no file can fit. Narrow scan.included_paths or run on an API platform.');
+        $this->expectExceptionMessageContaining('The audit prompt was refused even with only the 100-byte file "src/A.php" in it (The model cannot fit the request: The prompt is longer than the 131071 bytes one command-line argument of the CLI can carry.): the system prompt and the project mapping around it take up the rest of the command line that starts the subscription CLI, so no file can fit. Narrow scan.included_paths or run on an API platform.');
 
         $this->recovery()->recover(
             [$this->file()],
