@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
+use Symfony\Component\Console\Exception\MissingInputException;
 use Symfony\Component\Console\Question\ChoiceQuestion;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\MissingChoiceException;
@@ -56,11 +57,15 @@ final readonly class NumberedChoice
      * The prompt names no default.
      *
      * @param list<string> $choices
-     * @param list<string> $values  what each choice stands for
+     * @param list<string> $values      what each choice stands for
+     * @param ?int         $maxAttempts how many empty answers end the question, null to ask until one is given
+     *
+     * @throws MissingChoiceException when every attempt got an empty answer
+     * @throws MissingInputException  when the input ends before an answer
      */
-    public static function askWithoutDefault(SymfonyStyle $symfonyStyle, string $question, array $choices, array $values): string
+    public static function askWithoutDefault(SymfonyStyle $symfonyStyle, string $question, array $choices, array $values, ?int $maxAttempts): string
     {
-        return self::askQuestion($symfonyStyle, new ChoiceQuestion($question, self::numberedFromOne($choices)), $values);
+        return self::askQuestion($symfonyStyle, (new ChoiceQuestion($question, self::numberedFromOne($choices)))->setMaxAttempts($maxAttempts), $values);
     }
 
     /**

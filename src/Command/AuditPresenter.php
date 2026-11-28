@@ -160,16 +160,16 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         $project = $this->sanitizeForWarning($projectPath);
 
         if ([] === $scanPaths) {
-            $symfonyStyle->warning(\sprintf('No files matched under "%s". Check your included_paths configuration.', $project));
+            $symfonyStyle->warning($this->workflowCommandNeutralizer->message(\sprintf('No files matched under "%s". Check your included_paths configuration.', $project)));
 
             return;
         }
 
-        $symfonyStyle->warning(\sprintf(
+        $symfonyStyle->warning($this->workflowCommandNeutralizer->message(\sprintf(
             'No files matched under "%s" for --path %s. Check that each --path exists in the project, relative to its root, and holds PHP, Twig, YAML or XML files.',
             $project,
             implode(', ', array_map($this->sanitizeForWarning(...), $scanPaths)),
-        ));
+        )));
     }
 
     #[Override]
@@ -341,7 +341,7 @@ final readonly class AuditPresenter implements AuditPresenterInterface
         return \sprintf(
             'Audit incomplete: %d file(s) could not be fully analyzed: %s. The absence of findings there proves nothing. Risk: %s | Vulnerabilities: %d.',
             \count($auditReport->unanalyzedFiles()),
-            NamedFiles::of(array_map($this->sanitizeForWarning(...), $auditReport->unanalyzedFiles())),
+            $this->workflowCommandNeutralizer->message(NamedFiles::of(array_map($this->sanitizeForWarning(...), $auditReport->unanalyzedFiles()))),
             $auditReport->riskLevel(),
             $auditReport->totalVulnerabilities(),
         );

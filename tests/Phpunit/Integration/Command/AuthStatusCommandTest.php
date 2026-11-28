@@ -206,6 +206,20 @@ final class AuthStatusCommandTest extends TestCase
         );
     }
 
+    public function test_it_fails_when_an_anthropic_audit_cannot_sign_in_through_workload_identity_federation(): void
+    {
+        $this->writeConfig();
+        $commandTester = $this->federatedCommandTester('The job cannot get an identity token.');
+
+        $exitCode = $commandTester->execute([]);
+
+        self::assertSame(
+            [Command::FAILURE, true, false],
+            [$exitCode, str_contains($this->flattened($commandTester), '[ERROR] The job cannot get an identity token.'), str_contains($this->flattened($commandTester), 'An audit uses no API key')],
+            $commandTester->getDisplay(),
+        );
+    }
+
     public function test_a_variable_named_on_the_command_line_is_reported_under_workload_identity_federation_too(): void
     {
         $this->writeConfig();
@@ -214,6 +228,20 @@ final class AuthStatusCommandTest extends TestCase
         self::assertSame(
             [Command::FAILURE, true],
             [$commandTester->execute(['--env-var' => 'ANTHROPIC_API_KEY']), str_contains($this->flattened($commandTester), 'No API key resolves for ANTHROPIC_API_KEY')],
+            $commandTester->getDisplay(),
+        );
+    }
+
+    public function test_a_variable_named_on_the_command_line_is_reported_whatever_refuses_the_federated_sign_in(): void
+    {
+        $this->writeConfig();
+        $commandTester = $this->federatedCommandTester('The job cannot get an identity token.');
+
+        $exitCode = $commandTester->execute(['--env-var' => 'ANTHROPIC_API_KEY']);
+
+        self::assertSame(
+            [Command::FAILURE, true, false],
+            [$exitCode, str_contains($this->flattened($commandTester), 'No API key resolves for ANTHROPIC_API_KEY'), str_contains($this->flattened($commandTester), 'The job cannot get an identity token.')],
             $commandTester->getDisplay(),
         );
     }
@@ -414,7 +442,7 @@ final class AuthStatusCommandTest extends TestCase
         ));
     }
 
-    private function federatedCommandTester(): CommandTester
+    private function federatedCommandTester(?string $federatedSignInRefusal = null): CommandTester
     {
         $xdgConfigPathResolver = new XdgConfigPathResolver($this->configHome, null, null);
 
@@ -422,6 +450,7 @@ final class AuthStatusCommandTest extends TestCase
             new FilesystemCredentialStore($xdgConfigPathResolver),
             new ConfiguredCredentialVariable($xdgConfigPathResolver, workloadIdentityFederation: new WorkloadIdentityFederation('fdrl_rule', 'org-uuid')),
             cliAgentAccountProbe: new FixedCliAgentAccountProbe(CliAgentAccount::subscription(null)),
+            federatedSignInRefusal: $federatedSignInRefusal,
         ));
     }
 

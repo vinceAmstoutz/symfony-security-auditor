@@ -69,6 +69,7 @@ final readonly class OptionScenarios
                 ->collecting('out/report.json'),
             self::base('output/directory', Step::audit(['--format' => 'json', '--output' => '{workspace}/out']))->withFiles(['out/keep' => 'x']),
             self::base('output/config-key', Step::audit(['--format' => 'json']))->withConfig(['audit' => ['output' => '{workspace}/out/configured.json']])->collecting('out/configured.json'),
+            self::base('output/extension-without-format', Step::audit(['--output' => '{workspace}/out/report.json']))->collecting('out/report.json'),
         ];
     }
 

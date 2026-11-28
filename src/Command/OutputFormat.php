@@ -15,6 +15,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Symfony\Component\Filesystem\Path;
 
+use function Symfony\Component\String\u;
+
 /** @internal not part of the BC promise: the enum *values* (`console`, `executive`, `json`, `sarif`, `html`, `markdown`, `junit`, `github`, `github-comment`) are part of the CLI contract, but the PHP enum itself is for internal use only. */
 enum OutputFormat: string
 {
@@ -28,12 +30,20 @@ enum OutputFormat: string
     case GithubAnnotations = 'github';
     case GithubComment = 'github-comment';
 
+    private const string SARIF_NAMED_AS_JSON = '.sarif.json';
+
     /**
      * Returns the format an output file's extension names, null for any other file.
      */
     public static function ofOutputFile(?string $outputFile): ?self
     {
-        return match (null === $outputFile ? '' : Path::getExtension($outputFile, true)) {
+        $outputFile ??= '';
+
+        if (u($outputFile)->ignoreCase()->endsWith(self::SARIF_NAMED_AS_JSON)) {
+            return self::Sarif;
+        }
+
+        return match (Path::getExtension($outputFile, true)) {
             'html', 'htm' => self::Html,
             'json' => self::Json,
             'sarif' => self::Sarif,

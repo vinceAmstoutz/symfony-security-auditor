@@ -71,6 +71,7 @@ final readonly class InitCommand
         private ?PricedModelListInterface $pricedModelList = null,
         private ?ConnectionTestRunnerInterface $connectionTestRunner = null,
         private ?PulledModelListInterface $pulledModelList = null,
+        private StandardInputInterface $standardInput = new StandardInput(),
     ) {}
 
     /**
@@ -82,18 +83,19 @@ final readonly class InitCommand
         InputInterface $input,
         #[MapInput] InitCommandInput $initCommandInput,
     ): int {
-        return $this->configure($symfonyStyle, $initCommandInput, $input->isInteractive());
+        return $this->configure($symfonyStyle, $initCommandInput, $input);
     }
 
     /**
      * @throws UnresolvableConfigPathException
      * @throws BridgeInstallationFailedException
      */
-    private function configure(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, bool $interactive): int
+    private function configure(SymfonyStyle $symfonyStyle, InitCommandInput $initCommandInput, InputInterface $input): int
     {
         $configFile = $this->xdgConfigPathResolver->configFile();
 
-        $provider = b($initCommandInput->provider ?? InitProviderQuestion::ask($symfonyStyle, $interactive))->trim()->toString();
+        $provider = b($initCommandInput->provider ?? InitProviderQuestion::ask($symfonyStyle, $input, $this->standardInput->isTerminal($input)))->trim()->toString();
+        $interactive = $input->isInteractive();
 
         if ($this->refused($symfonyStyle, InitRefusal::forProviderText($provider))) {
             return Command::INVALID;

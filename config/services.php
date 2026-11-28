@@ -194,6 +194,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMerger;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineMergerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessorInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\CommandOutputHolder;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBanner;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ConsoleBannerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\DiffCommand;
@@ -216,6 +217,7 @@ use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrendAnalyzer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportTrendAnalyzerInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriterInterface;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\StandardOutputInterface;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendCommand;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendHtmlRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\TrendHtmlRendererInterface;
@@ -414,6 +416,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->factory([WorkflowCommandNeutralizer::class, 'fromEnvironment']);
     $defaultsConfigurator->alias(WorkflowCommandNeutralizerInterface::class, WorkflowCommandNeutralizer::class);
 
+    $defaultsConfigurator->set(CommandOutputHolder::class);
+    $defaultsConfigurator->alias(StandardOutputInterface::class, CommandOutputHolder::class);
     $defaultsConfigurator->set(ReportWriter::class)
         ->args([tagged_iterator('symfony_security_auditor.report_renderer')]);
     $defaultsConfigurator->alias(ReportWriterInterface::class, ReportWriter::class);
@@ -803,6 +807,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             ]),
             service(BaselineFilePathsHolder::class),
             service(PulledModelNoticePass::SERVICE)->nullOnInvalid(),
+            service(CommandOutputHolder::class),
         ])
         ->tag('console.command');
 

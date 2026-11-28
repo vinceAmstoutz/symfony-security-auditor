@@ -17,8 +17,8 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 interface StandardOutputInterface
 {
     /**
-     * Whether the standard output is a terminal a person reads, rather than a
-     * pipe or a file.
+     * Whether the running command prints to a terminal a person reads, rather
+     * than a pipe, a file or the output of its caller.
      */
     public function isTerminal(): bool;
 }

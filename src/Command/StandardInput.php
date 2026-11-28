@@ -14,13 +14,17 @@ declare(strict_types=1);
 namespace VinceAmstoutz\SymfonySecurityAuditor\Command;
 
 use Override;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\StreamableInputInterface;
 
 /** @internal not part of the BC promise, see docs/versioning.md */
-final readonly class StandardOutput implements StandardOutputInterface
+final readonly class StandardInput implements StandardInputInterface
 {
     #[Override]
-    public function isTerminal(): bool
+    public function isTerminal(InputInterface $input): bool
     {
-        return stream_isatty(\STDOUT);
+        $stream = $input instanceof StreamableInputInterface ? $input->getStream() : null;
+
+        return stream_isatty($stream ?? \STDIN);
     }
 }

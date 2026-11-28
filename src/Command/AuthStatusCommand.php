@@ -40,6 +40,7 @@ final readonly class AuthStatusCommand
 
     /**
      * @param array<string, string> $environment
+     * @param ?string               $federatedSignInRefusal why an audit cannot sign in through workload identity federation here
      */
     public function __construct(
         private CredentialStoreInterface $credentialStore,
@@ -47,6 +48,7 @@ final readonly class AuthStatusCommand
         private array $environment = [],
         private Filesystem $filesystem = new Filesystem(),
         private ?CliAgentAccountProbeInterface $cliAgentAccountProbe = null,
+        private ?string $federatedSignInRefusal = null,
     ) {}
 
     /**
@@ -62,8 +64,9 @@ final readonly class AuthStatusCommand
         }
 
         $providerSetup = (new ProviderSetupReader($this->configuredCredentialVariable, $this->cliAgentAccountProbe))->report($symfonyStyle);
-        if ($this->federatedCredentialReported($symfonyStyle, $providerSetup, $envVar)) {
-            return Command::SUCCESS;
+        $federatedOutcome = $this->reportFederatedCredential($symfonyStyle, $providerSetup, $envVar);
+        if (null !== $federatedOutcome) {
+            return $federatedOutcome;
         }
 
         $placeholder = $this->configuredCredentialVariable->placeholder();
@@ -89,19 +92,26 @@ final readonly class AuthStatusCommand
     }
 
     /**
-     * Reports the federated credential an audit signs in with, unless a
-     * variable is named on the command line.
+     * Reports the federated credential an audit signs in with, or why it
+     * cannot. Returns the exit code, null when no federated credential
+     * applies or a variable is named on the command line.
      */
-    private function federatedCredentialReported(SymfonyStyle $symfonyStyle, ?ProviderSetup $providerSetup, ?string $envVar): bool
+    private function reportFederatedCredential(SymfonyStyle $symfonyStyle, ?ProviderSetup $providerSetup, ?string $envVar): ?int
     {
         $federatedCredential = null === $envVar ? $providerSetup?->federatedCredential() : null;
         if (null === $federatedCredential) {
-            return false;
+            return null;
+        }
+
+        if (null !== $this->federatedSignInRefusal) {
+            $symfonyStyle->error($this->federatedSignInRefusal);
+
+            return Command::FAILURE;
         }
 
         $symfonyStyle->success(\sprintf('An audit uses no API key: it signs in through %s.', $federatedCredential));
 
-        return true;
+        return Command::SUCCESS;
     }
 
     private function reportWithoutVariable(SymfonyStyle $symfonyStyle, ?ProviderSetup $providerSetup): int

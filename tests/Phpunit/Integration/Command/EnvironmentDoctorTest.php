@@ -84,6 +84,15 @@ final class EnvironmentDoctorTest extends TestCase
         self::assertEquals(new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and an audit signs in through workload identity federation (rule fdrl_rule), with no API key.'), $results[0]);
     }
 
+    public function test_it_fails_the_api_key_check_when_an_anthropic_audit_cannot_sign_in_through_workload_identity_federation(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\nmodel: claude-opus-5-5\n");
+
+        $results = $this->federatedDoctor('The job cannot get an identity token.')->diagnose();
+
+        self::assertEquals(new DoctorCheckResult('API key', DoctorCheckStatus::Failure, 'The job cannot get an identity token.'), $results[0]);
+    }
+
     public function test_it_names_the_api_key_of_another_provider_selected_beside_an_anthropic_block_under_workload_identity_federation(): void
     {
         $this->writeConfig("provider: openai\nplatform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n    openai:\n        api_key: 'sk-test-0123456789abcdefghij'\nmodel: 'gpt-4'\n");
@@ -91,6 +100,15 @@ final class EnvironmentDoctorTest extends TestCase
         $results = $this->federatedDoctor()->diagnose();
 
         self::assertSame('Config resolves and an API key is available: sk-tes…ghij (SHA256:2e9cd0e8ecfb255a). Run "auth:status" to see where it comes from.', $results[0]->detail);
+    }
+
+    public function test_a_refused_federated_sign_in_leaves_a_run_on_another_provider_alone(): void
+    {
+        $this->writeConfig("provider: openai\nplatform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\n    openai:\n        api_key: 'sk-test-0123456789abcdefghij'\nmodel: 'gpt-4'\n");
+
+        $results = $this->federatedDoctor('The job cannot get an identity token.')->diagnose();
+
+        self::assertEquals(new DoctorCheckResult('Configuration', DoctorCheckStatus::Ok, 'Config resolves and an API key is available: sk-tes…ghij (SHA256:2e9cd0e8ecfb255a). Run "auth:status" to see where it comes from.'), $results[0]);
     }
 
     public function test_it_reports_a_platform_that_needs_no_api_key(): void
@@ -503,7 +521,7 @@ final class EnvironmentDoctorTest extends TestCase
         );
     }
 
-    private function federatedDoctor(): EnvironmentDoctor
+    private function federatedDoctor(?string $federatedSignInRefusal = null): EnvironmentDoctor
     {
         $composerAvailabilityChecker = self::createStub(ComposerAvailabilityCheckerInterface::class);
         $composerAvailabilityChecker->method('probe')->willReturn(ComposerProbe::available());
@@ -515,6 +533,7 @@ final class EnvironmentDoctorTest extends TestCase
             self::createStub(AuditPreflightInterface::class),
             new ModelsDevPricingProvider(new NullLogger()),
             workloadIdentityFederation: new WorkloadIdentityFederation('fdrl_rule', 'org-uuid'),
+            federatedSignInRefusal: $federatedSignInRefusal,
         );
     }
 

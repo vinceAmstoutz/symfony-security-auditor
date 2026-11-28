@@ -69,6 +69,15 @@ final readonly class FederatedAnthropicAccess
     }
 
     /**
+     * Returns why no identity token can be requested, null in a GitHub
+     * Actions job that may request one.
+     */
+    public function identityTokenRefusal(): ?UnobtainableIdentityTokenException
+    {
+        return '' === $this->identityTokenRequestUrl || '' === $this->identityTokenRequestToken ? UnobtainableIdentityTokenException::outsideGithubActions() : null;
+    }
+
+    /**
      * The placeholder API key only the `anthropic` block reads, for the
      * platform config resolver to apply when the run calls that platform.
      *
@@ -95,8 +104,9 @@ final readonly class FederatedAnthropicAccess
             return $aiConfig;
         }
 
-        if ('' === $this->identityTokenRequestUrl || '' === $this->identityTokenRequestToken) {
-            throw UnobtainableIdentityTokenException::outsideGithubActions();
+        $identityTokenRefusal = $this->identityTokenRefusal();
+        if ($identityTokenRefusal instanceof UnobtainableIdentityTokenException) {
+            throw $identityTokenRefusal;
         }
 
         $containerBuilder->register(self::HTTP_CLIENT_SERVICE, WorkloadIdentityHttpClient::class)->setArguments([

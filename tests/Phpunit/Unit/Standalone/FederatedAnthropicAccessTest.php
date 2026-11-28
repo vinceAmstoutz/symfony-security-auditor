@@ -99,6 +99,26 @@ final class FederatedAnthropicAccessTest extends TestCase
     }
 
     /**
+     * @param array<string, string> $environment
+     */
+    #[DataProvider('environmentsWithoutAnIdentityTokenRequest')]
+    public function test_it_says_why_a_job_that_cannot_request_an_identity_token_cannot_sign_in(array $environment): void
+    {
+        self::assertSame(
+            'Workload identity federation reads the identity token from GitHub Actions: run in a job with the "id-token: write" permission, or set ANTHROPIC_API_KEY.',
+            FederatedAnthropicAccess::fromEnvironment($environment)?->identityTokenRefusal()?->getMessage(),
+        );
+    }
+
+    public function test_a_job_that_can_request_an_identity_token_is_not_refused(): void
+    {
+        $federatedAnthropicAccess = FederatedAnthropicAccess::fromEnvironment(self::FEDERATION);
+        self::assertInstanceOf(FederatedAnthropicAccess::class, $federatedAnthropicAccess);
+
+        self::assertNull($federatedAnthropicAccess->identityTokenRefusal());
+    }
+
+    /**
      * @return iterable<string, array{array<string, string>}>
      */
     public static function environmentsWithoutAnIdentityTokenRequest(): iterable

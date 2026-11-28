@@ -456,6 +456,18 @@ final class StandaloneApplicationFactoryTest extends TestCase
     private function federatedEnvironment(): array
     {
         return [
+            ...$this->federatedEnvironmentWithoutAnIdentityToken(),
+            'ACTIONS_ID_TOKEN_REQUEST_URL' => 'https://token.actions.example/request',
+            'ACTIONS_ID_TOKEN_REQUEST_TOKEN' => 'runner-token',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function federatedEnvironmentWithoutAnIdentityToken(): array
+    {
+        return [
             'XDG_CONFIG_HOME' => $this->configHome,
             'XDG_CACHE_HOME' => $this->cacheHome,
             'SSA_NO_UPDATE_CHECK' => '1',
@@ -777,6 +789,34 @@ final class StandaloneApplicationFactoryTest extends TestCase
         self::assertSame(Command::SUCCESS, $statusCode, $display);
         self::assertStringContainsString('Billing per call, through workload identity federation (rule fdrl_rule)', $display);
         self::assertStringContainsString('[OK] An audit uses no API key: it signs in through workload identity federation (rule fdrl_rule).', $display);
+    }
+
+    public function test_auth_status_fails_under_workload_identity_federation_in_a_job_that_cannot_get_an_identity_token(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\nmodel: claude-opus-5-5\n");
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment($this->federatedEnvironmentWithoutAnIdentityToken())->create();
+        $standaloneApplication->setAutoExit(false);
+
+        $applicationTester = new ApplicationTester($standaloneApplication);
+
+        $statusCode = $applicationTester->run(['command' => 'auth:status']);
+        $display = (string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay());
+
+        self::assertSame(Command::FAILURE, $statusCode, $display);
+        self::assertStringContainsString('[ERROR] Workload identity federation reads the identity token from GitHub Actions: run in a job with the "id-token: write" permission, or set ANTHROPIC_API_KEY.', $display);
+    }
+
+    public function test_doctor_fails_its_api_key_check_under_workload_identity_federation_in_a_job_that_cannot_get_an_identity_token(): void
+    {
+        $this->writeConfig("platform:\n    anthropic:\n        api_key: '%env(ANTHROPIC_API_KEY)%'\nmodel: claude-opus-5-5\n");
+        $standaloneApplication = StandaloneApplicationFactory::fromEnvironment($this->federatedEnvironmentWithoutAnIdentityToken())->create();
+        $standaloneApplication->setAutoExit(false);
+
+        $applicationTester = new ApplicationTester($standaloneApplication);
+
+        $applicationTester->run(['command' => 'doctor']);
+
+        self::assertStringContainsString('[ERROR] API key: Workload identity federation reads the identity token from GitHub Actions: run in a job with the "id-token: write" permission, or set ANTHROPIC_API_KEY.', (string) preg_replace('/\s+/', ' ', $applicationTester->getDisplay()));
     }
 
     public function test_doctor_names_the_workload_identity_federation_an_audit_signs_in_with_and_no_api_key(): void

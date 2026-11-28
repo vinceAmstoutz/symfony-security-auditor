@@ -492,6 +492,10 @@
             "sha256": "cb5cc332494f9f0e3297bee9e00b1a7a12d1bc22291f7e04390f1b48986ca943"
         },
         {
+            "scenario": "output/extension-without-format",
+            "sha256": "53e91b57317500c468a37ce3cb3d0b793572f1df155b0f4c2a21e04675c96fa4"
+        },
+        {
             "scenario": "output/missing-directory",
             "sha256": "519b2f26351e5328d5d8ceb1eda3b027350aaf9f864cf706f461567852efd092"
         },
@@ -1173,5 +1177,5 @@
         }
     ],
     "unrecorded": [],
-    "seal": "db21c854d916a4e1680bfbfdb6021181d9eb164469b7e47c6ff3b2341ecc4ed8"
+    "seal": "d6f61cbcc617a8ff2a61f341a623b45590026812779d2eed7b4a365810cf1dba"
 }

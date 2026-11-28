@@ -266,7 +266,7 @@ final readonly class StandaloneApplicationFactory
         $standaloneApplication->addCommand($this->selfUpdateCommand());
         $standaloneApplication->addCommand($this->doctorCommand());
         $standaloneApplication->addCommand(new AuthSetCommand($this->credentialStore, $this->configuredCredentialVariable()));
-        $standaloneApplication->addCommand(new AuthStatusCommand($this->credentialStore, $this->configuredCredentialVariable(), $this->environment, cliAgentAccountProbe: new ProcessCliAgentAccountProbe()));
+        $standaloneApplication->addCommand(new AuthStatusCommand($this->credentialStore, $this->configuredCredentialVariable(), $this->environment, cliAgentAccountProbe: new ProcessCliAgentAccountProbe(), federatedSignInRefusal: $this->federatedSignInRefusal()));
         $standaloneApplication->addCommand(new AuthRemoveCommand($this->credentialStore, $this->configuredCredentialVariable()));
         $standaloneApplication->addCommand(new AuthTestCommand(new StandaloneConnectionCheck($this->standaloneConfigLoader, $this->xdgConfigPathResolver, $this->standaloneContainerFactory), new ProviderSetupReader($this->configuredCredentialVariable(), new ProcessCliAgentAccountProbe())));
         $standaloneApplication->addCommand($this->lazyAuditCommand($standaloneApplication));
@@ -323,6 +323,14 @@ final readonly class StandaloneApplicationFactory
     private function workloadIdentityFederation(): ?WorkloadIdentityFederation
     {
         return FederatedAnthropicAccess::fromEnvironment($this->environment)?->workloadIdentityFederation;
+    }
+
+    /**
+     * Why an audit cannot sign in through workload identity federation here, null when it can or does not.
+     */
+    private function federatedSignInRefusal(): ?string
+    {
+        return FederatedAnthropicAccess::fromEnvironment($this->environment)?->identityTokenRefusal()?->getMessage();
     }
 
     private function selfUpdateCommand(): SelfUpdateCommand
@@ -442,6 +450,7 @@ final readonly class StandaloneApplicationFactory
                     new OllamaPulledModelList(HttpClient::create()),
                 ),
                 workloadIdentityFederation: $this->workloadIdentityFederation(),
+                federatedSignInRefusal: $this->federatedSignInRefusal(),
             ), $this->configuredCredentialVariable(), new ProcessCliAgentAccountProbe()),
             new StandaloneConnectionCheck($this->standaloneConfigLoader, $this->xdgConfigPathResolver, $this->standaloneContainerFactory),
         );

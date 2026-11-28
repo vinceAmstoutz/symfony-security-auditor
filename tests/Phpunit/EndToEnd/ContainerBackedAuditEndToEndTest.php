@@ -26,8 +26,13 @@ use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Test\TestContainer;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\Console\Application;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Exception\ExceptionInterface as ConsoleExceptionInterface;
+use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Output\StreamOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
@@ -158,6 +163,36 @@ final class ContainerBackedAuditEndToEndTest extends TestCase
         $display = $bufferedOutput->fetch();
         self::assertStringContainsString(':\\:stop-commands::pwned', $display);
         self::assertStringContainsString('src/a :\\:error:\\:x.php', $display);
+    }
+
+    /**
+     * @throws ConsoleExceptionInterface
+     * @throws InvalidAuditContextException
+     * @throws UnsupportedOutputFormatException
+     * @throws UnsafeReportWriteException
+     * @throws ReportWriteFailedException
+     */
+    #[RunInSeparateProcess]
+    #[MaximumDuration(8000)]
+    public function test_the_wired_report_writer_links_an_html_report_once_the_audit_command_printed_to_a_terminal(): void
+    {
+        $kernel = $this->boot(['model' => 'gpt-4o']);
+        $testContainer = $kernel->getContainer()->get('test.service_container');
+        self::assertInstanceOf(TestContainer::class, $testContainer);
+        $reportWriter = $testContainer->get(ReportWriterInterface::class);
+        self::assertInstanceOf(ReportWriterInterface::class, $reportWriter);
+        $terminal = fopen('/dev/ptmx', 'r+');
+        self::assertIsResource($terminal);
+        (new Command(null, $this->auditCommand($kernel)))->run(
+            new ArrayInput(['project-path' => $this->fixtureDir, '--show-scanned' => true]),
+            new StreamOutput($terminal, OutputInterface::VERBOSITY_QUIET),
+        );
+        $bufferedOutput = new BufferedOutput();
+
+        $reportWriter->write(AuditReport::fromContext(AuditContext::forProject($this->fixtureDir)), OutputFormat::Html, null, new SymfonyStyle(new StringInput(''), $bufferedOutput));
+
+        self::assertSame(1, preg_match('#Report saved, open it in your browser: file://(\S+\.html)#', $bufferedOutput->fetch(), $linked));
+        (new Filesystem())->remove($linked[1]);
     }
 
     #[RunInSeparateProcess]

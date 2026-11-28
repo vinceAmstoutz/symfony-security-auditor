@@ -43,7 +43,7 @@ final readonly class ReportWriter implements ReportWriterInterface
         private Filesystem $filesystem,
         private WorkflowCommandNeutralizerInterface $workflowCommandNeutralizer = new WorkflowCommandNeutralizer(false),
         private ?string $temporaryDirectory = null,
-        private StandardOutputInterface $standardOutput = new StandardOutput(),
+        private StandardOutputInterface $standardOutput = new CommandOutputHolder(),
     ) {
         $indexed = [];
         foreach ($renderers as $renderer) {
