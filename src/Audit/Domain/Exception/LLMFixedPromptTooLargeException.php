@@ -20,6 +20,26 @@ namespace VinceAmstoutz\SymfonySecurityAuditor\Audit\Domain\Exception;
  */
 final class LLMFixedPromptTooLargeException extends LLMProviderException
 {
+    /**
+     * Advises a larger context window only when the model refused the
+     * prompt, never when the command line of a subscription CLI did.
+     *
+     * @internal not part of the BC promise, see docs/versioning.md
+     */
+    public static function forRefusal(string $filePath, int $bytes, LLMRequestTooLargeException $llmRequestTooLargeException): self
+    {
+        if (!$llmRequestTooLargeException->exceedsCommandLine()) {
+            return self::forFile($filePath, $bytes, $llmRequestTooLargeException->getMessage());
+        }
+
+        return new self(\sprintf(
+            'The audit prompt was refused even with only the %d-byte file "%s" in it (%s): the system prompt and the project mapping around it take up the rest of the command line that starts the subscription CLI, so no file can fit. Narrow scan.included_paths or run on an API platform.',
+            $bytes,
+            $filePath,
+            $llmRequestTooLargeException->getMessage(),
+        ));
+    }
+
     public static function forFile(string $filePath, int $bytes, string $reason): self
     {
         return new self(\sprintf(

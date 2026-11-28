@@ -165,6 +165,44 @@ final class OversizedChunkRecoveryTest extends TestCase
         self::assertSame('the file is too large for the command-line limit of the subscription CLI: turn on audit.code_slicing.enabled, set scan.max_file_size_kb below 4 to skip it or run on an API platform', $recordingCoverageRecorder->failureReasons[0]['reason']);
     }
 
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_a_small_file_the_model_refuses_stops_the_run_advising_a_larger_context_window(): void
+    {
+        $this->expectException(LLMFixedPromptTooLargeException::class);
+        $this->expectExceptionMessage('so no file can fit. Use a model with a larger context window for the attacker, raise audit.rate_limit.input_tokens_per_minute when that limit refused it, or narrow scan.included_paths.');
+
+        $this->recovery()->recover(
+            [$this->file()],
+            new ChunkContext(str_repeat('s', 401), str_repeat('u', 600), '', false, self::FILE_BYTES),
+            new LLMRequestTooLargeException('prompt is too long'),
+            new RecordingCoverageRecorder(),
+            $this->unreachableAnalysis(),
+        );
+    }
+
+    /**
+     * @throws InvalidProjectFileException
+     * @throws BudgetExceededException
+     * @throws LLMProviderException
+     */
+    public function test_a_small_file_the_command_line_of_a_subscription_cli_refuses_stops_the_run_naming_that_limit(): void
+    {
+        $this->expectException(LLMFixedPromptTooLargeException::class);
+        $this->expectExceptionMessage('The audit prompt was refused even with only the 100-byte file "src/A.php" in it (The model cannot fit the request: The prompt is longer than the 131071 bytes one command-line argument of the CLI can carry.): the system prompt and the project mapping around it take up the rest of the command line that starts the subscription CLI, so no file can fit. Narrow scan.included_paths or run on an API platform.');
+
+        $this->recovery()->recover(
+            [$this->file()],
+            new ChunkContext(str_repeat('s', 401), str_repeat('u', 600), '', false, self::FILE_BYTES),
+            LLMRequestTooLargeException::fromProviderRejection(CliAgentPromptTooLongException::forOneArgument(131071)),
+            new RecordingCoverageRecorder(),
+            $this->unreachableAnalysis(),
+        );
+    }
+
     private function recovery(): OversizedChunkRecovery
     {
         $vulnerabilityFactory = new VulnerabilityFactory(new NullLogger(), Validation::createValidator());

@@ -196,6 +196,8 @@ When even a small file is refused, the run stops: the system prompt and project 
 The audit prompt was refused even with only the 512-byte file "src/Kernel.php" in it (…): the system prompt and the project mapping around it take up the rest, so no file can fit. Use a model with a larger context window for the attacker, raise audit.rate_limit.input_tokens_per_minute when that limit refused it, or narrow scan.included_paths.
 ```
 
+On a Claude or ChatGPT subscription the same stop names the command line instead, since a larger context window would not help: `… take up the rest of the command line that starts the subscription CLI, so no file can fit. Narrow scan.included_paths or run on an API platform.`
+
 A tool conversation that outgrows the window after tool results (`Tool-using conversation outgrew the model input limit after tool results were appended; …`) keeps what it recorded and its chunk is errored. Lower `audit.max_tool_iterations`.
 
 ### `OpenSSL SSL_read: … unexpected eof while reading` / `Transfer closed with … bytes remaining to read` / `cURL error 56`

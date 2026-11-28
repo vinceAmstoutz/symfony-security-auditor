@@ -113,7 +113,7 @@ final readonly class OversizedChunkRecovery
         $bytes = $chunkContext->promptedFileBytes;
         $promptBytes = \strlen($chunkContext->systemPrompt) + \strlen($chunkContext->userMessage);
         if ($bytes * 100 < self::FIXED_PROMPT_BLAMED_BELOW_FILE_PERCENT * $promptBytes) {
-            throw LLMFixedPromptTooLargeException::forFile($projectFile->relativePath(), $bytes, $llmRequestTooLargeException->getMessage());
+            throw LLMFixedPromptTooLargeException::forRefusal($projectFile->relativePath(), $bytes, $llmRequestTooLargeException);
         }
 
         $this->logger->warning('Attacker chunk exceeds the model input limit as a single file; it is recorded as errored and left out of the cache', [
