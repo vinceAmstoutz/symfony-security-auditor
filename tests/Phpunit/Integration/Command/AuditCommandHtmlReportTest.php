@@ -19,8 +19,10 @@ use Psr\Log\NullLogger;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Exception\ExceptionInterface;
 use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Output\StreamOutput;
+use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
@@ -47,12 +49,16 @@ use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Reviewer\Re
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Prompt\Skill\AttackerSkillRegistry;
 use VinceAmstoutz\SymfonySecurityAuditor\Audit\Infrastructure\Report\HtmlReportRenderer;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommand;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditCommandInput;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditExitCodeResolver;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\AuditPresenter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\Baseline;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\BaselineProcessor;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\CommandOutputHolder;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\UnsupportedOutputFormatException;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\Exception\WorkingDirectoryUnavailableException;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\FindingTypeFilter;
+use VinceAmstoutz\SymfonySecurityAuditor\Command\OutputFormat;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\ReportWriter;
 use VinceAmstoutz\SymfonySecurityAuditor\Command\UnpricedModelBudgetGuard;
 use VinceAmstoutz\SymfonySecurityAuditor\Tests\Integration\Command\Fixture\FixedFindingPipeline;
@@ -109,6 +115,26 @@ final class AuditCommandHtmlReportTest extends TestCase
         $commandTester->execute(['project-path' => $this->fixtureDir, '--format' => 'html']);
 
         self::assertStringContainsString('<!doctype html>', $commandTester->getDisplay());
+    }
+
+    /**
+     * @throws InvalidCodeLocationException
+     * @throws InvalidVulnerabilityClassificationException
+     * @throws InvalidVulnerabilityNarrativeException
+     * @throws UnsupportedOutputFormatException
+     * @throws WorkingDirectoryUnavailableException
+     */
+    public function test_a_command_called_with_the_three_arguments_it_took_in_1_22_prints_the_html_report(): void
+    {
+        $input = new ArrayInput([]);
+        $bufferedOutput = new BufferedOutput();
+        $auditCommandInput = new AuditCommandInput();
+        $auditCommandInput->projectPath = $this->fixtureDir;
+        $auditCommandInput->givenFormat = OutputFormat::Html;
+
+        ($this->auditCommand())($input, new SymfonyStyle($input, $bufferedOutput), $auditCommandInput);
+
+        self::assertStringContainsString('<!doctype html>', $bufferedOutput->fetch());
     }
 
     /**

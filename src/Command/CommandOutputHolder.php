@@ -30,7 +30,7 @@ final class CommandOutputHolder implements StandardOutputInterface
 {
     private ?OutputInterface $output = null;
 
-    public function set(OutputInterface $output): void
+    public function set(?OutputInterface $output): void
     {
         $this->output = $output;
     }

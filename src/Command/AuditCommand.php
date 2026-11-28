@@ -93,9 +93,9 @@ final readonly class AuditCommand
      */
     public function __invoke(
         InputInterface $input,
-        OutputInterface $output,
         SymfonyStyle $symfonyStyle,
         #[MapInput] AuditCommandInput $auditCommandInput,
+        ?OutputInterface $output = null,
     ): int {
         $this->commandOutputHolder->set($output);
         $auditCommandInput->applyDefaults($this->auditCommandDefaults);
